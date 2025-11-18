@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Numeric
 from app.db import Base
 
 
@@ -8,4 +8,8 @@ class Unit(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     size_m2 = Column(Integer, nullable=True)
-    capacity = Column(Integer, nullable=False, default=6)
+    capacity = Column(Integer, nullable=True)
+
+    # 💰 tariffa base consigliata per notte (può essere sovrascritta sulla singola prenotazione)
+    base_nightly_rate = Column(Numeric(10, 2), nullable=True)
+    currency = Column(String(3), nullable=False, default="EUR")

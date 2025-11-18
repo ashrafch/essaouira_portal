@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { getUnits } from "../services/api";
 import db from "../offline/dbLocal";
 
@@ -104,6 +105,19 @@ function Units() {
     justifyContent: "center",
   });
 
+  const timelineButton = {
+    display: "inline-flex",
+    marginTop: 8,
+    fontSize: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid #d1d5db",
+    textDecoration: "none",
+    color: "#111827",
+    backgroundColor: "#ffffff",
+    alignSelf: "flex-start",
+  };
+
   return (
     <div>
       <div style={layoutHeader}>
@@ -169,10 +183,10 @@ function Units() {
                 <span style={chip}>
                   {u.size_m2 ? `${u.size_m2} m²` : "Metri quadri n/d"}
                 </span>
-                <span style={chip}>
-                  {u.capacity} ospiti
-                </span>
-                <span style={{ ...chip, background: "#ecfdf5", color: "#047857" }}>
+                <span style={chip}>{u.capacity} ospiti</span>
+                <span
+                  style={{ ...chip, background: "#ecfdf5", color: "#047857" }}
+                >
                   Attivo
                 </span>
               </div>
@@ -187,6 +201,10 @@ function Units() {
                 In futuro qui possiamo mostrare occupazione annua, ricavi,
                 note specifiche dell&apos;unità, ecc.
               </div>
+
+              <Link to={`/units/${u.id}/timeline`} style={timelineButton}>
+                Vedi timeline
+              </Link>
             </div>
           ))}
         </div>

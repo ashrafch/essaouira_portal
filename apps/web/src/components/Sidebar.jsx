@@ -38,6 +38,7 @@ function Sidebar() {
   return (
     <div style={wrapper}>
       <div style={brand}>Portale Essaouira</div>
+
       <nav style={nav}>
         <NavLink to="/" end style={linkStyle}>
           Dashboard
@@ -53,6 +54,14 @@ function Sidebar() {
 
         <NavLink to="/calendar" style={linkStyle}>
           Calendario
+        </NavLink>
+
+        <NavLink to="/staff" style={linkStyle}>
+          Staff
+        </NavLink>
+
+        <NavLink to="/staff-planner" style={linkStyle}>
+          Planner Staff
         </NavLink>
       </nav>
     </div>
