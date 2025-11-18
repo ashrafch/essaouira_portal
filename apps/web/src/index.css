@@ -1,0 +1,124 @@
+/* -------------------------------
+   RESET BASE
+---------------------------------*/
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* -------------------------------
+   TYPOGRAFIA E COLORI GLOBALI
+---------------------------------*/
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  background-color: #f3f4f6; /* grigio chiaro elegante */
+  color: #111827; /* testo scuro leggibile */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Link */
+a {
+  color: #0f766e;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Titoli */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  color: #111827;
+}
+
+/* -------------------------------
+   FORM ELEMENTS
+---------------------------------*/
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db; /* grigio chiaro */
+  border-radius: 6px;
+  width: 100%;
+  background-color: white;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #0f766e50;
+  border-color: #0f766e;
+}
+
+/* -------------------------------
+   BUTTONS
+---------------------------------*/
+button {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background-color: #0f766e;
+  color: white;
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #0d5f57;
+}
+
+button:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* -------------------------------
+   TABLES
+---------------------------------*/
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  padding: 8px 4px;
+  text-align: left;
+  border-bottom: 2px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+td {
+  padding: 8px 4px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* -------------------------------
+   GLOBALE
+---------------------------------*/
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Migliore gestione responsive */
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
