@@ -54,7 +54,7 @@ function UnitTimeline() {
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
       const data = await getUnitSchedule(unitId, params);
-      setItems(data);
+      setItems(data.items || []);
     } catch (err) {
       setError(err.message);
     } finally {

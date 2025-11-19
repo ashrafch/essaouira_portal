@@ -63,6 +63,9 @@ function Sidebar() {
         <NavLink to="/staff-planner" style={linkStyle}>
           Planner Staff
         </NavLink>
+        <NavLink to="/business" style={linkStyle}>
+          Business
+        </NavLink>
       </nav>
     </div>
   );

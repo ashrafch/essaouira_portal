@@ -304,6 +304,133 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     db.commit()
     return
 
+# ---------- UNIT SCHEDULE (TIMELINE SINGOLA UNITÀ) ----------
+
+@app.get("/units/{unit_id}/schedule")
+def get_unit_schedule(
+    unit_id: int,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    # verifica che l'unità esista
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unità non trovata")
+
+    # default range: mese corrente se non specificato
+    if from_date is None or to_date is None:
+        today = date.today()
+        month_start = today.replace(day=1)
+        if month_start.month == 12:
+            next_month_start = date(month_start.year + 1, 1, 1)
+        else:
+            next_month_start = date(month_start.year, month_start.month + 1, 1)
+        from_date = from_date or month_start
+        to_date = to_date or next_month_start
+
+    # prenotazioni che INTERSECANO il range richiesto
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.unit_id == unit_id,
+            Booking.checkin_date < to_date,
+            Booking.checkout_date > from_date,
+        )
+        .order_by(Booking.checkin_date)
+        .all()
+    )
+
+    # task staff collegati a questa unità nel range
+    staff_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.unit_id == unit_id,
+            StaffTask.date >= from_date,
+            StaffTask.date <= to_date,
+        )
+        .order_by(StaffTask.date)
+        .all()
+    )
+
+    # ---- costruiamo items per la timeline ----
+    items: list[dict] = []
+
+    # prenotazioni → blocchi orizzontali
+    for b in bookings:
+        items.append(
+            {
+                "kind": "booking",
+                "id": b.id,
+                "unit_id": unit.id,
+                "label": b.guest_name or f"Booking #{b.id}",
+                "start_date": b.checkin_date,
+                "end_date": b.checkout_date,
+                "source": b.source,
+                "is_paid": b.is_paid,
+                "total_price": b.total_price,
+            }
+        )
+
+    # task staff → punti / tag legati al giorno
+    for t in staff_tasks:
+        items.append(
+            {
+                "kind": "staff_task",
+                "id": t.id,
+                "unit_id": unit.id,
+                "label": t.task_type,
+                "date": t.date,
+                "assignee_name": t.assignee_name,
+                "status": t.status,
+                "estimated_hours": t.estimated_hours,
+                "cost": t.cost,
+                "currency": t.currency,
+            }
+        )
+
+    # opzionale: ordiniamo gli items per data inizio
+    def sort_key(item: dict):
+        if item["kind"] == "booking":
+            return (item["start_date"], 0)
+        else:
+            return (item["date"], 1)
+
+    items.sort(key=sort_key)
+
+    # mantengo anche bookings/staff_tasks se in futuro ci servono altrove
+    return {
+        "unit_id": unit.id,
+        "unit_name": unit.name,
+        "from_date": from_date,
+        "to_date": to_date,
+        "items": items,          # <--- quello che vuole la UnitTimeline
+        "bookings": [
+            {
+                "id": b.id,
+                "guest_name": b.guest_name,
+                "checkin_date": b.checkin_date,
+                "checkout_date": b.checkout_date,
+                "source": b.source,
+                "total_price": b.total_price,
+                "is_paid": b.is_paid,
+            }
+            for b in bookings
+        ],
+        "staff_tasks": [
+            {
+                "id": t.id,
+                "date": t.date,
+                "task_type": t.task_type,
+                "assignee_name": t.assignee_name,
+                "status": t.status,
+                "estimated_hours": t.estimated_hours,
+                "cost": t.cost,
+                "currency": t.currency,
+            }
+            for t in staff_tasks
+        ],
+    }
 
 # ---------- ANALYTICS / BUSINESS ----------
 
@@ -643,6 +770,155 @@ def delete_cost_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
     return
 
+# ---------- ANALYTICS: PROFIT & LOSS (Ricavi - Costi) ----------
+
+from typing import Dict, List
+
+
+class CostByCategory(BaseModel):
+    category: str
+    total: float
+
+
+class PnLMonthSummary(BaseModel):
+    year: int
+    month: int
+
+    nights_total: int
+    nights_occupied: int
+    occupancy_rate: float
+    adr: float | None
+
+    revenue_total: float
+    revenue_by_source: Dict[str, float]
+    revenue_by_unit: List[RevenueByUnit]
+
+    costs_total: float
+    costs_by_category: List[CostByCategory]
+
+    profit: float
+
+
+@app.get("/analytics/month-pnl", response_model=PnLMonthSummary)
+def month_pnl(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    # calcolo range mese
+    month_start = date(year, month, 1)
+    if month == 12:
+        next_month_start = date(year + 1, 1, 1)
+    else:
+        next_month_start = date(year, month + 1, 1)
+    days_in_month = (next_month_start - month_start).days
+
+    # --- Ricavi (quasi identico a /analytics/month-summary) ---
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+
+    units_count = db.query(Unit).count()
+    nights_total = days_in_month * units_count
+
+    occupied_nights = 0
+    revenue_total = 0.0
+    revenue_by_source: Dict[str, float] = {}
+    revenue_by_unit_map: Dict[int, RevenueByUnit] = {}
+
+    for b in bookings:
+        stay_start = max(b.checkin_date, month_start)
+        stay_end = min(b.checkout_date, next_month_start)
+        nights_in_month = (stay_end - stay_start).days
+
+        occupied_nights += nights_in_month
+
+        # Ricavo per questa prenotazione dentro il mese
+        if (
+            b.total_price is not None
+            and b.checkin_date >= month_start
+            and b.checkout_date <= next_month_start
+        ):
+            booking_revenue = float(b.total_price)
+        else:
+            if b.nightly_rate is not None:
+                booking_revenue = float(b.nightly_rate) * nights_in_month
+            else:
+                booking_revenue = 0.0
+
+        revenue_total += booking_revenue
+
+        # per sorgente
+        src = b.source or "unknown"
+        revenue_by_source[src] = revenue_by_source.get(src, 0.0) + booking_revenue
+
+        # per unità
+        u = b.unit
+        if not u:
+            continue
+
+        existing = revenue_by_unit_map.get(u.id)
+        if existing is None:
+            revenue_by_unit_map[u.id] = RevenueByUnit(
+                unit_id=u.id,
+                unit_name=u.name,
+                revenue=booking_revenue,
+                nights_occupied=nights_in_month,
+            )
+        else:
+            existing.revenue += booking_revenue
+            existing.nights_occupied += nights_in_month
+
+    occupancy_rate = (
+        (occupied_nights / nights_total) * 100 if nights_total > 0 else 0.0
+    )
+    adr = revenue_total / occupied_nights if occupied_nights > 0 else None
+
+    # --- Costi del mese ---
+    cost_items = (
+        db.query(CostItem)
+        .filter(
+            CostItem.date >= month_start,
+            CostItem.date < next_month_start,
+        )
+        .all()
+    )
+
+    costs_total = 0.0
+    costs_by_category_map: Dict[str, float] = {}
+
+    for c in cost_items:
+        amount = float(c.amount)
+        costs_total += amount
+        cat = c.category or "Altro"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+    costs_by_category = [
+        CostByCategory(category=cat, total=round(total, 2))
+        for cat, total in costs_by_category_map.items()
+    ]
+
+    profit = revenue_total - costs_total
+
+    return PnLMonthSummary(
+        year=year,
+        month=month,
+        nights_total=nights_total,
+        nights_occupied=occupied_nights,
+        occupancy_rate=round(occupancy_rate, 2),
+        adr=round(adr, 2) if adr is not None else None,
+        revenue_total=round(revenue_total, 2),
+        revenue_by_source={k: round(v, 2) for k, v in revenue_by_source.items()},
+        revenue_by_unit=list(revenue_by_unit_map.values()),
+        costs_total=round(costs_total, 2),
+        costs_by_category=costs_by_category,
+        profit=round(profit, 2),
+    )
 
 # ---------- STAFF DEFAULTS (impostazioni automatiche) ----------
 

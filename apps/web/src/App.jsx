@@ -8,6 +8,7 @@ import Staff from "./pages/Staff.jsx";
 import StaffPlanner from "./pages/StaffPlanner.jsx";
 import UnitTimeline from "./pages/UnitTimeline.jsx";
 import NotFound from "./pages/NotFound.jsx";
+import Business from "./pages/Business.jsx";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/staff" element={<Staff />} />
         <Route path="/staff-planner" element={<StaffPlanner />} />
+        <Route path="/business" element={<Business />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
