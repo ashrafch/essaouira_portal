@@ -381,6 +381,7 @@ def get_unit_schedule(
                 "unit_id": unit.id,
                 "label": t.task_type,
                 "date": t.date,
+                "task_type": t.task_type,          # 🔥 AGGIUNTO
                 "assignee_name": t.assignee_name,
                 "status": t.status,
                 "estimated_hours": t.estimated_hours,
@@ -398,13 +399,12 @@ def get_unit_schedule(
 
     items.sort(key=sort_key)
 
-    # mantengo anche bookings/staff_tasks se in futuro ci servono altrove
     return {
         "unit_id": unit.id,
         "unit_name": unit.name,
         "from_date": from_date,
         "to_date": to_date,
-        "items": items,          # <--- quello che vuole la UnitTimeline
+        "items": items,
         "bookings": [
             {
                 "id": b.id,
@@ -421,7 +421,7 @@ def get_unit_schedule(
             {
                 "id": t.id,
                 "date": t.date,
-                "task_type": t.task_type,
+                "task_type": t.task_type,          # 🔥 AGGIUNTO ANCHE QUI
                 "assignee_name": t.assignee_name,
                 "status": t.status,
                 "estimated_hours": t.estimated_hours,
@@ -431,7 +431,6 @@ def get_unit_schedule(
             for t in staff_tasks
         ],
     }
-
 # ---------- ANALYTICS / BUSINESS ----------
 
 
