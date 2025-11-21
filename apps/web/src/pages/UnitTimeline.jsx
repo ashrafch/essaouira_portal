@@ -23,7 +23,7 @@ function UnitTimeline() {
 
   // modali
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedCluster, setSelectedCluster] = useState(null); // cluster di task per giorno
 
   function parseDate(value) {
     if (!value) return null;
@@ -121,10 +121,7 @@ function UnitTimeline() {
       Math.round((startDate - rangeStart) / MS_PER_DAY)
     );
     const endDiff = endDate
-      ? Math.min(
-          totalDays,
-          Math.round((endDate - rangeStart) / MS_PER_DAY)
-        )
+      ? Math.min(totalDays, Math.round((endDate - rangeStart) / MS_PER_DAY))
       : startDiff;
 
     const left = (startDiff / totalDays) * 100;
@@ -188,6 +185,21 @@ function UnitTimeline() {
       return true;
     });
   }, [staffTasks, taskTypeFilter]);
+
+  // cluster per giorno per i task staff (per evitare dot sovrapposti)
+  const staffClusters = useMemo(() => {
+    const map = new Map();
+    staffFiltered.forEach((t) => {
+      if (!t.startDate) return;
+      const key = t.startDate.toISOString().slice(0, 10);
+      if (!map.has(key)) {
+        map.set(key, { date: t.startDate, tasks: [] });
+      }
+      map.get(key).tasks.push(t);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.date - b.date);
+  }, [staffFiltered]);
 
   // legenda staff (solo per quelli filtrati)
   const staffLegend = useMemo(() => {
@@ -356,10 +368,15 @@ function UnitTimeline() {
     position: "absolute",
     top: 5,
     bottom: 5,
-    width: 10,
-    marginLeft: -5,
+    width: 18,
+    marginLeft: -9,
     borderRadius: 999,
     cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 10,
+    color: "#ffffff",
   };
 
   const backButton = {
@@ -471,6 +488,23 @@ function UnitTimeline() {
         </div>
       </div>
     );
+  }
+
+  // tooltip testuale per cluster
+  function buildClusterTooltip(cluster) {
+    const { date, tasks } = cluster;
+    const counts = {};
+    tasks.forEach((t) => {
+      const key = t.task_type || t.type || "other";
+      const meta = taskTypeMeta(key);
+      const label = meta.label;
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    const parts = Object.entries(counts).map(
+      ([label, count]) => `${label}: ${count}`
+    );
+    const dateStr = formatDate(date);
+    return `${dateStr} – ${tasks.length} task\n${parts.join(" · ")}`;
   }
 
   return (
@@ -660,31 +694,44 @@ function UnitTimeline() {
             </div>
           )}
 
-          {/* Riga task staff */}
+          {/* Riga task staff (cluster per giorno) */}
           {(viewMode === "both" || viewMode === "staff") && (
             <div style={{ ...timelineRow, marginTop: 10 }}>
               <div>
                 <span style={tag("#e0f2fe", "#0369a1")}>Task staff</span>
               </div>
               <div style={track}>
-                {staffFiltered.map((t) => {
-                  const { left } = calcBar(t.startDate, t.endDate);
-                  const typeKey = t.task_type || t.type || "other";
-                  const meta = taskTypeMeta(typeKey);
+                {staffClusters.map((cluster) => {
+                  const { date, tasks } = cluster;
+                  const { left } = calcBar(date, date);
+
+                  // tipo "dominante" nel cluster (per colore del dot)
+                  const typeCounts = {};
+                  tasks.forEach((t) => {
+                    const typeKey = t.task_type || t.type || "other";
+                    typeCounts[typeKey] =
+                      (typeCounts[typeKey] || 0) + 1;
+                  });
+                  const dominantType =
+                    Object.entries(typeCounts).sort(
+                      (a, b) => b[1] - a[1]
+                    )[0]?.[0] || "other";
+                  const meta = taskTypeMeta(dominantType);
+
                   return (
                     <div
-                      key={`task-${t.id}`}
+                      key={date.toISOString()}
                       style={{
                         ...dotBase,
                         left,
                         backgroundColor: meta.color,
                         boxShadow: meta.shadow,
                       }}
-                      title={`${meta.label} – ${formatDate(
-                        t.startDate
-                      )} (${t.assignee_name || "non assegnato"})`}
-                      onClick={() => setSelectedTask(t)}
-                    />
+                      title={buildClusterTooltip(cluster)}
+                      onClick={() => setSelectedCluster(cluster)}
+                    >
+                      {tasks.length > 1 ? tasks.length : ""}
+                    </div>
                   );
                 })}
               </div>
@@ -814,51 +861,108 @@ function UnitTimeline() {
         </Modal>
       )}
 
-      {/* Modale task staff */}
-      {selectedTask && (
+      {/* Modale cluster task staff */}
+      {selectedCluster && (
         <Modal
-          title="Dettaglio task staff"
-          onClose={() => setSelectedTask(null)}
+          title="Task staff in questo giorno"
+          onClose={() => setSelectedCluster(null)}
         >
-          {(() => {
-            const typeKey =
-              selectedTask.task_type || selectedTask.type || "other";
-            const meta = taskTypeMeta(typeKey);
-            return (
-              <div style={{ fontSize: 13, color: "#374151" }}>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>Tipo:</strong> {meta.label}
-                </div>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>Data:</strong>{" "}
-                  {formatDate(selectedTask.startDate)}
-                </div>
-                {selectedTask.assignee_name && (
-                  <div style={{ marginBottom: 6 }}>
-                    <strong>Assegnato a:</strong>{" "}
-                    {selectedTask.assignee_name}
+          <div style={{ fontSize: 13, color: "#374151" }}>
+            <div style={{ marginBottom: 6 }}>
+              <strong>Data:</strong> {formatDate(selectedCluster.date)}
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <strong>Task totali:</strong> {selectedCluster.tasks.length}
+            </div>
+            <div
+              style={{
+                maxHeight: 260,
+                overflowY: "auto",
+                borderRadius: 10,
+                border: "1px solid #e5e7eb",
+                padding: "6px 8px",
+                background: "#f9fafb",
+              }}
+            >
+              {selectedCluster.tasks.map((t) => {
+                const typeKey = t.task_type || t.type || "other";
+                const meta = taskTypeMeta(typeKey);
+                return (
+                  <div
+                    key={t.id}
+                    style={{
+                      padding: "6px 4px",
+                      borderBottom: "1px solid #e5e7eb",
+                      fontSize: 12,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            backgroundColor: meta.color,
+                            boxShadow: meta.shadow,
+                          }}
+                        />
+                        <strong>{meta.label}</strong>
+                      </span>
+                      {t.status && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                          }}
+                        >
+                          {t.status}
+                        </span>
+                      )}
+                    </div>
+                    {t.assignee_name && (
+                      <div>
+                        <strong>Staff:</strong> {t.assignee_name}
+                      </div>
+                    )}
+                    {t.cost != null && (
+                      <div>
+                        <strong>Costo:</strong> {t.currency || "EUR"}{" "}
+                        {Number(t.cost).toFixed(2)}
+                      </div>
+                    )}
+                    {t.notes && (
+                      <div
+                        style={{ color: "#6b7280", fontSize: 11 }}
+                        title={t.notes}
+                      >
+                        {t.notes}
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedTask.status && (
-                  <div style={{ marginBottom: 6 }}>
-                    <strong>Stato:</strong> {selectedTask.status}
-                  </div>
-                )}
-                {selectedTask.cost != null && (
-                  <div style={{ marginBottom: 6 }}>
-                    <strong>Costo:</strong>{" "}
-                    {selectedTask.currency || "EUR"}{" "}
-                    {Number(selectedTask.cost).toFixed(2)}
-                  </div>
-                )}
-                {selectedTask.notes && (
-                  <div style={{ marginBottom: 6 }}>
-                    <strong>Note:</strong> {selectedTask.notes}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+                );
+              })}
+            </div>
+          </div>
           <div
             style={{
               display: "flex",
@@ -878,7 +982,7 @@ function UnitTimeline() {
                 color: "#374151",
                 cursor: "pointer",
               }}
-              onClick={() => setSelectedTask(null)}
+              onClick={() => setSelectedCluster(null)}
             >
               Chiudi
             </button>
@@ -894,7 +998,7 @@ function UnitTimeline() {
               }}
               onClick={() => {
                 navigate("/staff");
-                setSelectedTask(null);
+                setSelectedCluster(null);
               }}
             >
               Apri in Staff

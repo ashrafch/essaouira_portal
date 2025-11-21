@@ -127,7 +127,7 @@ function Staff() {
     });
   }, [tasks, assigneeFilter, statusFilter]);
 
-  // KPI
+  // KPI globali
   const kpi = useMemo(() => {
     const total = filteredTasks.length;
     const byStatus = filteredTasks.reduce(
@@ -147,6 +147,75 @@ function Staff() {
     );
     return { total, byStatus, hours, costTotal };
   }, [filteredTasks]);
+
+  // raggruppo per data per rendere l'agenda leggibile
+  const groupedTasks = useMemo(() => {
+    if (filteredTasks.length === 0) return [];
+
+    const byDate = /** @type {Record<string, any[]>} */ ({});
+
+    filteredTasks.forEach((t) => {
+      const key = t.date || "senza-data";
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(t);
+    });
+
+    return Object.entries(byDate)
+      .sort(([d1], [d2]) => d1.localeCompare(d2))
+      .map(([dateKey, list]) => {
+        // ordino i task per tipo / id per coerenza visiva
+        const sorted = list
+          .slice()
+          .sort((a, b) => {
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            if (a.task_type !== b.task_type)
+              return (a.task_type || "").localeCompare(b.task_type || "");
+            return a.id - b.id;
+          });
+
+        // mini riepilogo per data (Pulizie, Check-out, Colazioni, ecc.)
+        const counts = sorted.reduce(
+          (acc, t) => {
+            const type = t.task_type || "other";
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+          },
+          /** @type {Record<string, number>} */ ({})
+        );
+
+        return {
+          dateKey,
+          tasks: sorted,
+          counts,
+        };
+      });
+  }, [filteredTasks]);
+
+  function formatDate(d) {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("it-IT", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+    });
+  }
+
+  function prettifyType(type) {
+    switch (type) {
+      case "cleaning":
+        return "Pulizie";
+      case "checkin":
+        return "Check-in";
+      case "checkout":
+        return "Check-out";
+      case "breakfast":
+        return "Colazione";
+      case "maintenance":
+        return "Manutenzione";
+      default:
+        return "Altro";
+    }
+  }
 
   function resetForm() {
     setFormMode("create");
@@ -198,7 +267,7 @@ function Staff() {
       currency,
       booking_id: bookingId !== "" ? Number(bookingId) : null,
       unit_id: unitId !== "" ? Number(unitId) : null,
-      time: null, // per ora ignoriamo orario, lo si può gestire in futuro
+      time: null, // in futuro potrai gestire l'orario
     };
 
     setSaving(true);
@@ -362,6 +431,7 @@ function Staff() {
   const td = {
     padding: "6px 4px",
     borderBottom: "1px solid #f3f4f6",
+    verticalAlign: "top",
   };
 
   const pillStatus = (st) => {
@@ -392,6 +462,38 @@ function Staff() {
       border: "1px solid rgba(148,163,184,0.5)",
     };
   };
+
+  const dateHeaderRow = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "6px 4px 4px",
+    borderBottom: "1px solid #e5e7eb",
+    background: "#f9fafb",
+    borderRadius: "10px 10px 0 0",
+  };
+
+  const dateChip = {
+    borderRadius: 999,
+    padding: "3px 10px",
+    fontSize: 12,
+    background: "#ecfeff",
+    color: "#0f766e",
+    border: "1px solid #a5f3fc",
+  };
+
+  const miniSummary = {
+    fontSize: 11,
+    color: "#6b7280",
+  };
+
+  function renderCounts(counts) {
+    const entries = Object.entries(counts);
+    if (entries.length === 0) return "Nessun task";
+    return entries
+      .map(([type, count]) => `${prettifyType(type)}: ${count}`)
+      .join(" · ");
+  }
 
   return (
     <div>
@@ -752,7 +854,7 @@ function Staff() {
               </form>
             </div>
 
-            {/* LISTA TASK */}
+            {/* LISTA TASK (raggruppata per giorno) */}
             <div style={card}>
               <div
                 style={{
@@ -763,7 +865,15 @@ function Staff() {
                   gap: 8,
                 }}
               >
-                <h2 style={{ fontSize: 14 }}>Agenda staff</h2>
+                <div>
+                  <h2 style={{ fontSize: 14, marginBottom: 2 }}>
+                    Agenda staff
+                  </h2>
+                  <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
+                    Vista compatta, raggruppata per giorno, senza perdere
+                    nessun dettaglio di ogni task.
+                  </p>
+                </div>
                 <div
                   style={{
                     display: "flex",
@@ -792,115 +902,138 @@ function Staff() {
                 </div>
               </div>
 
-              {filteredTasks.length === 0 ? (
+              {groupedTasks.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#6b7280" }}>
                   Nessun task staff per i filtri selezionati.
                 </p>
               ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={table}>
-                    <thead>
-                      <tr>
-                        <th style={th}>Data</th>
-                        <th style={th}>Tipo</th>
-                        <th style={th}>Staff</th>
-                        <th style={th}>Unità</th>
-                        <th style={th}>Ore</th>
-                        <th style={th}>Costo</th>
-                        <th style={th}>Stato</th>
-                        <th style={th}>Azioni</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTasks
-                        .slice()
-                        .sort((a, b) => a.date.localeCompare(b.date))
-                        .map((t) => {
-                          const u = t.unit_id ? unitMap[t.unit_id] : null;
-                          return (
-                            <tr key={t.id}>
-                              <td style={td}>
-                                {t.date
-                                  ? new Date(t.date).toLocaleDateString("it-IT")
-                                  : "—"}
-                              </td>
-                              <td style={td}>
-                                {t.task_type === "cleaning"
-                                  ? "Pulizie"
-                                  : t.task_type === "checkin"
-                                  ? "Check-in"
-                                  : t.task_type === "checkout"
-                                  ? "Check-out"
-                                  : t.task_type === "breakfast"
-                                  ? "Colazione"
-                                  : t.task_type === "maintenance"
-                                  ? "Manutenzione"
-                                  : "Altro"}
-                              </td>
-                              <td style={td}>{t.assignee_name || "—"}</td>
-                              <td style={td}>
-                                {u
-                                  ? u.name
-                                  : t.unit_id
-                                  ? `Unit #${t.unit_id}`
-                                  : "—"}
-                              </td>
-                              <td style={td}>
-                                {t.estimated_hours != null
-                                  ? t.estimated_hours.toFixed(1)
-                                  : "—"}
-                              </td>
-                              <td style={td}>
-                                {t.cost != null
-                                  ? `${t.currency || "EUR"} ${Number(
-                                      t.cost
-                                    ).toFixed(2)}`
-                                  : "—"}
-                              </td>
-                              <td style={td}>
-                                <span style={pillStatus(t.status)}>
-                                  {t.status === "planned"
-                                    ? "Planned"
-                                    : t.status === "in_progress"
-                                    ? "In corso"
-                                    : t.status === "done"
-                                    ? "Completato"
-                                    : t.status === "cancelled"
-                                    ? "Annullato"
-                                    : t.status}
-                                </span>
-                              </td>
-                              <td style={{ ...td, whiteSpace: "nowrap" }}>
-                                <button
-                                  type="button"
-                                  style={{
-                                    ...buttonSecondary,
-                                    padding: "4px 10px",
-                                    fontSize: 12,
-                                  }}
-                                  onClick={() => loadTaskIntoForm(t)}
-                                >
-                                  Modifica
-                                </button>{" "}
-                                <button
-                                  type="button"
-                                  style={{
-                                    ...buttonSecondary,
-                                    padding: "4px 10px",
-                                    fontSize: 12,
-                                    borderColor: "#fecaca",
-                                    color: "#b91c1c",
-                                  }}
-                                  onClick={() => handleDelete(t.id)}
-                                >
-                                  Elimina
-                                </button>
-                              </td>
+                <div style={{ maxHeight: 600, overflowY: "auto" }}>
+                  {groupedTasks.map((group) => (
+                    <div
+                      key={group.dateKey}
+                      style={{
+                        marginBottom: 12,
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        overflow: "hidden",
+                        background: "#ffffff",
+                      }}
+                    >
+                      <div style={dateHeaderRow}>
+                        <div style={dateChip}>
+                          {group.dateKey === "senza-data"
+                            ? "Senza data"
+                            : formatDate(group.dateKey)}
+                        </div>
+                        <div style={miniSummary}>
+                          {group.tasks.length} task ·{" "}
+                          {renderCounts(group.counts)}
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={table}>
+                          <thead>
+                            <tr>
+                              <th style={th}>Tipo</th>
+                              <th style={th}>Staff</th>
+                              <th style={th}>Unità</th>
+                              <th style={th}>Ore</th>
+                              <th style={th}>Costo</th>
+                              <th style={th}>Stato</th>
+                              <th style={th}>Note</th>
+                              <th style={th}>Azioni</th>
                             </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
+                          </thead>
+                          <tbody>
+                            {group.tasks.map((t) => {
+                              const u = t.unit_id ? unitMap[t.unit_id] : null;
+                              return (
+                                <tr key={t.id}>
+                                  <td style={td}>
+                                    {prettifyType(t.task_type)}
+                                  </td>
+                                  <td style={td}>{t.assignee_name || "—"}</td>
+                                  <td style={td}>
+                                    {u
+                                      ? u.name
+                                      : t.unit_id
+                                      ? `Unit #${t.unit_id}`
+                                      : "—"}
+                                  </td>
+                                  <td style={td}>
+                                    {t.estimated_hours != null
+                                      ? t.estimated_hours.toFixed(1)
+                                      : "—"}
+                                  </td>
+                                  <td style={td}>
+                                    {t.cost != null
+                                      ? `${t.currency || "EUR"} ${Number(
+                                          t.cost
+                                        ).toFixed(2)}`
+                                      : "—"}
+                                  </td>
+                                  <td style={td}>
+                                    <span style={pillStatus(t.status)}>
+                                      {t.status === "planned"
+                                        ? "Planned"
+                                        : t.status === "in_progress"
+                                        ? "In corso"
+                                        : t.status === "done"
+                                        ? "Completato"
+                                        : t.status === "cancelled"
+                                        ? "Annullato"
+                                        : t.status}
+                                    </span>
+                                  </td>
+                                  <td style={{ ...td, maxWidth: 220 }}>
+                                    <div
+                                      style={{
+                                        fontSize: 11,
+                                        color: "#4b5563",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                      }}
+                                      title={t.notes || ""}
+                                    >
+                                      {t.notes || "—"}
+                                    </div>
+                                  </td>
+                                  <td style={{ ...td, whiteSpace: "nowrap" }}>
+                                    <button
+                                      type="button"
+                                      style={{
+                                        ...buttonSecondary,
+                                        padding: "4px 10px",
+                                        fontSize: 12,
+                                      }}
+                                      onClick={() => loadTaskIntoForm(t)}
+                                    >
+                                      Modifica
+                                    </button>{" "}
+                                    <button
+                                      type="button"
+                                      style={{
+                                        ...buttonSecondary,
+                                        padding: "4px 10px",
+                                        fontSize: 12,
+                                        borderColor: "#fecaca",
+                                        color: "#b91c1c",
+                                      }}
+                                      onClick={() => handleDelete(t.id)}
+                                    >
+                                      Elimina
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, time, datetime
+from typing import Optional, Dict, List
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +11,7 @@ from app.models.unit import Unit
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
-from app.models.staff_defaults import StaffDefaults  # <-- nuovo import
+from app.models.staff_defaults import StaffDefaults
 
 app = FastAPI(title="Portale Essaouira API")
 
@@ -107,6 +108,9 @@ class BookingBase(BaseModel):
     currency: str = "EUR"
     is_paid: bool = False
 
+    # late check-out
+    has_late_checkout: bool = False
+
 
 class BookingCreate(BookingBase):
     pass
@@ -149,14 +153,19 @@ def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
 
 def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     """
-    Crea o rigenera i task AUTOMATICI (AUTO:) collegati a una prenotazione:
-    - Check-in (giorno di arrivo)
-    - Pulizia (giorno di checkout)
-    - Colazioni (ogni giorno intermedio tra check-in e check-out)
+    Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione:
+
+    - Check-in (giorno di arrivo, es. 15:00)
+    - Check-out (ultimo giorno, mattina o pomeriggio se late check-out)
+    - Pulizia principale post-checkout
+    - Extra pulizia se late check-out
+    - Colazioni: tutti i giorni intermedi tra check-in e check-out
+
+    Nota: i task automatici sono riconosciuti da notes che inizia con "AUTO:".
     """
     defaults = _get_or_create_staff_defaults(db)
 
-    # cancella eventuali task AUTO: esistenti per questo booking
+    # elimina tutti i task AUTO: legati a questa prenotazione
     db.query(StaffTask).filter(
         StaffTask.booking_id == booking.id,
         StaffTask.notes.ilike("AUTO:%"),
@@ -166,15 +175,31 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         db.commit()
         return
 
-    base_assignee = defaults.cleaning_default_assignee
-    base_hours = defaults.cleaning_default_hours
-    base_cost = defaults.cleaning_default_cost
-    currency = defaults.currency
+    is_late = bool(getattr(booking, "has_late_checkout", False))
 
-    # 1) TASK CHECK-IN (giorno di arrivo)
+    base_assignee = defaults.cleaning_default_assignee
+    base_hours = defaults.cleaning_default_hours or 1.0
+    base_cost = defaults.cleaning_default_cost or 0.0
+    currency = defaults.currency or "EUR"
+
+    # parametri diversi se late check-out
+    checkout_time_obj = time(10, 0)
+    cleaning_time_obj = time(11, 0)
+    checkout_cost = base_cost
+    cleaning_hours = base_hours
+    cleaning_cost = base_cost
+
+    if is_late:
+        checkout_time_obj = time(16, 0)
+        cleaning_time_obj = time(17, 0)
+        checkout_cost = base_cost * 1.5
+        cleaning_hours = base_hours * 1.5
+        cleaning_cost = base_cost * 1.5
+
+    # 1) CHECK-IN (giorno di arrivo, orario standard 15:00)
     checkin_task = StaffTask(
         date=booking.checkin_date,
-        time=None,
+        time=time(15, 0),
         task_type="checkin",
         assignee_name=base_assignee,
         estimated_hours=base_hours,
@@ -187,38 +212,77 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     )
     db.add(checkin_task)
 
-    # 2) TASK PULIZIA (giorno di checkout)
-    cleaning_task = StaffTask(
+    # 2) CHECK-OUT
+    checkout_task = StaffTask(
         date=booking.checkout_date,
-        time=None,
-        task_type="cleaning",
+        time=checkout_time_obj,
+        task_type="checkout",
         assignee_name=base_assignee,
         estimated_hours=base_hours,
         status="planned",
-        notes=f"AUTO: Pulizia per prenotazione #{booking.id}",
-        cost=base_cost,
+        notes=(
+            f"AUTO: Check-out (late) per prenotazione #{booking.id}"
+            if is_late
+            else f"AUTO: Check-out per prenotazione #{booking.id}"
+        ),
+        cost=checkout_cost,
+        currency=currency,
+        booking_id=booking.id,
+        unit_id=booking.unit_id,
+    )
+    db.add(checkout_task)
+
+    # 3) PULIZIA principale dopo il check-out
+    cleaning_task = StaffTask(
+        date=booking.checkout_date,
+        time=cleaning_time_obj,
+        task_type="cleaning",
+        assignee_name=base_assignee,
+        estimated_hours=cleaning_hours,
+        status="planned",
+        notes=(
+            f"AUTO: Pulizia post late check-out per prenotazione #{booking.id}"
+            if is_late
+            else f"AUTO: Pulizia per prenotazione #{booking.id}"
+        ),
+        cost=cleaning_cost,
         currency=currency,
         booking_id=booking.id,
         unit_id=booking.unit_id,
     )
     db.add(cleaning_task)
 
-    # 3) TASK COLAZIONI (tutti i giorni intermedi)
-    # es: 5 giorni → 4 colazioni (dal giorno dopo il check-in
-    # fino al giorno prima del check-out)
+    # 4) Extra pulizia se late check-out (es. fine giornata)
+    if is_late:
+        extra_clean_task = StaffTask(
+            date=booking.checkout_date,
+            time=time(19, 0),
+            task_type="cleaning",
+            assignee_name=base_assignee,
+            estimated_hours=base_hours * 0.5,
+            status="planned",
+            notes=f"AUTO: Extra pulizia (late check-out) per prenotazione #{booking.id}",
+            cost=base_cost * 0.5,
+            currency=currency,
+            booking_id=booking.id,
+            unit_id=booking.unit_id,
+        )
+        db.add(extra_clean_task)
+
+    # 5) COLAZIONI (tutti i giorni intermedi)
     current = booking.checkin_date + timedelta(days=1)
     last_breakfast_day = booking.checkout_date - timedelta(days=1)
 
     while current <= last_breakfast_day:
         breakfast_task = StaffTask(
             date=current,
-            time=None,
+            time=time(8, 30),
             task_type="breakfast",
             assignee_name=base_assignee,
-            estimated_hours=base_hours,
+            estimated_hours=base_hours * 0.5,
             status="planned",
             notes=f"AUTO: Colazione per prenotazione #{booking.id}",
-            cost=base_cost,
+            cost=base_cost * 0.5,
             currency=currency,
             booking_id=booking.id,
             unit_id=booking.unit_id,
@@ -283,12 +347,13 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         channel_fee=payload.channel_fee,
         currency=payload.currency,
         is_paid=payload.is_paid,
+        has_late_checkout=payload.has_late_checkout,
     )
     db.add(booking)
     db.commit()
     db.refresh(booking)
 
-    # 🔁 CREA / RIGENERA TASK STAFF AUTOMATICI
+    # task staff automatici
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -354,11 +419,12 @@ def update_booking(
     booking.channel_fee = payload.channel_fee
     booking.currency = payload.currency
     booking.is_paid = payload.is_paid
+    booking.has_late_checkout = payload.has_late_checkout
 
     db.commit()
     db.refresh(booking)
 
-    # riallinea i task automatici (check-in / pulizia / colazioni)
+    # riallinea i task automatici con le nuove date / late checkout
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -620,16 +686,17 @@ def month_summary(
 
 class StaffTaskBase(BaseModel):
     date: date
-    time: str | None = None  # "HH:MM" opzionale
+    # lato API: stringa "HH:MM" oppure null
+    time: str | None = None
     task_type: str
-    assignee_name: str | None = None
-    estimated_hours: float | None = None
+    assignee_name: Optional[str] = None
+    estimated_hours: Optional[float] = None
     status: str = "planned"
-    notes: str | None = None
-    cost: float | None = None
+    notes: Optional[str] = None
+    cost: Optional[float] = None
     currency: str = "EUR"
-    booking_id: int | None = None
-    unit_id: int | None = None
+    booking_id: Optional[int] = None
+    unit_id: Optional[int] = None
 
 
 class StaffTaskCreate(StaffTaskBase):
@@ -647,6 +714,33 @@ class StaffTaskOut(StaffTaskBase):
         from_attributes = True
 
 
+def _parse_time_str(value: str | None) -> Optional[time]:
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        # accettiamo "HH:MM" (senza secondi)
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        # se qualcuno manda anche i secondi, proviamo "HH:MM:SS"
+        try:
+            return datetime.strptime(value, "%H:%M:%S").time()
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
+            )
+
+
+def _format_time_value(t: Optional[time]) -> Optional[str]:
+    if t is None:
+        return None
+    # sempre "HH:MM"
+    return t.strftime("%H:%M")
+
+
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])
 def list_staff_tasks(
     db: Session = Depends(get_db),
@@ -662,7 +756,29 @@ def list_staff_tasks(
             q = q.filter(StaffTask.date >= from_date)
         if to_date:
             q = q.filter(StaffTask.date <= to_date)
-    return q.all()
+
+    tasks = q.all()
+
+    # serializziamo noi a dict per controllare bene il campo time
+    result: list[dict] = []
+    for t in tasks:
+        result.append(
+            {
+                "id": t.id,
+                "date": t.date,
+                "time": _format_time_value(t.time),
+                "task_type": t.task_type,
+                "assignee_name": t.assignee_name,
+                "estimated_hours": t.estimated_hours,
+                "status": t.status,
+                "notes": t.notes,
+                "cost": t.cost,
+                "currency": t.currency,
+                "booking_id": t.booking_id,
+                "unit_id": t.unit_id,
+            }
+        )
+    return result
 
 
 @app.post("/staff-tasks", response_model=StaffTaskOut)
@@ -685,9 +801,11 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
                 detail="Unità collegata inesistente (unit_id).",
             )
 
+    task_time = _parse_time_str(payload.time)
+
     task = StaffTask(
         date=payload.date,
-        time=payload.time,
+        time=task_time,
         task_type=payload.task_type,
         assignee_name=payload.assignee_name,
         estimated_hours=payload.estimated_hours,
@@ -701,7 +819,21 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
     db.add(task)
     db.commit()
     db.refresh(task)
-    return task
+
+    return {
+        "id": task.id,
+        "date": task.date,
+        "time": _format_time_value(task.time),
+        "task_type": task.task_type,
+        "assignee_name": task.assignee_name,
+        "estimated_hours": task.estimated_hours,
+        "status": task.status,
+        "notes": task.notes,
+        "cost": task.cost,
+        "currency": task.currency,
+        "booking_id": task.booking_id,
+        "unit_id": task.unit_id,
+    }
 
 
 @app.put("/staff-tasks/{task_id}", response_model=StaffTaskOut)
@@ -728,8 +860,10 @@ def update_staff_task(
                 detail="Unità collegata inesistente (unit_id).",
             )
 
+    task_time = _parse_time_str(payload.time)
+
     task.date = payload.date
-    task.time = payload.time
+    task.time = task_time
     task.task_type = payload.task_type
     task.assignee_name = payload.assignee_name
     task.estimated_hours = payload.estimated_hours
@@ -742,7 +876,21 @@ def update_staff_task(
 
     db.commit()
     db.refresh(task)
-    return task
+
+    return {
+        "id": task.id,
+        "date": task.date,
+        "time": _format_time_value(task.time),
+        "task_type": task.task_type,
+        "assignee_name": task.assignee_name,
+        "estimated_hours": task.estimated_hours,
+        "status": task.status,
+        "notes": task.notes,
+        "cost": task.cost,
+        "currency": task.currency,
+        "booking_id": task.booking_id,
+        "unit_id": task.unit_id,
+    }
 
 
 @app.delete("/staff-tasks/{task_id}", status_code=204)
@@ -841,12 +989,10 @@ def delete_cost_item(item_id: int, db: Session = Depends(get_db)):
 
     db.delete(item)
     db.commit()
-    return
+    return item
 
 
 # ---------- ANALYTICS: PROFIT & LOSS (Ricavi - Costi) ----------
-
-from typing import Dict, List
 
 
 class CostByCategory(BaseModel):

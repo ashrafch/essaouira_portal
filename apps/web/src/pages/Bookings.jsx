@@ -62,6 +62,7 @@ function Bookings() {
   const [channelFee, setChannelFee] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [isPaid, setIsPaid] = useState(false);
+  const [hasLateCheckout, setHasLateCheckout] = useState(false);
 
   // filtri lista destra
   const [unitFilter, setUnitFilter] = useState("all");
@@ -188,8 +189,7 @@ function Bookings() {
       .slice()
       .sort(
         (a, b) =>
-          new Date(a.checkin_date).getTime() -
-          new Date(b.checkin_date).getTime()
+          new Date(a.checkin_date).getTime() - new Date(b.checkout_date).getTime()
       );
   }, [bookings, unitFilter, paymentFilter]);
 
@@ -212,6 +212,7 @@ function Bookings() {
     setChannelFee("");
     setCurrency("EUR");
     setIsPaid(false);
+    setHasLateCheckout(false);
     if (units[0]?.id) {
       setUnitId(String(units[0].id));
     } else {
@@ -245,9 +246,7 @@ function Bookings() {
         : ""
     );
     setCityTax(
-      b.city_tax != null && b.city_tax !== undefined
-        ? String(b.city_tax)
-        : ""
+      b.city_tax != null && b.city_tax !== undefined ? String(b.city_tax) : ""
     );
     setChannelFee(
       b.channel_fee != null && b.channel_fee !== undefined
@@ -256,6 +255,7 @@ function Bookings() {
     );
     setCurrency(b.currency || "EUR");
     setIsPaid(Boolean(b.is_paid));
+    setHasLateCheckout(Boolean(b.has_late_checkout));
   }
 
   async function handleSubmit(e) {
@@ -280,6 +280,7 @@ function Bookings() {
       channel_fee: channelFee !== "" ? Number(channelFee) : null,
       currency,
       is_paid: isPaid,
+      has_late_checkout: hasLateCheckout,
     };
 
     setSaving(true);
@@ -288,9 +289,7 @@ function Bookings() {
       let saved;
       if (formMode === "edit" && editingId != null) {
         saved = await updateBooking(editingId, payload);
-        setBookings((prev) =>
-          prev.map((b) => (b.id === saved.id ? saved : b))
-        );
+        setBookings((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
       } else {
         saved = await createBooking(payload);
         setBookings((prev) => [...prev, saved]);
@@ -487,6 +486,39 @@ function Bookings() {
     return chip("#f3f4f6", "#4b5563");
   };
 
+  // --- checkbox styles nuovi ---
+  const checkboxRow = {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    backgroundColor: "#f9fafb",
+  };
+
+  const checkboxInput = {
+    width: 16,
+    height: 16,
+    accentColor: "#0f766e",
+    cursor: "pointer",
+    marginTop: 2,
+    flexShrink: 0,
+  };
+
+  const checkboxLabelMain = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#111827",
+  };
+
+  const checkboxLabelSub = {
+    fontSize: 11,
+    color: "#6b7280",
+    marginTop: 2,
+    lineHeight: 1.4,
+  };
+
   return (
     <div>
       <div style={header}>
@@ -599,13 +631,13 @@ function Bookings() {
                             {availability.conflictBookings.map((b) => (
                               <li key={b.id}>
                                 {b.guest_name || "Ospite"} ·{" "}
-                                {parseDate(b.checkin_date)?.toLocaleDateString(
-                                  "it-IT"
-                                )}{" "}
+                                {parseDate(
+                                  b.checkin_date
+                                )?.toLocaleDateString("it-IT")}{" "}
                                 →{" "}
-                                {parseDate(b.checkout_date)?.toLocaleDateString(
-                                  "it-IT"
-                                )}
+                                {parseDate(
+                                  b.checkout_date
+                                )?.toLocaleDateString("it-IT")}
                               </li>
                             ))}
                           </ul>
@@ -815,26 +847,51 @@ function Bookings() {
                 </div>
               )}
 
+              {/* flag pagata + late checkout – versione sistemata */}
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 6,
+                  flexDirection: "column",
+                  gap: 8,
                   marginBottom: 10,
                 }}
               >
-                <input
-                  id="isPaid"
-                  type="checkbox"
-                  checked={isPaid}
-                  onChange={(e) => setIsPaid(e.target.checked)}
-                />
-                <label
-                  htmlFor="isPaid"
-                  style={{ fontSize: 12, color: "#374151" }}
-                >
-                  Pagata
-                </label>
+                <div style={checkboxRow}>
+                  <input
+                    id="isPaid"
+                    type="checkbox"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                    style={checkboxInput}
+                  />
+                  <div>
+                    <label htmlFor="isPaid" style={checkboxLabelMain}>
+                      Pagata
+                    </label>
+                    <div style={checkboxLabelSub}>
+                      Segna la prenotazione come già incassata.
+                    </div>
+                  </div>
+                </div>
+
+                <div style={checkboxRow}>
+                  <input
+                    id="hasLateCheckout"
+                    type="checkbox"
+                    checked={hasLateCheckout}
+                    onChange={(e) => setHasLateCheckout(e.target.checked)}
+                    style={checkboxInput}
+                  />
+                  <div>
+                    <label htmlFor="hasLateCheckout" style={checkboxLabelMain}>
+                      Late check-out
+                    </label>
+                    <div style={checkboxLabelSub}>
+                      Uscita nel pomeriggio; il sistema adegua automaticamente
+                      costi e pulizie.
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div style={field}>
@@ -915,7 +972,9 @@ function Bookings() {
                   </select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: "#6b7280" }}>Pagamento</span>
+                  <span style={{ fontSize: 11, color: "#6b7280" }}>
+                    Pagamento
+                  </span>
                   <select
                     style={{
                       ...input,
@@ -1010,6 +1069,16 @@ function Bookings() {
                               >
                                 {n} notte{n !== 1 ? "i" : ""}
                               </span>
+                              {b.has_late_checkout && (
+                                <span
+                                  style={{
+                                    ...chip("#fef9c3", "#92400e"),
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  Late check-out
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td style={td}>{unit?.name || `Unit #${b.unit_id}`}</td>
