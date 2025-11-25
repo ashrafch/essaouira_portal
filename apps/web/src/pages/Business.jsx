@@ -1,133 +1,154 @@
-import { useEffect, useState, useMemo } from "react";
-import { getMonthPnlSummary } from "../services/api";
+import { useEffect, useMemo, useState } from "react";
+import { getMonthPnL, getCostItems, getUnits } from "../services/api";
+
+function pad2(n) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("it-IT");
+}
 
 function Business() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
 
-  const [data, setData] = useState(null);
+  const [pnl, setPnl] = useState(null);
+  const [costItems, setCostItems] = useState([]);
+  const [units, setUnits] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [selectedCostCategory, setSelectedCostCategory] = useState("all");
+
+  // mappa unità
+  const unitMap = useMemo(
+    () =>
+      units.reduce((acc, u) => {
+        acc[u.id] = u;
+        return acc;
+      }, {}),
+    [units]
+  );
+
+  // calcolo range mese per chiamare /cost-items
+  function getMonthRange(y, m) {
+    const start = `${y}-${pad2(m)}-01`;
+    const nextMonth = m === 12 ? { y: y + 1, m: 1 } : { y: y, m: m + 1 };
+    const end = `${nextMonth.y}-${pad2(nextMonth.m)}-01`;
+    return { from_date: start, to_date: end };
+  }
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const res = await getMonthPnlSummary(year, month);
-        setData(res);
+        const range = getMonthRange(year, month);
+        const [pnlResp, costResp, unitsResp] = await Promise.all([
+          getMonthPnL(year, month),
+          getCostItems(range),
+          getUnits(),
+        ]);
+        setPnl(pnlResp);
+        setCostItems(costResp);
+        setUnits(unitsResp);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || "Errore caricando i dati business");
       } finally {
         setLoading(false);
       }
     }
+
     load();
   }, [year, month]);
 
-  const monthLabel = useMemo(() => {
-    const d = new Date(year, month - 1, 1);
-    return d.toLocaleDateString("it-IT", { month: "long", year: "numeric" });
-  }, [year, month]);
+  const monthInputValue = `${year}-${pad2(month)}`;
 
-  // ---- DERIVED / INSIGHTS ----
-  const derived = useMemo(() => {
-    if (!data) {
-      return {
-        profitMargin: null,
-        mainChannel: null,
-        mainChannelShare: null,
-        bestUnit: null,
-        bestUnitRevenue: null,
-        topCostCategory: null,
-      };
-    }
+  const costCategories = useMemo(() => {
+    if (!pnl) return [];
+    return pnl.costs_by_category?.map((c) => c.category) || [];
+  }, [pnl]);
 
-    const profitMargin =
-      data.revenue_total > 0 ? (data.profit / data.revenue_total) * 100 : null;
+  const visibleCostItems = useMemo(() => {
+    return costItems.filter((c) =>
+      selectedCostCategory === "all"
+        ? true
+        : c.category === selectedCostCategory
+    );
+  }, [costItems, selectedCostCategory]);
 
-    let mainChannel = null;
-    let mainChannelShare = null;
-    if (data.revenue_by_source && Object.keys(data.revenue_by_source).length) {
-      const entries = Object.entries(data.revenue_by_source);
-      entries.sort((a, b) => b[1] - a[1]);
-      const [topSource, topValue] = entries[0];
-      mainChannel = topSource;
-      mainChannelShare =
-        data.revenue_total > 0 ? (topValue / data.revenue_total) * 100 : null;
-    }
+  // ---- styles ----
 
-    let bestUnit = null;
-    let bestUnitRevenue = null;
-    if (data.revenue_by_unit && data.revenue_by_unit.length > 0) {
-      const sorted = [...data.revenue_by_unit].sort(
-        (a, b) => b.revenue - a.revenue
-      );
-      bestUnit = sorted[0].unit_name;
-      bestUnitRevenue = sorted[0].revenue;
-    }
+  const page = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  };
 
-    let topCostCategory = null;
-    if (data.costs_by_category && data.costs_by_category.length > 0) {
-      const sorted = [...data.costs_by_category].sort(
-        (a, b) => b.total - a.total
-      );
-      topCostCategory = sorted[0];
-    }
-
-    return {
-      profitMargin,
-      mainChannel,
-      mainChannelShare,
-      bestUnit,
-      bestUnitRevenue,
-      topCostCategory,
-    };
-  }, [data]);
-
-  const layoutHeader = {
+  const header = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    gap: 12,
-    marginBottom: 20,
+    marginBottom: 4,
     flexWrap: "wrap",
+    gap: 8,
   };
 
-  const card = {
-    backgroundColor: "white",
-    borderRadius: "14px",
-    padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
-  };
-
-  const select = {
-    borderRadius: 999,
-    border: "1px solid #d1d5db",
-    padding: "6px 10px",
-    fontSize: 13,
-    backgroundColor: "white",
-  };
-
-  const kpiGrid = {
+  const cardGrid = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
     gap: 12,
-    marginBottom: 16,
   };
 
-  const kpiCard = {
-    background: "#f9fafb",
-    borderRadius: "12px",
-    padding: "10px 12px",
+  const card = {
+    background: "white",
+    borderRadius: 14,
+    padding: 12,
+    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
+    border: "1px solid #e5e7eb",
+  };
+
+  const cardTitle = {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.04,
+    color: "#6b7280",
+    marginBottom: 4,
+  };
+
+  const cardValue = {
+    fontSize: 20,
+    fontWeight: 600,
+    color: "#111827",
+  };
+
+  const cardSub = {
+    fontSize: 11,
+    color: "#6b7280",
+    marginTop: 2,
+  };
+
+  const sectionTitle = {
+    fontSize: 13,
+    fontWeight: 600,
+    marginBottom: 6,
+    color: "#111827",
+  };
+
+  const sectionRow = {
+    display: "grid",
+    gridTemplateColumns: "1.2fr 1fr",
+    gap: 12,
   };
 
   const table = {
     width: "100%",
     borderCollapse: "collapse",
-    fontSize: 13,
+    fontSize: 12,
   };
 
   const th = {
@@ -135,432 +156,296 @@ function Business() {
     borderBottom: "1px solid #e5e7eb",
     padding: "6px 4px",
     color: "#6b7280",
-    fontSize: 12,
+    fontSize: 11,
   };
 
   const td = {
-    padding: "6px 4px",
     borderBottom: "1px solid #f3f4f6",
-    verticalAlign: "middle",
+    padding: "6px 4px",
+    verticalAlign: "top",
   };
 
-  const pill = {
+  const pill = (bg, color, border = "transparent") => ({
     display: "inline-flex",
     alignItems: "center",
-    gap: 6,
-    padding: "4px 10px",
+    padding: "3px 8px",
     borderRadius: 999,
     fontSize: 11,
-    border: "1px solid #e5e7eb",
-    backgroundColor: "#f9fafb",
-    color: "#374151",
-  };
-
-  const pillDot = (color) => ({
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: color,
+    backgroundColor: bg,
+    color,
+    border: `1px solid ${border}`,
   });
 
-  const miniBarContainer = {
-    position: "relative",
-    width: "100%",
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: "#f3f4f6",
-    overflow: "hidden",
-  };
-
-  const miniBar = (ratio, color) => ({
-    position: "absolute",
-    inset: 0,
-    width: `${Math.max(5, Math.min(100, ratio * 100))}%`,
-    borderRadius: 999,
-    backgroundColor: color,
-  });
-
-  const revenueBySourceArray = useMemo(() => {
-    if (!data?.revenue_by_source) return [];
-    return Object.entries(data.revenue_by_source).map(([src, val]) => ({
-      source: src,
-      amount: val,
-    }));
-  }, [data]);
-
-  const monthOptions = Array.from({ length: 12 }).map((_, i) => ({
-    value: i + 1,
-    label: new Date(2024, i, 1).toLocaleDateString("it-IT", {
-      month: "short",
-    }),
-  }));
-
-  const yearOptions = [];
-  for (let y = today.getFullYear() - 2; y <= today.getFullYear() + 2; y++) {
-    yearOptions.push(y);
-  }
-
-  // max per mini-bar
-  const maxRevenueUnit =
-    data?.revenue_by_unit && data.revenue_by_unit.length > 0
-      ? Math.max(...data.revenue_by_unit.map((u) => u.revenue))
-      : 0;
-
-  const maxCostCategory =
-    data?.costs_by_category && data.costs_by_category.length > 0
-      ? Math.max(...data.costs_by_category.map((c) => c.total))
-      : 0;
-
-  const maxRevenueChannel =
-    revenueBySourceArray.length > 0
-      ? Math.max(...revenueBySourceArray.map((r) => r.amount))
-      : 0;
+  const costCategoryChip = (active) =>
+    pill(
+      active ? "#0f766e" : "#f3f4f6",
+      active ? "white" : "#374151",
+      active ? "#0f766e" : "#e5e7eb"
+    );
 
   return (
-    <div>
-      <div style={layoutHeader}>
+    <div style={page}>
+      <div style={header}>
         <div>
-          <h1 style={{ marginBottom: 4 }}>Business & Finanze</h1>
+          <h1 style={{ marginBottom: 4 }}>Business & Analytics</h1>
           <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Pannello P&amp;L mensile: ricavi, costi, profitto e performance per
-            appartamento.
+            Panoramica mensile di ricavi, costi e performance degli
+            appartamenti.
           </p>
         </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            fontSize: 13,
-          }}
-        >
-          <span style={{ color: "#6b7280", fontSize: 12 }}>Periodo</span>
-          <select
-            style={select}
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
+        <div>
+          <label
+            style={{
+              fontSize: 11,
+              color: "#6b7280",
+              marginRight: 6,
+            }}
           >
-            {monthOptions.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-          <select
-            style={select}
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+            Mese di riferimento
+          </label>
+          <input
+            type="month"
+            value={monthInputValue}
+            onChange={(e) => {
+              const [y, m] = e.target.value.split("-").map(Number);
+              setYear(y);
+              setMonth(m);
+            }}
+            style={{
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              padding: "6px 8px",
+              fontSize: 13,
+            }}
+          />
         </div>
       </div>
 
       {error && (
-        <p style={{ color: "red", fontSize: 12, marginBottom: 8 }}>{error}</p>
+        <p style={{ color: "red", fontSize: 12, marginBottom: 4 }}>{error}</p>
       )}
 
-      {loading || !data ? (
-        <p>Caricamento dati business...</p>
+      {loading || !pnl ? (
+        <p style={{ fontSize: 13 }}>Caricamento dati business...</p>
       ) : (
         <>
           {/* KPI principali */}
-          <div style={kpiGrid}>
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Periodo selezionato
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>
-                {monthLabel}
-              </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Notti disponibili: {data.nights_total} · Occupate:{" "}
-                {data.nights_occupied}
+          <div style={cardGrid}>
+            <div style={card}>
+              <div style={cardTitle}>Occupazione</div>
+              <div style={cardValue}>{pnl.occupancy_rate.toFixed(1)}%</div>
+              <div style={cardSub}>
+                {pnl.nights_occupied} notti occupate su{" "}
+                {pnl.nights_total} disponibili
               </div>
             </div>
-
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Ricavi totali
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
-                € {data.revenue_total.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                ADR:{" "}
-                {data.adr != null ? `€ ${data.adr.toFixed(2)}` : "n/d"}
+            <div style={card}>
+              <div style={cardTitle}>Ricavi totali</div>
+              <div style={cardValue}>{pnl.revenue_total.toFixed(2)} €</div>
+              <div style={cardSub}>
+                ADR (tariffa media per notte):{" "}
+                {pnl.adr != null ? `${pnl.adr.toFixed(2)} €` : "—"}
               </div>
             </div>
-
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Costi totali
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
-                € {data.costs_total.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Somma di tutte le voci costi del mese
+            <div style={card}>
+              <div style={cardTitle}>Costi totali</div>
+              <div style={cardValue}>{pnl.costs_total.toFixed(2)} €</div>
+              <div style={cardSub}>
+                Somma di costi staff, fee di prenotazione e costi extra
+                registrati nel mese.
               </div>
             </div>
-
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Margine (profitto)
-              </div>
+            <div style={card}>
+              <div style={cardTitle}>Profitto del mese</div>
               <div
                 style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  marginTop: 2,
-                  color: data.profit >= 0 ? "#15803d" : "#b91c1c",
+                  ...cardValue,
+                  color: pnl.profit >= 0 ? "#15803d" : "#b91c1c",
                 }}
               >
-                € {data.profit.toFixed(2)}
+                {pnl.profit.toFixed(2)} €
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Ricavi - Costi nel periodo
-              </div>
-            </div>
-
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Occupazione media
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
-                {data.occupancy_rate.toFixed(2)}%
-              </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Calcolata su tutte le unità
-              </div>
-            </div>
-
-            <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
-                Profit margin
-              </div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
-                {derived.profitMargin != null
-                  ? `${derived.profitMargin.toFixed(1)}%`
-                  : "n/d"}
-              </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                Profitto / Ricavi
+              <div style={cardSub}>
+                Ricavi − Costi (tutte le unità e tutti i canali).
               </div>
             </div>
           </div>
 
-          {/* Insight strip */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              marginBottom: 14,
-            }}
-          >
-            <span style={pill}>
-              <span style={pillDot(data.profit >= 0 ? "#22c55e" : "#ef4444")} />
-              {data.profit > 0
-                ? "Mese in utile"
-                : data.profit < 0
-                ? "Mese in perdita"
-                : "Break-even"}
-            </span>
-
-            {derived.mainChannel && (
-              <span style={pill}>
-                <span style={pillDot("#3b82f6")} />
-                Canale principale: <strong>{derived.mainChannel}</strong>
-                {derived.mainChannelShare != null &&
-                  ` · ${derived.mainChannelShare.toFixed(1)}% dei ricavi`}
-              </span>
-            )}
-
-            {derived.bestUnit && (
-              <span style={pill}>
-                <span style={pillDot("#22c55e")} />
-                Miglior appartamento:{" "}
-                <strong>{derived.bestUnit}</strong> · €
-                {derived.bestUnitRevenue.toFixed(2)}
-              </span>
-            )}
-
-            {derived.topCostCategory && (
-              <span style={pill}>
-                <span style={pillDot("#f97316")} />
-                Costo principale:{" "}
-                <strong>{derived.topCostCategory.category}</strong> · €
-                {derived.topCostCategory.total.toFixed(2)}
-              </span>
-            )}
-          </div>
-
-          {/* Layout 2 colonne: Ricavi vs Costi */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(260px, 1.5fr) minmax(260px, 1fr)",
-              gap: 16,
-              alignItems: "flex-start",
-            }}
-          >
-            {/* Ricavi per unità */}
+          {/* Ricavi per sorgente / unità */}
+          <div style={sectionRow}>
             <div style={card}>
-              <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-                Ricavi per appartamento
-              </h2>
-              {(!data.revenue_by_unit ||
-                data.revenue_by_unit.length === 0) ? (
-                <p style={{ fontSize: 13, color: "#6b7280" }}>
-                  Nessun ricavo per questo mese.
+              <div style={sectionTitle}>Ricavi per sorgente</div>
+              {Object.keys(pnl.revenue_by_source || {}).length === 0 ? (
+                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                  Nessun ricavo per il mese selezionato.
+                </p>
+              ) : (
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Sorgente</th>
+                      <th style={th}>Ricavi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(pnl.revenue_by_source).map(
+                      ([src, value]) => (
+                        <tr key={src}>
+                          <td style={td}>{src || "Altro"}</td>
+                          <td style={td}>{value.toFixed(2)} €</td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={card}>
+              <div style={sectionTitle}>Ricavi per unità</div>
+              {pnl.revenue_by_unit.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                  Nessuna prenotazione nel mese selezionato.
+                </p>
+              ) : (
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Unità</th>
+                      <th style={th}>Notti occupate</th>
+                      <th style={th}>Ricavi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pnl.revenue_by_unit.map((u) => (
+                      <tr key={u.unit_id}>
+                        <td style={td}>{u.unit_name}</td>
+                        <td style={td}>{u.nights_occupied}</td>
+                        <td style={td}>{u.revenue.toFixed(2)} €</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Costi per categoria + dettaglio */}
+          <div style={{ display: "grid", gap: 12, marginTop: 8 }}>
+            <div style={card}>
+              <div style={sectionTitle}>Costi per categoria</div>
+              {pnl.costs_by_category.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                  Nessun costo registrato nel mese selezionato.
+                </p>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      marginBottom: 6,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCostCategory("all")}
+                      style={{
+                        ...costCategoryChip(selectedCostCategory === "all"),
+                        cursor: "pointer",
+                      }}
+                    >
+                      Tutte le categorie
+                    </button>
+                    {pnl.costs_by_category.map((c) => (
+                      <button
+                        key={c.category}
+                        type="button"
+                        onClick={() => setSelectedCostCategory(c.category)}
+                        style={{
+                          ...costCategoryChip(
+                            selectedCostCategory === c.category
+                          ),
+                          cursor: "pointer",
+                        }}
+                      >
+                        {c.category} · {c.total.toFixed(2)} €
+                      </button>
+                    ))}
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#6b7280",
+                      marginTop: 2,
+                    }}
+                  >
+                    Questi importi includono:
+                    {" "}
+                    fee legate alle prenotazioni
+                    (cleaning fee, commissioni canale, tassa di soggiorno nel mese del
+                    check-out),
+                    costi dello staff (da task) e eventuali costi extra inseriti
+                    manualmente (CostItem).
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div style={card}>
+              <div style={sectionTitle}>Dettaglio costi del mese</div>
+              <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+                Stai visualizzando:{" "}
+                <strong>
+                  {selectedCostCategory === "all"
+                    ? "tutte le categorie"
+                    : selectedCostCategory}
+                </strong>
+                . In questa tabella vedi nel dettaglio solo i costi
+                inseriti manualmente (CostItem). Le categorie generate
+                automaticamente da prenotazioni e task dello staff potrebbero
+                non avere righe qui.
+              </p>
+
+              {visibleCostItems.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                  Nessun costo manuale registrato per il filtro selezionato.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={table}>
                     <thead>
                       <tr>
+                        <th style={th}>Data</th>
+                        <th style={th}>Categoria</th>
+                        <th style={th}>Descrizione</th>
                         <th style={th}>Unità</th>
-                        <th style={th}>Notti occupate</th>
-                        <th style={th}>Ricavo</th>
-                        <th style={th}>RevPAR approx</th>
-                        <th style={th}>Peso</th>
+                        <th style={th}>Importo</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.revenue_by_unit.map((u) => {
-                        const revPar =
-                          u.nights_occupied > 0
-                            ? u.revenue / u.nights_occupied
-                            : 0;
-                        const ratio =
-                          maxRevenueUnit > 0
-                            ? u.revenue / maxRevenueUnit
-                            : 0;
-                        return (
-                          <tr key={u.unit_id}>
-                            <td style={td}>{u.unit_name}</td>
-                            <td style={td}>{u.nights_occupied}</td>
-                            <td style={td}>€ {u.revenue.toFixed(2)}</td>
-                            <td style={td}>€ {revPar.toFixed(2)}</td>
-                            <td style={td}>
-                              <div style={miniBarContainer}>
-                                <div
-                                  style={miniBar(
-                                    ratio,
-                                    "#22c55e"
-                                  )}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {visibleCostItems.map((c) => (
+                        <tr key={c.id}>
+                          <td style={td}>{formatDate(c.date)}</td>
+                          <td style={td}>{c.category}</td>
+                          <td style={td}>{c.description || "—"}</td>
+                          <td style={td}>
+                            {c.unit_id
+                              ? unitMap[c.unit_id]?.name ||
+                                `Unit #${c.unit_id}`
+                              : "—"}
+                          </td>
+                          <td style={td}>
+                            {c.currency || "EUR"}{" "}
+                            {Number(c.amount).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               )}
-            </div>
-
-            {/* Costi + ricavi per canale */}
-            <div style={card}>
-              <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-                Costi per categoria
-              </h2>
-              {(!data.costs_by_category ||
-                data.costs_by_category.length === 0) ? (
-                <p style={{ fontSize: 13, color: "#6b7280" }}>
-                  Nessun costo registrato per questo mese.
-                </p>
-              ) : (
-                <table style={table}>
-                  <thead>
-                    <tr>
-                      <th style={th}>Categoria</th>
-                      <th style={th}>Totale</th>
-                      <th style={th}>Peso</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.costs_by_category.map((c) => {
-                      const ratio =
-                        maxCostCategory > 0 ? c.total / maxCostCategory : 0;
-                      return (
-                        <tr key={c.category}>
-                          <td style={td}>{c.category}</td>
-                          <td style={td}>€ {c.total.toFixed(2)}</td>
-                          <td style={td}>
-                            <div style={miniBarContainer}>
-                              <div
-                                style={miniBar(
-                                  ratio,
-                                  "#f97316"
-                                )}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-
-              <div
-                style={{
-                  marginTop: 14,
-                  borderTop: "1px dashed #e5e7eb",
-                  paddingTop: 10,
-                }}
-              >
-                <h3 style={{ fontSize: 13, marginBottom: 4 }}>
-                  Ricavi per canale
-                </h3>
-                {revenueBySourceArray.length === 0 ? (
-                  <p style={{ fontSize: 12, color: "#6b7280" }}>
-                    Nessun dato per canale sorgente.
-                  </p>
-                ) : (
-                  <table style={table}>
-                    <thead>
-                      <tr>
-                        <th style={th}>Canale</th>
-                        <th style={th}>Ricavo</th>
-                        <th style={th}>Peso</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revenueBySourceArray.map((r) => {
-                        const ratio =
-                          maxRevenueChannel > 0
-                            ? r.amount / maxRevenueChannel
-                            : 0;
-                        return (
-                          <tr key={r.source}>
-                            <td style={td}>{r.source}</td>
-                            <td style={td}>€ {r.amount.toFixed(2)}</td>
-                            <td style={td}>
-                              <div style={miniBarContainer}>
-                                <div
-                                  style={miniBar(
-                                    ratio,
-                                    "#3b82f6"
-                                  )}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
             </div>
           </div>
         </>

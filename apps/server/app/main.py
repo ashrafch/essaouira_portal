@@ -162,6 +162,8 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     - Colazioni: tutti i giorni intermedi tra check-in e check-out
 
     Nota: i task automatici sono riconosciuti da notes che inizia con "AUTO:".
+    Non impostiamo alcun costo automatico: il campo cost resta null
+    finché non lo imposti tu a mano.
     """
     defaults = _get_or_create_staff_defaults(db)
 
@@ -179,22 +181,15 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
 
     base_assignee = defaults.cleaning_default_assignee
     base_hours = defaults.cleaning_default_hours or 1.0
-    base_cost = defaults.cleaning_default_cost or 0.0
     currency = defaults.currency or "EUR"
 
-    # parametri diversi se late check-out
+    # orari diversi se late check-out
     checkout_time_obj = time(10, 0)
     cleaning_time_obj = time(11, 0)
-    checkout_cost = base_cost
-    cleaning_hours = base_hours
-    cleaning_cost = base_cost
 
     if is_late:
         checkout_time_obj = time(16, 0)
         cleaning_time_obj = time(17, 0)
-        checkout_cost = base_cost * 1.5
-        cleaning_hours = base_hours * 1.5
-        cleaning_cost = base_cost * 1.5
 
     # 1) CHECK-IN (giorno di arrivo, orario standard 15:00)
     checkin_task = StaffTask(
@@ -205,7 +200,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         estimated_hours=base_hours,
         status="planned",
         notes=f"AUTO: Check-in per prenotazione #{booking.id}",
-        cost=base_cost,
+        cost=None,  # nessun costo auto
         currency=currency,
         booking_id=booking.id,
         unit_id=booking.unit_id,
@@ -225,7 +220,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
             if is_late
             else f"AUTO: Check-out per prenotazione #{booking.id}"
         ),
-        cost=checkout_cost,
+        cost=None,
         currency=currency,
         booking_id=booking.id,
         unit_id=booking.unit_id,
@@ -238,14 +233,14 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         time=cleaning_time_obj,
         task_type="cleaning",
         assignee_name=base_assignee,
-        estimated_hours=cleaning_hours,
+        estimated_hours=base_hours if not is_late else base_hours * 1.5,
         status="planned",
         notes=(
             f"AUTO: Pulizia post late check-out per prenotazione #{booking.id}"
             if is_late
             else f"AUTO: Pulizia per prenotazione #{booking.id}"
         ),
-        cost=cleaning_cost,
+        cost=None,
         currency=currency,
         booking_id=booking.id,
         unit_id=booking.unit_id,
@@ -262,7 +257,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
             estimated_hours=base_hours * 0.5,
             status="planned",
             notes=f"AUTO: Extra pulizia (late check-out) per prenotazione #{booking.id}",
-            cost=base_cost * 0.5,
+            cost=None,
             currency=currency,
             booking_id=booking.id,
             unit_id=booking.unit_id,
@@ -282,7 +277,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
             estimated_hours=base_hours * 0.5,
             status="planned",
             notes=f"AUTO: Colazione per prenotazione #{booking.id}",
-            cost=base_cost * 0.5,
+            cost=None,
             currency=currency,
             booking_id=booking.id,
             unit_id=booking.unit_id,
@@ -1033,7 +1028,7 @@ def month_pnl(
         next_month_start = date(year, month + 1, 1)
     days_in_month = (next_month_start - month_start).days
 
-    # --- Ricavi (quasi identico a /analytics/month-summary) ---
+    # --- Prenotazioni per il mese ---
     bookings = (
         db.query(Booking)
         .filter(
@@ -1051,7 +1046,13 @@ def month_pnl(
     revenue_by_source: Dict[str, float] = {}
     revenue_by_unit_map: Dict[int, RevenueByUnit] = {}
 
+    # base per i costi
+    costs_total = 0.0
+    costs_by_category_map: Dict[str, float] = {}
+
+    # --- Ricavi e costi legati alle prenotazioni ---
     for b in bookings:
+        # notti di questa prenotazione dentro il mese
         stay_start = max(b.checkin_date, month_start)
         stay_end = min(b.checkout_date, next_month_start)
         nights_in_month = (stay_end - stay_start).days
@@ -1079,27 +1080,52 @@ def month_pnl(
 
         # per unità
         u = b.unit
-        if not u:
-            continue
+        if u:
+            existing = revenue_by_unit_map.get(u.id)
+            if existing is None:
+                revenue_by_unit_map[u.id] = RevenueByUnit(
+                    unit_id=u.id,
+                    unit_name=u.name,
+                    revenue=booking_revenue,
+                    nights_occupied=nights_in_month,
+                )
+            else:
+                existing.revenue += booking_revenue
+                existing.nights_occupied += nights_in_month
 
-        existing = revenue_by_unit_map.get(u.id)
-        if existing is None:
-            revenue_by_unit_map[u.id] = RevenueByUnit(
-                unit_id=u.id,
-                unit_name=u.name,
-                revenue=booking_revenue,
-                nights_occupied=nights_in_month,
-            )
-        else:
-            existing.revenue += booking_revenue
-            existing.nights_occupied += nights_in_month
+        # ---- COSTI DA PRENOTAZIONE ----
+        # conteggiati nel mese in cui cade il CHECK-OUT
+        if month_start <= b.checkout_date < next_month_start:
+            # cleaning fee (costo pulizia)
+            if b.cleaning_fee is not None:
+                cf = float(b.cleaning_fee)
+                costs_total += cf
+                costs_by_category_map["Booking - Cleaning fee"] = (
+                    costs_by_category_map.get("Booking - Cleaning fee", 0.0) + cf
+                )
+
+            # commissioni canale (Airbnb / Booking, ecc.)
+            if b.channel_fee is not None:
+                ch = float(b.channel_fee)
+                costs_total += ch
+                costs_by_category_map["Booking - Channel fee"] = (
+                    costs_by_category_map.get("Booking - Channel fee", 0.0) + ch
+                )
+
+            # tassa di soggiorno → trattata come costo/pass-through
+            if b.city_tax is not None:
+                ct = float(b.city_tax)
+                costs_total += ct
+                costs_by_category_map["Booking - City tax"] = (
+                    costs_by_category_map.get("Booking - City tax", 0.0) + ct
+                )
 
     occupancy_rate = (
         (occupied_nights / nights_total) * 100 if nights_total > 0 else 0.0
     )
     adr = revenue_total / occupied_nights if occupied_nights > 0 else None
 
-    # --- Costi del mese ---
+    # --- Costi manuali (CostItem) ---
     cost_items = (
         db.query(CostItem)
         .filter(
@@ -1109,19 +1135,36 @@ def month_pnl(
         .all()
     )
 
-    costs_total = 0.0
-    costs_by_category_map: Dict[str, float] = {}
-
     for c in cost_items:
         amount = float(c.amount)
         costs_total += amount
         cat = c.category or "Altro"
         costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
 
+    # --- Costi staff (StaffTask.cost) ---
+    staff_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.date >= month_start,
+            StaffTask.date < next_month_start,
+        )
+        .all()
+    )
+
+    for t in staff_tasks:
+        if t.cost is None:
+            continue
+        amount = float(t.cost)
+        costs_total += amount
+        cat = f"Staff - {t.task_type or 'Altro'}"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+    # trasformiamo le categorie in lista ordinata
     costs_by_category = [
         CostByCategory(category=cat, total=round(total, 2))
         for cat, total in costs_by_category_map.items()
     ]
+    costs_by_category.sort(key=lambda x: x.category)
 
     profit = revenue_total - costs_total
 

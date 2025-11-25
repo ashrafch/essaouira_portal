@@ -19,6 +19,8 @@ function buildQuery(params = {}) {
   return qs ? `?${qs}` : "";
 }
 
+/* --------- LOW LEVEL WRAPPERS --------- */
+
 export async function apiGet(path, params) {
   const url = `${BASE_URL}${path}${buildQuery(params)}`;
   const res = await fetch(url);
@@ -100,7 +102,7 @@ export function getMonthSummary(year, month) {
 }
 
 // ricavi, costi, profitto per mese (pagina Business)
-export function getMonthPnlSummary(year, month) {
+export function getMonthPnL(year, month) {
   return apiGet("/analytics/month-pnl", { year, month });
 }
 
