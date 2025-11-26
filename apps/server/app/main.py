@@ -12,6 +12,9 @@ from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
 from app.models.staff_defaults import StaffDefaults
+from app.models.staff_member import StaffMember
+from app.models.pricing_defaults import PricingDefaults
+
 
 app = FastAPI(title="Portale Essaouira API")
 
@@ -60,6 +63,42 @@ def on_startup():
         db.add(defaults)
         db.commit()
 
+    # seed staff members se non esistono
+    if db.query(StaffMember).count() == 0:
+        staff_seed = [
+            StaffMember(
+                full_name="Operatore 1",
+                role="Housekeeping",
+                email=None,
+                phone=None,
+                color_hex="#0f766e",
+                is_active=True,
+                hourly_cost=None,
+            ),
+            StaffMember(
+                full_name="Operatore 2",
+                role="Manutenzione",
+                email=None,
+                phone=None,
+                color_hex="#2563eb",
+                is_active=True,
+                hourly_cost=None,
+            ),
+        ]
+        db.add_all(staff_seed)
+        db.commit()
+
+    # seed pricing defaults se non esistono
+    if db.query(PricingDefaults).count() == 0:
+        pricing_defaults = PricingDefaults(
+            default_cleaning_fee=None,
+            default_city_tax_per_night=None,
+            default_channel_commission_percent=None,
+            currency="EUR",
+        )
+        db.add(pricing_defaults)
+        db.commit()
+
 
 @app.get("/health")
 def health():
@@ -81,10 +120,40 @@ class UnitOut(BaseModel):
         from_attributes = True
 
 
+class UnitUpdate(BaseModel):
+    name: str | None = None
+    size_m2: int | None = None
+    capacity: int | None = None
+    base_nightly_rate: float | None = None
+    currency: str | None = None
+
+
 @app.get("/units", response_model=list[UnitOut])
 def list_units(db: Session = Depends(get_db)):
     units = db.query(Unit).all()
     return units
+
+
+@app.put("/units/{unit_id}", response_model=UnitOut)
+def update_unit(unit_id: int, payload: UnitUpdate, db: Session = Depends(get_db)):
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unità non trovata")
+
+    if payload.name is not None:
+        unit.name = payload.name
+    if payload.size_m2 is not None:
+        unit.size_m2 = payload.size_m2
+    if payload.capacity is not None:
+        unit.capacity = payload.capacity
+    if payload.base_nightly_rate is not None:
+        unit.base_nightly_rate = payload.base_nightly_rate
+    if payload.currency is not None:
+        unit.currency = payload.currency
+
+    db.commit()
+    db.refresh(unit)
+    return unit
 
 
 # ---------- BOOKING Schemas ----------
@@ -127,13 +196,7 @@ class BookingOut(BookingBase):
         from_attributes = True
 
 
-# ---------- BOOKING endpoints ----------
-
-
-@app.get("/bookings", response_model=list[BookingOut])
-def list_bookings(db: Session = Depends(get_db)):
-    bookings = db.query(Booking).order_by(Booking.checkin_date).all()
-    return bookings
+# ---------- HELPERS: STAFF DEFAULTS & PRICING DEFAULTS ----------
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -151,19 +214,27 @@ def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
     return defaults
 
 
+def _get_or_create_pricing_defaults(db: Session) -> PricingDefaults:
+    pricing = db.query(PricingDefaults).first()
+    if not pricing:
+        pricing = PricingDefaults(
+            default_cleaning_fee=None,
+            default_city_tax_per_night=None,
+            default_channel_commission_percent=None,
+            currency="EUR",
+        )
+        db.add(pricing)
+        db.commit()
+        db.refresh(pricing)
+    return pricing
+
+
 def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     """
-    Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione:
+    Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione.
 
-    - Check-in (giorno di arrivo, es. 15:00)
-    - Check-out (ultimo giorno, mattina o pomeriggio se late check-out)
-    - Pulizia principale post-checkout
-    - Extra pulizia se late check-out
-    - Colazioni: tutti i giorni intermedi tra check-in e check-out
-
-    Nota: i task automatici sono riconosciuti da notes che inizia con "AUTO:".
     Non impostiamo alcun costo automatico: il campo cost resta null
-    finché non lo imposti tu a mano.
+    finché non lo imposti tu a mano lato staff.
     """
     defaults = _get_or_create_staff_defaults(db)
 
@@ -200,7 +271,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         estimated_hours=base_hours,
         status="planned",
         notes=f"AUTO: Check-in per prenotazione #{booking.id}",
-        cost=None,  # nessun costo auto
+        cost=None,
         currency=currency,
         booking_id=booking.id,
         unit_id=booking.unit_id,
@@ -288,6 +359,15 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     db.commit()
 
 
+# ---------- BOOKING endpoints ----------
+
+
+@app.get("/bookings", response_model=list[BookingOut])
+def list_bookings(db: Session = Depends(get_db)):
+    bookings = db.query(Booking).order_by(Booking.checkin_date).all()
+    return bookings
+
+
 @app.post("/bookings", response_model=BookingOut)
 def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     unit = db.query(Unit).filter(Unit.id == payload.unit_id).first()
@@ -327,6 +407,29 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
 
     total_price = payload.total_price or base_total
 
+    # applica eventuali default tariffari
+    pricing = _get_or_create_pricing_defaults(db)
+
+    cleaning_fee = payload.cleaning_fee
+    if cleaning_fee is None and getattr(pricing, "default_cleaning_fee", None) is not None:
+        cleaning_fee = float(pricing.default_cleaning_fee)
+
+    city_tax = payload.city_tax
+    if city_tax is None and getattr(pricing, "default_city_tax_per_night", None) is not None:
+        city_tax = float(pricing.default_city_tax_per_night) * nights
+
+    channel_fee = payload.channel_fee
+    if (
+        channel_fee is None
+        and getattr(pricing, "default_channel_commission_percent", None) is not None
+        and total_price is not None
+    ):
+        channel_fee = (
+            float(pricing.default_channel_commission_percent)
+            * float(total_price)
+            / 100.0
+        )
+
     booking = Booking(
         unit_id=payload.unit_id,
         guest_name=payload.guest_name,
@@ -337,9 +440,9 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         notes=payload.notes,
         nightly_rate=nightly_rate,
         total_price=total_price,
-        cleaning_fee=payload.cleaning_fee,
-        city_tax=payload.city_tax,
-        channel_fee=payload.channel_fee,
+        cleaning_fee=cleaning_fee,
+        city_tax=city_tax,
+        channel_fee=channel_fee,
         currency=payload.currency,
         is_paid=payload.is_paid,
         has_late_checkout=payload.has_late_checkout,
@@ -400,6 +503,29 @@ def update_booking(
 
     total_price = payload.total_price or base_total
 
+    # riapplica default tariffari solo se i campi sono None
+    pricing = _get_or_create_pricing_defaults(db)
+
+    cleaning_fee = payload.cleaning_fee
+    if cleaning_fee is None and getattr(pricing, "default_cleaning_fee", None) is not None:
+        cleaning_fee = float(pricing.default_cleaning_fee)
+
+    city_tax = payload.city_tax
+    if city_tax is None and getattr(pricing, "default_city_tax_per_night", None) is not None:
+        city_tax = float(pricing.default_city_tax_per_night) * nights
+
+    channel_fee = payload.channel_fee
+    if (
+        channel_fee is None
+        and getattr(pricing, "default_channel_commission_percent", None) is not None
+        and total_price is not None
+    ):
+        channel_fee = (
+            float(pricing.default_channel_commission_percent)
+            * float(total_price)
+            / 100.0
+        )
+
     booking.unit_id = payload.unit_id
     booking.guest_name = payload.guest_name
     booking.guest_email = payload.guest_email
@@ -409,9 +535,9 @@ def update_booking(
     booking.notes = payload.notes
     booking.nightly_rate = nightly_rate
     booking.total_price = total_price
-    booking.cleaning_fee = payload.cleaning_fee
-    booking.city_tax = payload.city_tax
-    booking.channel_fee = payload.channel_fee
+    booking.cleaning_fee = cleaning_fee
+    booking.city_tax = city_tax
+    booking.channel_fee = channel_fee
     booking.currency = payload.currency
     booking.is_paid = payload.is_paid
     booking.has_late_checkout = payload.has_late_checkout
@@ -674,6 +800,326 @@ def month_summary(
         revenue_by_source={k: round(v, 2) for k, v in revenue_by_source.items()},
         revenue_by_unit=list(revenue_by_unit_map.values()),
     )
+
+
+# ---------- ANALYTICS: PROFIT & LOSS (Ricavi - Costi) ----------
+
+
+class CostByCategory(BaseModel):
+    category: str
+    total: float
+
+
+class PnLMonthSummary(BaseModel):
+    year: int
+    month: int
+
+    nights_total: int
+    nights_occupied: int
+    occupancy_rate: float
+    adr: float | None
+
+    revenue_total: float
+    revenue_by_source: Dict[str, float]
+    revenue_by_unit: List[RevenueByUnit]
+
+    costs_total: float
+    costs_by_category: List[CostByCategory]
+
+    profit: float
+
+
+class MonthCostLine(BaseModel):
+    date: date
+    category: str
+    description: str | None = None
+    amount: float
+    currency: str = "EUR"
+    unit_id: int | None = None
+    booking_id: int | None = None
+    staff_task_id: int | None = None
+    origin: str
+
+    class Config:
+        from_attributes = True
+
+
+def _get_month_range(year: int, month: int):
+    month_start = date(year, month, 1)
+    if month == 12:
+        next_month_start = date(year + 1, 1, 1)
+    else:
+        next_month_start = date(year, month + 1, 1)
+    days_in_month = (next_month_start - month_start).days
+    return month_start, next_month_start, days_in_month
+
+
+def _collect_costs_for_month(
+    db: Session, month_start: date, next_month_start: date
+):
+    costs_total = 0.0
+    costs_by_category_map: Dict[str, float] = {}
+    cost_lines: list[dict] = []
+
+    # --- Costi manuali (CostItem) ---
+    cost_items = (
+        db.query(CostItem)
+        .filter(
+            CostItem.date >= month_start,
+            CostItem.date < next_month_start,
+        )
+        .all()
+    )
+
+    for c in cost_items:
+        amount = float(c.amount)
+        costs_total += amount
+        cat = c.category or "Altro"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+        cost_lines.append(
+            {
+                "date": c.date,
+                "category": cat,
+                "description": c.description,
+                "amount": amount,
+                "currency": c.currency or "EUR",
+                "unit_id": c.unit_id,
+                "booking_id": None,
+                "staff_task_id": None,
+                "origin": "manual",
+            }
+        )
+
+    # --- Costi da prenotazioni (cleaning_fee, channel_fee, city_tax) ---
+    bookings_for_costs = (
+        db.query(Booking)
+        .filter(
+            Booking.checkout_date >= month_start,
+            Booking.checkout_date < next_month_start,
+        )
+        .all()
+    )
+
+    for b in bookings_for_costs:
+        desc = (
+            f"Prenotazione #{b.id} - {b.guest_name}"
+            if b.guest_name
+            else f"Prenotazione #{b.id}"
+        )
+        curr = b.currency or "EUR"
+
+        # cleaning fee
+        if b.cleaning_fee is not None:
+            cf = float(b.cleaning_fee)
+            costs_total += cf
+            cat = "Booking - Cleaning fee"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + cf
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": cf,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_cleaning_fee",
+                }
+            )
+
+        # commissioni canale
+        if b.channel_fee is not None:
+            ch = float(b.channel_fee)
+            costs_total += ch
+            cat = "Booking - Channel fee"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + ch
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": ch,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_channel_fee",
+                }
+            )
+
+        # tassa di soggiorno → trattata come costo/pass-through
+        if b.city_tax is not None:
+            ct = float(b.city_tax)
+            costs_total += ct
+            cat = "Booking - City tax"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + ct
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": ct,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_city_tax",
+                }
+            )
+
+    # --- Costi staff (StaffTask.cost) ---
+    staff_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.date >= month_start,
+            StaffTask.date < next_month_start,
+        )
+        .all()
+    )
+
+    for t in staff_tasks:
+        if t.cost is None:
+            continue
+        amount = float(t.cost)
+        costs_total += amount
+        cat = f"Staff - {t.task_type or 'Altro'}"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+        desc = t.notes or f"Task staff #{t.id}"
+        cost_lines.append(
+            {
+                "date": t.date,
+                "category": cat,
+                "description": desc,
+                "amount": amount,
+                "currency": t.currency or "EUR",
+                "unit_id": t.unit_id,
+                "booking_id": t.booking_id,
+                "staff_task_id": t.id,
+                "origin": "staff_task",
+            }
+        )
+
+    return costs_total, costs_by_category_map, cost_lines
+
+
+@app.get("/analytics/month-pnl", response_model=PnLMonthSummary)
+def month_pnl(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    # calcolo range mese
+    month_start, next_month_start, days_in_month = _get_month_range(year, month)
+
+    # --- Prenotazioni per il mese (ricavi e occupancy) ---
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+
+    units_count = db.query(Unit).count()
+    nights_total = days_in_month * units_count
+
+    occupied_nights = 0
+    revenue_total = 0.0
+    revenue_by_source: Dict[str, float] = {}
+    revenue_by_unit_map: Dict[int, RevenueByUnit] = {}
+
+    for b in bookings:
+        # notti di questa prenotazione dentro il mese
+        stay_start = max(b.checkin_date, month_start)
+        stay_end = min(b.checkout_date, next_month_start)
+        nights_in_month = (stay_end - stay_start).days
+
+        occupied_nights += nights_in_month
+
+        # ricavo allocato nel mese
+        if (
+            b.total_price is not None
+            and b.checkin_date >= month_start
+            and b.checkout_date <= next_month_start
+        ):
+            booking_revenue = float(b.total_price)
+        else:
+            if b.nightly_rate is not None:
+                booking_revenue = float(b.nightly_rate) * nights_in_month
+            else:
+                booking_revenue = 0.0
+
+        revenue_total += booking_revenue
+
+        # per sorgente
+        src = b.source or "unknown"
+        revenue_by_source[src] = revenue_by_source.get(src, 0.0) + booking_revenue
+
+        # per unità
+        u = b.unit
+        if u:
+            existing = revenue_by_unit_map.get(u.id)
+            if existing is None:
+                revenue_by_unit_map[u.id] = RevenueByUnit(
+                    unit_id=u.id,
+                    unit_name=u.name,
+                    revenue=booking_revenue,
+                    nights_occupied=nights_in_month,
+                )
+            else:
+                existing.revenue += booking_revenue
+                existing.nights_occupied += nights_in_month
+
+    occupancy_rate = (
+        (occupied_nights / nights_total) * 100 if nights_total > 0 else 0.0
+    )
+    adr = revenue_total / occupied_nights if occupied_nights > 0 else None
+
+    # --- Costi del mese (da helper condiviso) ---
+    costs_total, costs_by_category_map, _ = _collect_costs_for_month(
+        db, month_start, next_month_start
+    )
+
+    costs_by_category = [
+        CostByCategory(category=cat, total=round(total, 2))
+        for cat, total in costs_by_category_map.items()
+    ]
+    costs_by_category.sort(key=lambda x: x.category)
+
+    profit = revenue_total - costs_total
+
+    return PnLMonthSummary(
+        year=year,
+        month=month,
+        nights_total=nights_total,
+        nights_occupied=occupied_nights,
+        occupancy_rate=round(occupancy_rate, 2),
+        adr=round(adr, 2) if adr is not None else None,
+        revenue_total=round(revenue_total, 2),
+        revenue_by_source={k: round(v, 2) for k, v in revenue_by_source.items()},
+        revenue_by_unit=list(revenue_by_unit_map.values()),
+        costs_total=round(costs_total, 2),
+        costs_by_category=costs_by_category,
+        profit=round(profit, 2),
+    )
+
+
+@app.get("/analytics/month-cost-lines", response_model=List[MonthCostLine])
+def month_cost_lines(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, _ = _get_month_range(year, month)
+    _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
+    return [MonthCostLine(**line) for line in cost_lines]
 
 
 # ---------- STAFF TASKS ----------
@@ -987,203 +1433,6 @@ def delete_cost_item(item_id: int, db: Session = Depends(get_db)):
     return item
 
 
-# ---------- ANALYTICS: PROFIT & LOSS (Ricavi - Costi) ----------
-
-
-class CostByCategory(BaseModel):
-    category: str
-    total: float
-
-
-class PnLMonthSummary(BaseModel):
-    year: int
-    month: int
-
-    nights_total: int
-    nights_occupied: int
-    occupancy_rate: float
-    adr: float | None
-
-    revenue_total: float
-    revenue_by_source: Dict[str, float]
-    revenue_by_unit: List[RevenueByUnit]
-
-    costs_total: float
-    costs_by_category: List[CostByCategory]
-
-    profit: float
-
-
-@app.get("/analytics/month-pnl", response_model=PnLMonthSummary)
-def month_pnl(
-    year: int = Query(..., ge=2000, le=2100),
-    month: int = Query(..., ge=1, le=12),
-    db: Session = Depends(get_db),
-):
-    # calcolo range mese
-    month_start = date(year, month, 1)
-    if month == 12:
-        next_month_start = date(year + 1, 1, 1)
-    else:
-        next_month_start = date(year, month + 1, 1)
-    days_in_month = (next_month_start - month_start).days
-
-    # --- Prenotazioni per il mese ---
-    bookings = (
-        db.query(Booking)
-        .filter(
-            Booking.checkin_date < next_month_start,
-            Booking.checkout_date > month_start,
-        )
-        .all()
-    )
-
-    units_count = db.query(Unit).count()
-    nights_total = days_in_month * units_count
-
-    occupied_nights = 0
-    revenue_total = 0.0
-    revenue_by_source: Dict[str, float] = {}
-    revenue_by_unit_map: Dict[int, RevenueByUnit] = {}
-
-    # base per i costi
-    costs_total = 0.0
-    costs_by_category_map: Dict[str, float] = {}
-
-    # --- Ricavi e costi legati alle prenotazioni ---
-    for b in bookings:
-        # notti di questa prenotazione dentro il mese
-        stay_start = max(b.checkin_date, month_start)
-        stay_end = min(b.checkout_date, next_month_start)
-        nights_in_month = (stay_end - stay_start).days
-
-        occupied_nights += nights_in_month
-
-        # Ricavo per questa prenotazione dentro il mese
-        if (
-            b.total_price is not None
-            and b.checkin_date >= month_start
-            and b.checkout_date <= next_month_start
-        ):
-            booking_revenue = float(b.total_price)
-        else:
-            if b.nightly_rate is not None:
-                booking_revenue = float(b.nightly_rate) * nights_in_month
-            else:
-                booking_revenue = 0.0
-
-        revenue_total += booking_revenue
-
-        # per sorgente
-        src = b.source or "unknown"
-        revenue_by_source[src] = revenue_by_source.get(src, 0.0) + booking_revenue
-
-        # per unità
-        u = b.unit
-        if u:
-            existing = revenue_by_unit_map.get(u.id)
-            if existing is None:
-                revenue_by_unit_map[u.id] = RevenueByUnit(
-                    unit_id=u.id,
-                    unit_name=u.name,
-                    revenue=booking_revenue,
-                    nights_occupied=nights_in_month,
-                )
-            else:
-                existing.revenue += booking_revenue
-                existing.nights_occupied += nights_in_month
-
-        # ---- COSTI DA PRENOTAZIONE ----
-        # conteggiati nel mese in cui cade il CHECK-OUT
-        if month_start <= b.checkout_date < next_month_start:
-            # cleaning fee (costo pulizia)
-            if b.cleaning_fee is not None:
-                cf = float(b.cleaning_fee)
-                costs_total += cf
-                costs_by_category_map["Booking - Cleaning fee"] = (
-                    costs_by_category_map.get("Booking - Cleaning fee", 0.0) + cf
-                )
-
-            # commissioni canale (Airbnb / Booking, ecc.)
-            if b.channel_fee is not None:
-                ch = float(b.channel_fee)
-                costs_total += ch
-                costs_by_category_map["Booking - Channel fee"] = (
-                    costs_by_category_map.get("Booking - Channel fee", 0.0) + ch
-                )
-
-            # tassa di soggiorno → trattata come costo/pass-through
-            if b.city_tax is not None:
-                ct = float(b.city_tax)
-                costs_total += ct
-                costs_by_category_map["Booking - City tax"] = (
-                    costs_by_category_map.get("Booking - City tax", 0.0) + ct
-                )
-
-    occupancy_rate = (
-        (occupied_nights / nights_total) * 100 if nights_total > 0 else 0.0
-    )
-    adr = revenue_total / occupied_nights if occupied_nights > 0 else None
-
-    # --- Costi manuali (CostItem) ---
-    cost_items = (
-        db.query(CostItem)
-        .filter(
-            CostItem.date >= month_start,
-            CostItem.date < next_month_start,
-        )
-        .all()
-    )
-
-    for c in cost_items:
-        amount = float(c.amount)
-        costs_total += amount
-        cat = c.category or "Altro"
-        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
-
-    # --- Costi staff (StaffTask.cost) ---
-    staff_tasks = (
-        db.query(StaffTask)
-        .filter(
-            StaffTask.date >= month_start,
-            StaffTask.date < next_month_start,
-        )
-        .all()
-    )
-
-    for t in staff_tasks:
-        if t.cost is None:
-            continue
-        amount = float(t.cost)
-        costs_total += amount
-        cat = f"Staff - {t.task_type or 'Altro'}"
-        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
-
-    # trasformiamo le categorie in lista ordinata
-    costs_by_category = [
-        CostByCategory(category=cat, total=round(total, 2))
-        for cat, total in costs_by_category_map.items()
-    ]
-    costs_by_category.sort(key=lambda x: x.category)
-
-    profit = revenue_total - costs_total
-
-    return PnLMonthSummary(
-        year=year,
-        month=month,
-        nights_total=nights_total,
-        nights_occupied=occupied_nights,
-        occupancy_rate=round(occupancy_rate, 2),
-        adr=round(adr, 2) if adr is not None else None,
-        revenue_total=round(revenue_total, 2),
-        revenue_by_source={k: round(v, 2) for k, v in revenue_by_source.items()},
-        revenue_by_unit=list(revenue_by_unit_map.values()),
-        costs_total=round(costs_total, 2),
-        costs_by_category=costs_by_category,
-        profit=round(profit, 2),
-    )
-
-
 # ---------- STAFF DEFAULTS (impostazioni automatiche) ----------
 
 
@@ -1228,3 +1477,164 @@ def update_staff_defaults_endpoint(
     db.commit()
     db.refresh(defaults)
     return defaults
+
+
+# ---------- STAFF MEMBERS (ANAGRAFICA) ----------
+
+
+class StaffMemberBase(BaseModel):
+    full_name: str
+    role: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    color_hex: str | None = None
+    hourly_cost: float | None = None
+    is_active: bool = True
+
+
+class StaffMemberCreate(StaffMemberBase):
+    pass
+
+
+class StaffMemberUpdate(BaseModel):
+    full_name: str | None = None
+    role: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    color_hex: str | None = None
+    hourly_cost: float | None = None
+    is_active: bool | None = None
+
+
+class StaffMemberOut(StaffMemberBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+@app.get("/staff-members", response_model=List[StaffMemberOut])
+def list_staff_members(
+    db: Session = Depends(get_db),
+    include_inactive: bool = False,
+):
+    q = db.query(StaffMember)
+    if not include_inactive:
+        q = q.filter(StaffMember.is_active.is_(True))
+    members = q.order_by(StaffMember.full_name).all()
+    return members
+
+
+@app.post("/staff-members", response_model=StaffMemberOut)
+def create_staff_member(
+    payload: StaffMemberCreate, db: Session = Depends(get_db)
+):
+    member = StaffMember(
+        full_name=payload.full_name,
+        role=payload.role,
+        email=payload.email,
+        phone=payload.phone,
+        color_hex=payload.color_hex,
+        hourly_cost=payload.hourly_cost,
+        is_active=payload.is_active,
+    )
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@app.put("/staff-members/{member_id}", response_model=StaffMemberOut)
+def update_staff_member(
+    member_id: int, payload: StaffMemberUpdate, db: Session = Depends(get_db)
+):
+    member = db.query(StaffMember).filter(StaffMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Staff member non trovato")
+
+    if payload.full_name is not None:
+        member.full_name = payload.full_name
+    if payload.role is not None:
+        member.role = payload.role
+    if payload.email is not None:
+        member.email = payload.email
+    if payload.phone is not None:
+        member.phone = payload.phone
+    if payload.color_hex is not None:
+        member.color_hex = payload.color_hex
+    if payload.hourly_cost is not None:
+        member.hourly_cost = payload.hourly_cost
+    if payload.is_active is not None:
+        member.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@app.delete("/staff-members/{member_id}", status_code=204)
+def deactivate_staff_member(member_id: int, db: Session = Depends(get_db)):
+    member = db.query(StaffMember).filter(StaffMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Staff member non trovato")
+
+    # soft delete: lo marchiamo come non attivo
+    member.is_active = False
+    db.commit()
+    return
+
+
+# ---------- PRICING DEFAULTS ----------
+
+
+class PricingDefaultsOut(BaseModel):
+    default_cleaning_fee: float | None = None
+    default_city_tax_per_night: float | None = None
+    default_channel_fee_percent: float | None = None
+    default_currency: str = "EUR"
+
+
+class PricingDefaultsUpdate(BaseModel):
+    default_cleaning_fee: float | None = None
+    default_city_tax_per_night: float | None = None
+    default_channel_fee_percent: float | None = None
+    default_currency: str | None = None
+
+
+@app.get("/pricing-defaults", response_model=PricingDefaultsOut)
+def get_pricing_defaults_endpoint(db: Session = Depends(get_db)):
+    pricing = _get_or_create_pricing_defaults(db)
+    return PricingDefaultsOut(
+        default_cleaning_fee=pricing.default_cleaning_fee,
+        default_city_tax_per_night=pricing.default_city_tax_per_night,
+        default_channel_fee_percent=pricing.default_channel_commission_percent,
+        default_currency=pricing.currency,
+    )
+
+
+@app.put("/pricing-defaults", response_model=PricingDefaultsOut)
+def update_pricing_defaults_endpoint(
+    payload: PricingDefaultsUpdate, db: Session = Depends(get_db)
+):
+    pricing = _get_or_create_pricing_defaults(db)
+
+    if payload.default_cleaning_fee is not None:
+        pricing.default_cleaning_fee = payload.default_cleaning_fee
+    if payload.default_city_tax_per_night is not None:
+        pricing.default_city_tax_per_night = payload.default_city_tax_per_night
+    if payload.default_channel_fee_percent is not None:
+        pricing.default_channel_commission_percent = (
+            payload.default_channel_fee_percent
+        )
+    if payload.default_currency is not None:
+        pricing.currency = payload.default_currency
+
+    db.commit()
+    db.refresh(pricing)
+
+    return PricingDefaultsOut(
+        default_cleaning_fee=pricing.default_cleaning_fee,
+        default_city_tax_per_night=pricing.default_city_tax_per_night,
+        default_channel_fee_percent=pricing.default_channel_commission_percent,
+        default_currency=pricing.currency,
+    )

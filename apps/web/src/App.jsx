@@ -9,12 +9,16 @@ import StaffPlanner from "./pages/StaffPlanner.jsx";
 import UnitTimeline from "./pages/UnitTimeline.jsx";
 import NotFound from "./pages/NotFound.jsx";
 import Business from "./pages/Business.jsx";
+import ArrivalsDepartures from "./pages/ArrivalsDepartures";
+import StaffDirectory from "./pages/StaffDirectory";
+import Pricing from "./pages/Pricing";
 
 function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/operations" element={<ArrivalsDepartures />} />
         <Route path="/units" element={<Units />} />
         <Route path="/units/:unitId/timeline" element={<UnitTimeline />} />
         <Route path="/bookings" element={<Bookings />} />
@@ -22,6 +26,8 @@ function App() {
         <Route path="/staff" element={<Staff />} />
         <Route path="/staff-planner" element={<StaffPlanner />} />
         <Route path="/business" element={<Business />} />
+        <Route path="/staff-anagrafica" element={<StaffDirectory />} />
+        <Route path="/tariffe-canali" element={<Pricing />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

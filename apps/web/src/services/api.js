@@ -68,6 +68,10 @@ export function getUnits() {
   return apiGet("/units");
 }
 
+export function updateUnit(unitId, payload) {
+  return apiPut(`/units/${unitId}`, payload);
+}
+
 /* --------- BOOKINGS --------- */
 
 export function getBookings() {
@@ -104,6 +108,11 @@ export function getMonthSummary(year, month) {
 // ricavi, costi, profitto per mese (pagina Business)
 export function getMonthPnL(year, month) {
   return apiGet("/analytics/month-pnl", { year, month });
+}
+
+// righe di costo dettagliate per il mese (booking + staff + costi manuali)
+export function getMonthCostLines(year, month) {
+  return apiGet("/analytics/month-cost-lines", { year, month });
 }
 
 /* --------- STAFF TASKS --------- */
@@ -150,4 +159,32 @@ export function getStaffDefaults() {
 
 export function updateStaffDefaults(payload) {
   return apiPut("/staff-defaults", payload);
+}
+
+/* --------- STAFF MEMBERS (ANAGRAFICA) --------- */
+
+export function getStaffMembers(params = {}) {
+  return apiGet("/staff-members", params);
+}
+
+export function createStaffMember(payload) {
+  return apiPost("/staff-members", payload);
+}
+
+export function updateStaffMember(id, payload) {
+  return apiPut(`/staff-members/${id}`, payload);
+}
+
+export function deactivateStaffMember(id) {
+  return apiDelete(`/staff-members/${id}`);
+}
+
+/* --------- PRICING DEFAULTS --------- */
+
+export function getPricingDefaults() {
+  return apiGet("/pricing-defaults");
+}
+
+export function updatePricingDefaults(payload) {
+  return apiPut("/pricing-defaults", payload);
 }

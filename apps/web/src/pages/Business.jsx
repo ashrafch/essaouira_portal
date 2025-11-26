@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getMonthPnL, getCostItems, getUnits } from "../services/api";
+import { getMonthPnL, getMonthCostLines, getUnits } from "../services/api";
 
 function pad2(n) {
   return n < 10 ? `0${n}` : String(n);
@@ -16,7 +16,7 @@ function Business() {
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
 
   const [pnl, setPnl] = useState(null);
-  const [costItems, setCostItems] = useState([]);
+  const [costLines, setCostLines] = useState([]);
   const [units, setUnits] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -34,27 +34,18 @@ function Business() {
     [units]
   );
 
-  // calcolo range mese per chiamare /cost-items
-  function getMonthRange(y, m) {
-    const start = `${y}-${pad2(m)}-01`;
-    const nextMonth = m === 12 ? { y: y + 1, m: 1 } : { y: y, m: m + 1 };
-    const end = `${nextMonth.y}-${pad2(nextMonth.m)}-01`;
-    return { from_date: start, to_date: end };
-  }
-
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const range = getMonthRange(year, month);
-        const [pnlResp, costResp, unitsResp] = await Promise.all([
+        const [pnlResp, costLinesResp, unitsResp] = await Promise.all([
           getMonthPnL(year, month),
-          getCostItems(range),
+          getMonthCostLines(year, month),
           getUnits(),
         ]);
         setPnl(pnlResp);
-        setCostItems(costResp);
+        setCostLines(costLinesResp);
         setUnits(unitsResp);
       } catch (err) {
         setError(err.message || "Errore caricando i dati business");
@@ -73,13 +64,48 @@ function Business() {
     return pnl.costs_by_category?.map((c) => c.category) || [];
   }, [pnl]);
 
-  const visibleCostItems = useMemo(() => {
-    return costItems.filter((c) =>
+  const visibleCostLines = useMemo(() => {
+    return costLines.filter((c) =>
       selectedCostCategory === "all"
         ? true
         : c.category === selectedCostCategory
     );
-  }, [costItems, selectedCostCategory]);
+  }, [costLines, selectedCostCategory]);
+
+  const selectedCategoryTotal = useMemo(() => {
+    if (!pnl || selectedCostCategory === "all") return null;
+    const found = pnl.costs_by_category.find(
+      (c) => c.category === selectedCostCategory
+    );
+    return found ? found.total : null;
+  }, [pnl, selectedCostCategory]);
+
+  const selectedCategoryPerc = useMemo(() => {
+    if (!pnl || selectedCostCategory === "all") return null;
+    if (!pnl.costs_total || pnl.costs_total <= 0) return null;
+    const found = pnl.costs_by_category.find(
+      (c) => c.category === selectedCostCategory
+    );
+    if (!found) return null;
+    return (found.total / pnl.costs_total) * 100;
+  }, [pnl, selectedCostCategory]);
+
+  function getOriginLabel(line) {
+    switch (line.origin) {
+      case "manual":
+        return "Manuale";
+      case "booking_cleaning_fee":
+        return "Booking · Cleaning fee";
+      case "booking_channel_fee":
+        return "Booking · Channel fee";
+      case "booking_city_tax":
+        return "Booking · City tax";
+      case "staff_task":
+        return "Staff task";
+      default:
+        return line.origin || "Altro";
+    }
+  }
 
   // ---- styles ----
 
@@ -165,23 +191,20 @@ function Business() {
     verticalAlign: "top",
   };
 
-  const pill = (bg, color, border = "transparent") => ({
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "3px 8px",
-    borderRadius: 999,
-    fontSize: 11,
-    backgroundColor: bg,
-    color,
-    border: `1px solid ${border}`,
+  const clickableRow = (active) => ({
+    cursor: "pointer",
+    backgroundColor: active ? "#ecfdf5" : "transparent",
   });
 
-  const costCategoryChip = (active) =>
-    pill(
-      active ? "#0f766e" : "#f3f4f6",
-      active ? "white" : "#374151",
-      active ? "#0f766e" : "#e5e7eb"
-    );
+  const smallButton = {
+    borderRadius: 999,
+    border: "1px solid #d1d5db",
+    padding: "4px 10px",
+    fontSize: 11,
+    color: "gray",
+    background: "#f9fafb",
+    cursor: "pointer",
+  };
 
   return (
     <div style={page}>
@@ -251,8 +274,8 @@ function Business() {
               <div style={cardTitle}>Costi totali</div>
               <div style={cardValue}>{pnl.costs_total.toFixed(2)} €</div>
               <div style={cardSub}>
-                Somma di costi staff, fee di prenotazione e costi extra
-                registrati nel mese.
+                Somma di tutte le spese (booking, staff e costi manuali) nel
+                mese.
               </div>
             </div>
             <div style={card}>
@@ -266,7 +289,7 @@ function Business() {
                 {pnl.profit.toFixed(2)} €
               </div>
               <div style={cardSub}>
-                Ricavi − Costi (tutte le unità e tutti i canali).
+                Ricavi − Costi (tutti i canali e tutte le unità).
               </div>
             </div>
           </div>
@@ -343,52 +366,88 @@ function Business() {
                   <div
                     style={{
                       display: "flex",
-                      flexWrap: "wrap",
-                      gap: 6,
+                      justifyContent: "space-between",
+                      alignItems: "center",
                       marginBottom: 6,
+                      gap: 8,
                     }}
                   >
+                    <p style={{ fontSize: 11, color: "#6b7280" }}>
+                      Il valore in tabella è il{" "}
+                      <strong>totale dei costi</strong> per ciascuna
+                      categoria nel mese selezionato.
+                      <br />
+                      La colonna % indica quanto pesa quella categoria sui{" "}
+                      <strong>costi totali del mese</strong>.
+                      <br />
+                      Clicca una riga per filtrare il dettaglio sotto.
+                    </p>
                     <button
                       type="button"
+                      style={smallButton}
                       onClick={() => setSelectedCostCategory("all")}
-                      style={{
-                        ...costCategoryChip(selectedCostCategory === "all"),
-                        cursor: "pointer",
-                      }}
                     >
-                      Tutte le categorie
+                      Mostra tutte le categorie
                     </button>
-                    {pnl.costs_by_category.map((c) => (
-                      <button
-                        key={c.category}
-                        type="button"
-                        onClick={() => setSelectedCostCategory(c.category)}
-                        style={{
-                          ...costCategoryChip(
-                            selectedCostCategory === c.category
-                          ),
-                          cursor: "pointer",
-                        }}
-                      >
-                        {c.category} · {c.total.toFixed(2)} €
-                      </button>
-                    ))}
                   </div>
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "#6b7280",
-                      marginTop: 2,
-                    }}
-                  >
-                    Questi importi includono:
-                    {" "}
-                    fee legate alle prenotazioni
-                    (cleaning fee, commissioni canale, tassa di soggiorno nel mese del
-                    check-out),
-                    costi dello staff (da task) e eventuali costi extra inseriti
-                    manualmente (CostItem).
-                  </p>
+
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={table}>
+                      <thead>
+                        <tr>
+                          <th style={th}>Categoria</th>
+                          <th style={{ ...th, textAlign: "right" }}>
+                            Totale costi (mese)
+                          </th>
+                          <th style={{ ...th, textAlign: "right" }}>
+                            % sul totale costi
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pnl.costs_by_category.map((c) => {
+                          const active = selectedCostCategory === c.category;
+                          const perc =
+                            pnl.costs_total > 0
+                              ? (c.total / pnl.costs_total) * 100
+                              : 0;
+
+                          return (
+                            <tr
+                              key={c.category}
+                              style={clickableRow(active)}
+                              onClick={() =>
+                                setSelectedCostCategory(
+                                  active ? "all" : c.category
+                                )
+                              }
+                            >
+                              <td style={td}>{c.category}</td>
+                              <td
+                                style={{
+                                  ...td,
+                                  textAlign: "right",
+                                  fontWeight: active ? 600 : 400,
+                                }}
+                              >
+                                {c.total.toFixed(2)} €
+                              </td>
+                              <td
+                                style={{
+                                  ...td,
+                                  textAlign: "right",
+                                  fontSize: 11,
+                                  color: "#4b5563",
+                                }}
+                              >
+                                {perc.toFixed(1)}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </>
               )}
             </div>
@@ -402,15 +461,33 @@ function Business() {
                     ? "tutte le categorie"
                     : selectedCostCategory}
                 </strong>
-                . In questa tabella vedi nel dettaglio solo i costi
-                inseriti manualmente (CostItem). Le categorie generate
-                automaticamente da prenotazioni e task dello staff potrebbero
-                non avere righe qui.
+                {selectedCostCategory !== "all" &&
+                  selectedCategoryTotal != null && (
+                    <>
+                      {" "}
+                      · Totale costi:{" "}
+                      <strong>
+                        {selectedCategoryTotal.toFixed(2)} €
+                      </strong>
+                      {selectedCategoryPerc != null && (
+                        <>
+                          {" "}
+                          (
+                          <strong>
+                            {selectedCategoryPerc.toFixed(1)}%
+                          </strong>{" "}
+                          dei costi totali)
+                        </>
+                      )}
+                    </>
+                  )}
+                . Qui vedi concretamente da dove arrivano i totali sopra
+                (booking, staff e costi manuali).
               </p>
 
-              {visibleCostItems.length === 0 ? (
+              {visibleCostLines.length === 0 ? (
                 <p style={{ fontSize: 12, color: "#6b7280" }}>
-                  Nessun costo manuale registrato per il filtro selezionato.
+                  Nessun costo registrato per il filtro selezionato.
                 </p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -419,16 +496,33 @@ function Business() {
                       <tr>
                         <th style={th}>Data</th>
                         <th style={th}>Categoria</th>
+                        <th style={th}>Origine</th>
+                        <th style={th}>Riferimento</th>
                         <th style={th}>Descrizione</th>
                         <th style={th}>Unità</th>
                         <th style={th}>Importo</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleCostItems.map((c) => (
-                        <tr key={c.id}>
+                      {visibleCostLines.map((c, idx) => (
+                        <tr
+                          key={
+                            c.id ??
+                            `${c.origin}-${c.booking_id || ""}-${
+                              c.staff_task_id || ""
+                            }-${idx}`
+                          }
+                        >
                           <td style={td}>{formatDate(c.date)}</td>
                           <td style={td}>{c.category}</td>
+                          <td style={td}>{getOriginLabel(c)}</td>
+                          <td style={td}>
+                            {c.booking_id
+                              ? `Booking #${c.booking_id}`
+                              : c.staff_task_id
+                              ? `Task #${c.staff_task_id}`
+                              : "—"}
+                          </td>
                           <td style={td}>{c.description || "—"}</td>
                           <td style={td}>
                             {c.unit_id
