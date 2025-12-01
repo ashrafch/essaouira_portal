@@ -175,8 +175,14 @@ export function updateStaffMember(id, payload) {
   return apiPut(`/staff-members/${id}`, payload);
 }
 
+// soft delete -> mette is_active = false
 export function deactivateStaffMember(id) {
   return apiDelete(`/staff-members/${id}`);
+}
+
+// hard delete -> cancella dal DB
+export function deleteStaffMember(id) {
+  return apiDelete(`/staff-members/${id}/hard-delete`);
 }
 
 /* --------- PRICING DEFAULTS --------- */

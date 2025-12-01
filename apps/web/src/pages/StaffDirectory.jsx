@@ -3,20 +3,31 @@ import {
   getStaffMembers,
   createStaffMember,
   updateStaffMember,
-  deactivateStaffMember,
+  deactivateStaffMember, // usato come "elimina definitiva"
 } from "../services/api";
+
+const COLOR_SWATCHES = [
+  "#0f766e", // verde owner / housekeeping
+  "#2563eb", // blu manutenzione
+  "#f97316", // arancio operations
+  "#a855f7", // viola amministrazione
+  "#dc2626", // rosso esterno / fornitore
+  "#16a34a", // altro verde
+];
 
 function StaffDirectory() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // false = mostra solo attivi (active_only=true)
+  // true  = mostra anche disattivi (no filtro)
   const [showInactive, setShowInactive] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
-  const [fullName, setFullName] = useState("");
+  const [name, setName] = useState("");
   const [role, setRole] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [hourlyCost, setHourlyCost] = useState("");
   const [colorHex, setColorHex] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,12 +37,24 @@ function StaffDirectory() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getStaffMembers({
-          include_inactive: showInactive,
+        const params = {};
+        // se NON voglio vedere i disattivi → chiedo solo attivi
+        if (!showInactive) {
+          params.active_only = "true";
+        }
+        const data = await getStaffMembers(params);
+
+        // ordino: prima attivi, poi disattivi, poi per nome
+        data.sort((a, b) => {
+          if (a.is_active !== b.is_active) {
+            return a.is_active ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name);
         });
+
         setMembers(data);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || "Errore caricando lo staff.");
       } finally {
         setLoading(false);
       }
@@ -41,48 +64,67 @@ function StaffDirectory() {
 
   function resetForm() {
     setEditingId(null);
-    setFullName("");
+    setName("");
     setRole("");
-    setEmail("");
-    setPhone("");
+    setHourlyCost("");
     setColorHex("");
     setIsActive(true);
   }
 
   function startEdit(m) {
     setEditingId(m.id);
-    setFullName(m.full_name);
+    setName(m.name || "");
     setRole(m.role || "");
-    setEmail(m.email || "");
-    setPhone(m.phone || "");
+    setHourlyCost(
+      m.hourly_cost === null || m.hourly_cost === undefined
+        ? ""
+        : m.hourly_cost
+    );
     setColorHex(m.color_hex || "");
     setIsActive(m.is_active);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!fullName.trim()) {
+    if (!name.trim()) {
       alert("Il nome è obbligatorio");
       return;
     }
     setSaving(true);
     try {
       const payload = {
-        full_name: fullName.trim(),
+        name: name.trim(),
         role: role || null,
-        email: email || null,
-        phone: phone || null,
         color_hex: colorHex || null,
+        hourly_cost:
+          hourlyCost === "" || hourlyCost == null
+            ? null
+            : Number(hourlyCost),
         is_active: isActive,
       };
+
       if (editingId) {
         const updated = await updateStaffMember(editingId, payload);
         setMembers((prev) =>
-          prev.map((m) => (m.id === updated.id ? updated : m))
+          prev
+            .map((m) => (m.id === updated.id ? updated : m))
+            .sort((a, b) => {
+              if (a.is_active !== b.is_active) {
+                return a.is_active ? -1 : 1;
+              }
+              return a.name.localeCompare(b.name);
+            })
         );
       } else {
         const created = await createStaffMember(payload);
-        setMembers((prev) => [...prev, created]);
+        setMembers((prev) =>
+          [...prev, created].sort((a, b) => {
+            if (a.is_active !== b.is_active) {
+              return a.is_active ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+          })
+        );
       }
       resetForm();
     } catch (err) {
@@ -92,19 +134,43 @@ function StaffDirectory() {
     }
   }
 
-  async function handleDeactivate(id) {
-    if (!window.confirm("Disattivare questo membro?")) return;
+  async function handleToggleActive(member) {
     try {
-      await deactivateStaffMember(id);
+      const updated = await updateStaffMember(member.id, {
+        is_active: !member.is_active,
+      });
       setMembers((prev) =>
-        prev.map((m) =>
-          m.id === id ? { ...m, is_active: false } : m
-        )
+        prev
+          .map((m) => (m.id === updated.id ? updated : m))
+          .sort((a, b) => {
+            if (a.is_active !== b.is_active) {
+              return a.is_active ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name);
+          })
       );
     } catch (err) {
-      alert("Errore disattivando membro: " + err.message);
+      alert("Errore aggiornando stato: " + err.message);
     }
   }
+
+  async function handleDelete(id) {
+    if (
+      !window.confirm(
+        "Eliminare definitivamente questo membro? L'operazione non è reversibile."
+      )
+    )
+      return;
+    try {
+      await deactivateStaffMember(id); // DELETE /staff-members/{id}
+      setMembers((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      alert("Errore eliminando membro: " + err.message);
+    }
+  }
+
+  const activeCount = members.filter((m) => m.is_active).length;
+  const inactiveCount = members.length - activeCount;
 
   const page = {
     display: "flex",
@@ -171,31 +237,93 @@ function StaffDirectory() {
   const th = {
     textAlign: "left",
     borderBottom: "1px solid #e5e7eb",
-    padding: "6px 4px",
+    padding: "6px 6px",
     color: "#6b7280",
     fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: "0.03em",
   };
 
-  const td = {
-    padding: "6px 4px",
+  const tdBase = {
+    padding: "6px 6px",
     borderBottom: "1px solid #f3f4f6",
-    verticalAlign: "top",
+    verticalAlign: "middle",
+  };
+
+  const colorSwatchBase = {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    border: "1px solid rgba(0,0,0,0.15)",
+    cursor: "pointer",
   };
 
   return (
     <div style={page}>
-      <div>
-        <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
-        <p style={{ fontSize: 13, color: "#6b7280" }}>
-          Gestisci le persone che lavorano nella struttura. I nomi
-          dovrebbero essere gli stessi che usi come <code>assignee</code>{" "}
-          nei task.
-        </p>
+      {/* Header + KPI */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          gap: 12,
+        }}
+      >
+        <div>
+          <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
+          <p style={{ fontSize: 13, color: "#6b7280" }}>
+            Gestisci i membri dello staff della struttura. I nomi dovrebbero
+            essere coerenti con gli <code>assignee</code> usati nei task e nel
+            planner staff.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            fontSize: 11,
+          }}
+        >
+          <div
+            style={{
+              padding: "6px 10px",
+              borderRadius: 999,
+              backgroundColor: "#ecfdf5",
+              color: "#166534",
+              border: "1px solid #bbf7d0",
+              minWidth: 80,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 10, textTransform: "uppercase" }}>
+              Attivi
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{activeCount}</div>
+          </div>
+          <div
+            style={{
+              padding: "6px 10px",
+              borderRadius: 999,
+              backgroundColor: "#f9fafb",
+              color: "#6b7280",
+              border: "1px solid #e5e7eb",
+              minWidth: 80,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 10, textTransform: "uppercase" }}>
+              Disattivi
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {inactiveCount}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {error && (
-        <p style={{ color: "red", fontSize: 12 }}>{error}</p>
-      )}
+      {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
 
       <div
         style={{
@@ -205,6 +333,7 @@ function StaffDirectory() {
           alignItems: "flex-start",
         }}
       >
+        {/* FORM */}
         <div style={card}>
           <h2 style={{ fontSize: 14, marginBottom: 8 }}>
             {editingId ? "Modifica membro" : "Nuovo membro"}
@@ -214,8 +343,8 @@ function StaffDirectory() {
               <label style={label}>Nome completo</label>
               <input
                 style={input}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Es. Fatima El A."
               />
             </div>
@@ -229,30 +358,66 @@ function StaffDirectory() {
               />
             </div>
             <div style={field}>
-              <label style={label}>Email</label>
+              <label style={label}>Costo orario indicativo (€)</label>
               <input
                 style={input}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="number"
+                min="0"
+                step="0.5"
+                value={hourlyCost}
+                onChange={(e) => setHourlyCost(e.target.value)}
+                placeholder="Es. 5"
               />
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
+                Usato solo per analisi interne (Business), opzionale.
+              </span>
             </div>
             <div style={field}>
-              <label style={label}>Telefono</label>
-              <input
-                style={input}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-            <div style={field}>
-              <label style={label}>
-                Colore (es. #0f766e) – opzionale
-              </label>
-              <input
-                style={input}
-                value={colorHex}
-                onChange={(e) => setColorHex(e.target.value)}
-              />
+              <label style={label}>Colore identificativo</label>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                {COLOR_SWATCHES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColorHex(c)}
+                    style={{
+                      ...colorSwatchBase,
+                      backgroundColor: c,
+                      boxShadow:
+                        colorHex === c ? "0 0 0 2px #0f766e" : "none",
+                    }}
+                  />
+                ))}
+                <input
+                  style={{ ...input, maxWidth: 110, fontSize: 12 }}
+                  value={colorHex}
+                  onChange={(e) => setColorHex(e.target.value)}
+                  placeholder="#0f766e"
+                />
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 10,
+                  color: "#9ca3af",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                }}
+              >
+                <span>Es. </span>
+                <span>verde = housekeeping</span>
+                <span>blu = manutenzione</span>
+                <span>arancio = operations</span>
+                <span>viola = amministrazione</span>
+              </div>
             </div>
             <div style={field}>
               <label style={label}>
@@ -267,11 +432,7 @@ function StaffDirectory() {
             </div>
 
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button
-                type="submit"
-                style={buttonPrimary}
-                disabled={saving}
-              >
+              <button type="submit" style={buttonPrimary} disabled={saving}>
                 {saving
                   ? "Salvataggio..."
                   : editingId
@@ -291,15 +452,22 @@ function StaffDirectory() {
           </form>
         </div>
 
+        {/* LISTA */}
         <div style={card}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               marginBottom: 6,
+              alignItems: "center",
             }}
           >
-            <h2 style={{ fontSize: 14 }}>Lista staff</h2>
+            <div>
+              <h2 style={{ fontSize: 14, marginBottom: 2 }}>Lista staff</h2>
+              <p style={{ fontSize: 11, color: "#9ca3af" }}>
+                I membri disattivi non compariranno nel planner staff.
+              </p>
+            </div>
             <label
               style={{
                 fontSize: 11,
@@ -312,9 +480,7 @@ function StaffDirectory() {
               <input
                 type="checkbox"
                 checked={showInactive}
-                onChange={(e) =>
-                  setShowInactive(e.target.checked)
-                }
+                onChange={(e) => setShowInactive(e.target.checked)}
               />
               Mostra anche disattivi
             </label>
@@ -333,80 +499,89 @@ function StaffDirectory() {
                   <tr>
                     <th style={th}>Nome</th>
                     <th style={th}>Ruolo</th>
-                    <th style={th}>Contatti</th>
+                    <th style={th}>Costo orario</th>
                     <th style={th}>Stato</th>
                     <th style={th}>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
-                    <tr key={m.id}>
-                      <td style={td}>
-                        <div
-                          style={{
-                            fontWeight: 500,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
-                          {m.color_hex && (
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "999px",
-                                backgroundColor: m.color_hex,
-                                border:
-                                  "1px solid rgba(0,0,0,0.15)",
-                              }}
-                            />
-                          )}
-                          {m.full_name}
-                        </div>
-                      </td>
-                      <td style={td}>{m.role || "—"}</td>
-                      <td style={td}>
-                        <div style={{ fontSize: 11 }}>
-                          {m.email && (
-                            <div>Email: {m.email}</div>
-                          )}
-                          {m.phone && (
-                            <div>Tel: {m.phone}</div>
-                          )}
-                          {!m.email && !m.phone && "—"}
-                        </div>
-                      </td>
-                      <td style={td}>
-                        <span
-                          style={{
-                            borderRadius: 999,
-                            padding: "2px 8px",
-                            fontSize: 11,
-                            backgroundColor: m.is_active
-                              ? "#dcfce7"
-                              : "#f3f4f6",
-                            color: m.is_active
-                              ? "#166534"
-                              : "#6b7280",
-                          }}
-                        >
-                          {m.is_active ? "Attivo" : "Disattivo"}
-                        </span>
-                      </td>
-                      <td style={td}>
-                        <button
-                          type="button"
-                          style={{
-                            ...buttonSecondary,
-                            padding: "4px 8px",
-                            fontSize: 11,
-                          }}
-                          onClick={() => startEdit(m)}
-                        >
-                          Modifica
-                        </button>{" "}
-                        {m.is_active && (
+                  {members.map((m, idx) => {
+                    const rowStyle = {
+                      backgroundColor: idx % 2 === 0 ? "#ffffff" : "#f9fafb",
+                    };
+                    return (
+                      <tr key={m.id} style={rowStyle}>
+                        <td style={tdBase}>
+                          <div
+                            style={{
+                              fontWeight: 500,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            {m.color_hex && (
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "999px",
+                                  backgroundColor: m.color_hex,
+                                  border: "1px solid rgba(0,0,0,0.15)",
+                                }}
+                              />
+                            )}
+                            {m.name}
+                          </div>
+                        </td>
+                        <td style={tdBase}>{m.role || "—"}</td>
+                        <td style={tdBase}>
+                          {m.hourly_cost != null
+                            ? `€ ${m.hourly_cost.toFixed(2)}`
+                            : "—"}
+                        </td>
+                        <td style={tdBase}>
+                          <span
+                            style={{
+                              borderRadius: 999,
+                              padding: "2px 8px",
+                              fontSize: 11,
+                              backgroundColor: m.is_active
+                                ? "#dcfce7"
+                                : "#f3f4f6",
+                              color: m.is_active ? "#166534" : "#6b7280",
+                            }}
+                          >
+                            {m.is_active ? "Attivo" : "Disattivo"}
+                          </span>
+                        </td>
+                        <td style={{ ...tdBase, whiteSpace: "nowrap" }}>
+                          <button
+                            type="button"
+                            style={{
+                              ...buttonSecondary,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                            }}
+                            onClick={() => startEdit(m)}
+                          >
+                            Modifica
+                          </button>{" "}
+                          <button
+                            type="button"
+                            style={{
+                              ...buttonSecondary,
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              borderColor: m.is_active
+                                ? "#fee2e2"
+                                : "#bfdbfe",
+                              color: m.is_active ? "#b91c1c" : "#1d4ed8",
+                            }}
+                            onClick={() => handleToggleActive(m)}
+                          >
+                            {m.is_active ? "Disattiva" : "Riattiva"}
+                          </button>{" "}
                           <button
                             type="button"
                             style={{
@@ -416,14 +591,14 @@ function StaffDirectory() {
                               borderColor: "#fecaca",
                               color: "#b91c1c",
                             }}
-                            onClick={() => handleDeactivate(m.id)}
+                            onClick={() => handleDelete(m.id)}
                           >
-                            Disattiva
+                            Elimina
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

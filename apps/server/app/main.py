@@ -67,7 +67,7 @@ def on_startup():
     if db.query(StaffMember).count() == 0:
         staff_seed = [
             StaffMember(
-                full_name="Operatore 1",
+                name="Operatore 1",
                 role="Housekeeping",
                 email=None,
                 phone=None,
@@ -76,7 +76,7 @@ def on_startup():
                 hourly_cost=None,
             ),
             StaffMember(
-                full_name="Operatore 2",
+                name="Operatore 2",
                 role="Manutenzione",
                 email=None,
                 phone=None,
@@ -99,6 +99,7 @@ def on_startup():
         db.add(pricing_defaults)
         db.commit()
 
+# ---------- HEALTH CHECK ----------
 
 @app.get("/health")
 def health():
@@ -233,6 +234,10 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     """
     Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione.
 
+    Logica assegnazione:
+    - prova a scegliere un membro staff attivo in base al ruolo (es. Housekeeping, Reception, Manutenzione)
+    - se non trovato, usa defaults.cleaning_default_assignee
+
     Non impostiamo alcun costo automatico: il campo cost resta null
     finché non lo imposti tu a mano lato staff.
     """
@@ -250,7 +255,6 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
 
     is_late = bool(getattr(booking, "has_late_checkout", False))
 
-    base_assignee = defaults.cleaning_default_assignee
     base_hours = defaults.cleaning_default_hours or 1.0
     currency = defaults.currency or "EUR"
 
@@ -263,11 +267,12 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         cleaning_time_obj = time(17, 0)
 
     # 1) CHECK-IN (giorno di arrivo, orario standard 15:00)
+    checkin_assignee = _pick_auto_assignee(db, "checkin", defaults)
     checkin_task = StaffTask(
         date=booking.checkin_date,
         time=time(15, 0),
         task_type="checkin",
-        assignee_name=base_assignee,
+        assignee_name=checkin_assignee,
         estimated_hours=base_hours,
         status="planned",
         notes=f"AUTO: Check-in per prenotazione #{booking.id}",
@@ -279,11 +284,12 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     db.add(checkin_task)
 
     # 2) CHECK-OUT
+    checkout_assignee = _pick_auto_assignee(db, "checkout", defaults)
     checkout_task = StaffTask(
         date=booking.checkout_date,
         time=checkout_time_obj,
         task_type="checkout",
-        assignee_name=base_assignee,
+        assignee_name=checkout_assignee,
         estimated_hours=base_hours,
         status="planned",
         notes=(
@@ -299,11 +305,12 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     db.add(checkout_task)
 
     # 3) PULIZIA principale dopo il check-out
+    cleaning_assignee = _pick_auto_assignee(db, "cleaning", defaults)
     cleaning_task = StaffTask(
         date=booking.checkout_date,
         time=cleaning_time_obj,
         task_type="cleaning",
-        assignee_name=base_assignee,
+        assignee_name=cleaning_assignee,
         estimated_hours=base_hours if not is_late else base_hours * 1.5,
         status="planned",
         notes=(
@@ -320,11 +327,12 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
 
     # 4) Extra pulizia se late check-out (es. fine giornata)
     if is_late:
+        extra_clean_assignee = _pick_auto_assignee(db, "cleaning", defaults)
         extra_clean_task = StaffTask(
             date=booking.checkout_date,
             time=time(19, 0),
             task_type="cleaning",
-            assignee_name=base_assignee,
+            assignee_name=extra_clean_assignee,
             estimated_hours=base_hours * 0.5,
             status="planned",
             notes=f"AUTO: Extra pulizia (late check-out) per prenotazione #{booking.id}",
@@ -336,6 +344,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         db.add(extra_clean_task)
 
     # 5) COLAZIONI (tutti i giorni intermedi)
+    breakfast_assignee = _pick_auto_assignee(db, "breakfast", defaults)
     current = booking.checkin_date + timedelta(days=1)
     last_breakfast_day = booking.checkout_date - timedelta(days=1)
 
@@ -344,7 +353,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
             date=current,
             time=time(8, 30),
             task_type="breakfast",
-            assignee_name=base_assignee,
+            assignee_name=breakfast_assignee,
             estimated_hours=base_hours * 0.5,
             status="planned",
             notes=f"AUTO: Colazione per prenotazione #{booking.id}",
@@ -357,6 +366,43 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         current += timedelta(days=1)
 
     db.commit()
+
+def _pick_auto_assignee(db: Session, task_type: str, defaults: StaffDefaults) -> str | None:
+    """
+    Sceglie automaticamente l'operatore a cui assegnare una task AUTO
+    in base al tipo di task e ai ruoli nello staff.
+
+    Regole:
+    - se esiste uno staff attivo con ruolo adatto al task_type → usa il primo (ordine alfabetico)
+    - altrimenti fallback su defaults.cleaning_default_assignee (stringa libera)
+    """
+
+    # mappa "tipo task" -> possibili ruoli in ordine di priorità
+    role_map: dict[str, list[str]] = {
+        "cleaning": ["Housekeeping"],
+        "breakfast": ["Housekeeping", "Breakfast"],
+        "checkin": ["Reception", "Front desk"],
+        "checkout": ["Reception", "Front desk"],
+        "maintenance": ["Manutenzione", "Maintenance"],
+    }
+
+    roles = role_map.get(task_type, [])
+
+    if roles:
+        member = (
+            db.query(StaffMember)
+            .filter(
+                StaffMember.is_active.is_(True),
+                StaffMember.role.in_(roles),
+            )
+            .order_by(StaffMember.name)
+            .first()
+        )
+        if member:
+            return member.name
+
+    # fallback: quello che imposti tu nel pannello "Impostazioni staff"
+    return defaults.cleaning_default_assignee
 
 
 # ---------- BOOKING endpoints ----------
@@ -1481,12 +1527,9 @@ def update_staff_defaults_endpoint(
 
 # ---------- STAFF MEMBERS (ANAGRAFICA) ----------
 
-
 class StaffMemberBase(BaseModel):
-    full_name: str
+    name: str
     role: str | None = None
-    email: str | None = None
-    phone: str | None = None
     color_hex: str | None = None
     hourly_cost: float | None = None
     is_active: bool = True
@@ -1497,10 +1540,8 @@ class StaffMemberCreate(StaffMemberBase):
 
 
 class StaffMemberUpdate(BaseModel):
-    full_name: str | None = None
+    name: str | None = None
     role: str | None = None
-    email: str | None = None
-    phone: str | None = None
     color_hex: str | None = None
     hourly_cost: float | None = None
     is_active: bool | None = None
@@ -1516,12 +1557,12 @@ class StaffMemberOut(StaffMemberBase):
 @app.get("/staff-members", response_model=List[StaffMemberOut])
 def list_staff_members(
     db: Session = Depends(get_db),
-    include_inactive: bool = False,
+    active_only: bool = False,
 ):
     q = db.query(StaffMember)
-    if not include_inactive:
+    if active_only:
         q = q.filter(StaffMember.is_active.is_(True))
-    members = q.order_by(StaffMember.full_name).all()
+    members = q.order_by(StaffMember.name).all()
     return members
 
 
@@ -1530,10 +1571,8 @@ def create_staff_member(
     payload: StaffMemberCreate, db: Session = Depends(get_db)
 ):
     member = StaffMember(
-        full_name=payload.full_name,
+        name=payload.name,
         role=payload.role,
-        email=payload.email,
-        phone=payload.phone,
         color_hex=payload.color_hex,
         hourly_cost=payload.hourly_cost,
         is_active=payload.is_active,
@@ -1552,14 +1591,10 @@ def update_staff_member(
     if not member:
         raise HTTPException(status_code=404, detail="Staff member non trovato")
 
-    if payload.full_name is not None:
-        member.full_name = payload.full_name
+    if payload.name is not None:
+        member.name = payload.name
     if payload.role is not None:
         member.role = payload.role
-    if payload.email is not None:
-        member.email = payload.email
-    if payload.phone is not None:
-        member.phone = payload.phone
     if payload.color_hex is not None:
         member.color_hex = payload.color_hex
     if payload.hourly_cost is not None:
@@ -1573,16 +1608,15 @@ def update_staff_member(
 
 
 @app.delete("/staff-members/{member_id}", status_code=204)
-def deactivate_staff_member(member_id: int, db: Session = Depends(get_db)):
+def delete_staff_member(member_id: int, db: Session = Depends(get_db)):
+    """Eliminazione definitiva del record staff."""
     member = db.query(StaffMember).filter(StaffMember.id == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Staff member non trovato")
 
-    # soft delete: lo marchiamo come non attivo
-    member.is_active = False
+    db.delete(member)
     db.commit()
     return
-
 
 # ---------- PRICING DEFAULTS ----------
 

@@ -54,7 +54,7 @@ function Staff() {
   const [defHours, setDefHours] = useState("1");
   const [defCurrency, setDefCurrency] = useState("EUR");
 
-  // quick-create su cella (giorno + assignee)
+  // quick-create su cella (giorno + colonna assignee)
   const [quickCreateTarget, setQuickCreateTarget] = useState(null); // { date, assignee }
   const [quickType, setQuickType] = useState("cleaning");
   const [quickUnitId, setQuickUnitId] = useState("");
@@ -62,6 +62,10 @@ function Staff() {
   const [quickHours, setQuickHours] = useState("");
   const [quickNotes, setQuickNotes] = useState("");
   const [creatingTask, setCreatingTask] = useState(false);
+
+  // nuovo: scelta ruolo + assegnatario per il quick-create
+  const [quickRole, setQuickRole] = useState("");
+  const [quickAssignee, setQuickAssignee] = useState("");
 
   // mappa unità
   const unitMap = useMemo(
@@ -102,7 +106,7 @@ function Staff() {
         const [uns, defs, staff] = await Promise.all([
           getUnits(),
           getStaffDefaults(),
-          getStaffMembers({ include_inactive: false }),
+          getStaffMembers({ active_only: true }), // <-- usa solo staff attivi
         ]);
         setUnits(uns || []);
         setStaffMembers(staff || []);
@@ -190,7 +194,16 @@ function Staff() {
     return { total, byStatus, hours, costTotal };
   }, [filteredTasks]);
 
-  // lista assignee (StaffDirectory + task)
+  // lista ruoli (da anagrafica staff)
+  const staffRoles = useMemo(() => {
+    const set = new Set();
+    staffMembers.forEach((m) => {
+      if (m.role) set.add(m.role);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [staffMembers]);
+
+  // lista assignee per colonne della board
   const assignees = useMemo(() => {
     const nameSet = new Set();
 
@@ -198,25 +211,21 @@ function Staff() {
     staffMembers
       .filter((m) => m.is_active)
       .forEach((m) => {
-        if (m.full_name) nameSet.add(m.full_name);
+        if (m.name) nameSet.add(m.name);
       });
 
     // 2) nomi che compaiono nei task
     for (const t of filteredTasks) {
-      nameSet.add(t.assignee_name || "Non assegnato");
+      const name = t.assignee_name || "Non assegnato";
+      nameSet.add(name);
     }
 
     let arr = Array.from(nameSet);
 
-    // ordina alfabeticamente
-    arr.sort((a, b) => a.localeCompare(b));
-
-    // sposta "Non assegnato" in fondo
+    // togli eventuali duplicati e ordina (lasciando "Non assegnato" alla fine)
     const unassigned = "Non assegnato";
-    if (arr.includes(unassigned)) {
-      arr = arr.filter((n) => n !== unassigned);
-      arr.push(unassigned);
-    }
+    arr = arr.filter((n) => n !== unassigned).sort((a, b) => a.localeCompare(b));
+    arr.push(unassigned);
 
     // se esiste un default assignee, mettilo in testa
     if (defAssignee && arr.includes(defAssignee)) {
@@ -226,12 +235,14 @@ function Staff() {
     return arr;
   }, [filteredTasks, defAssignee, staffMembers]);
 
+  const assigneeOptions = assignees;
+
   // mappa nome → colore da Anagrafica
   const staffColorMap = useMemo(() => {
     const map = {};
     for (const m of staffMembers) {
-      if (m.full_name && m.color_hex) {
-        map[m.full_name] = m.color_hex;
+      if (m.name && m.color_hex) {
+        map[m.name] = m.color_hex;
       }
     }
     return map;
@@ -346,6 +357,21 @@ function Staff() {
     saveTask(task.id, { estimated_hours: task.estimated_hours ?? null });
   }
 
+  // cambio assegnatario da select
+  function handleChangeAssignee(task, newName) {
+    const assignee =
+      !newName || newName === "Non assegnato" ? null : newName;
+
+    // ottimista: sposto la card di colonna
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id ? { ...t, assignee_name: assignee } : t
+      )
+    );
+
+    saveTask(task.id, { assignee_name: assignee });
+  }
+
   // ---- quick-create su cella ----
 
   function openQuickCreate(date, assignee) {
@@ -355,6 +381,8 @@ function Staff() {
     setQuickCost(defCost || "");
     setQuickHours(defHours || "");
     setQuickNotes("");
+    setQuickRole("");
+    setQuickAssignee(assignee === "Non assegnato" ? "" : assignee);
   }
 
   function closeQuickCreate() {
@@ -364,21 +392,38 @@ function Staff() {
     setQuickCost("");
     setQuickHours("");
     setQuickNotes("");
+    setQuickRole("");
+    setQuickAssignee("");
   }
+
+  // assignees disponibili nel quick-create (filtrati per ruolo se selezionato)
+  const quickAvailableAssignees = useMemo(() => {
+    let list = staffMembers.filter((m) => m.is_active);
+    if (quickRole) {
+      list = list.filter((m) => m.role === quickRole);
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [staffMembers, quickRole]);
 
   async function handleQuickCreate(e) {
     if (e) e.preventDefault();
     if (!quickCreateTarget) return;
     const { date, assignee } = quickCreateTarget;
 
+    // priorità: quickAssignee selezionato
+    let chosenAssignee = null;
+    if (quickAssignee && quickAssignee !== "Non assegnato") {
+      chosenAssignee = quickAssignee;
+    } else if (assignee && assignee !== "Non assegnato") {
+      chosenAssignee = assignee;
+    }
+
     const payload = {
       date,
       time: null,
       task_type: quickType,
-      assignee_name:
-        assignee === "Non assegnato" ? null : assignee || null,
-      estimated_hours:
-        quickHours !== "" ? Number(quickHours) : null,
+      assignee_name: chosenAssignee,
+      estimated_hours: quickHours !== "" ? Number(quickHours) : null,
       status: "planned",
       notes: quickNotes || null,
       cost: quickCost !== "" ? Number(quickCost) : null,
@@ -813,9 +858,7 @@ function Staff() {
               </div>
               <div style={kpiCard}>
                 <div style={tinyLabel}>Costo complessivo</div>
-                <div style={tinyValue}>
-                  € {kpi.costTotal.toFixed(2)}
-                </div>
+                <div style={tinyValue}>€ {kpi.costTotal.toFixed(2)}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af" }}>
                   Finisce nella pagina Business (Staff)
                 </div>
@@ -963,14 +1006,11 @@ function Staff() {
                     {/* prima colonna: giorno */}
                     <div style={boardDayCell}>
                       <div>{formatDate(d)}</div>
-                      <div style={{ fontSize: 10, color: "#6b7280" }}>
-                        {d}
-                      </div>
+                      <div style={{ fontSize: 10, color: "#6b7280" }}>{d}</div>
                     </div>
                     {/* celle per ogni assignee */}
                     {assignees.map((ass) => {
-                      const list =
-                        tasksByAssigneeAndDay[ass]?.[d] || [];
+                      const list = tasksByAssigneeAndDay[ass]?.[d] || [];
                       const isQuick =
                         quickCreateTarget &&
                         quickCreateTarget.date === d &&
@@ -1037,6 +1077,26 @@ function Staff() {
                                     {t.notes}
                                   </div>
                                 )}
+
+                                {/* select assegnatario */}
+                                <div style={{ marginTop: 4 }}>
+                                  <select
+                                    style={inputInline}
+                                    value={t.assignee_name || "Non assegnato"}
+                                    onChange={(e) =>
+                                      handleChangeAssignee(
+                                        t,
+                                        e.target.value
+                                      )
+                                    }
+                                  >
+                                    {assigneeOptions.map((name) => (
+                                      <option key={name} value={name}>
+                                        {name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
 
                                 <div
                                   style={{
@@ -1157,6 +1217,8 @@ function Staff() {
                                   ×
                                 </button>
                               </div>
+
+                              {/* tipo + unità */}
                               <div
                                 style={{
                                   display: "grid",
@@ -1211,6 +1273,53 @@ function Staff() {
                                   ))}
                                 </select>
                               </div>
+
+                              {/* ruolo + assegnatario */}
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns:
+                                    "1fr 1fr",
+                                  gap: 4,
+                                }}
+                              >
+                                <select
+                                  style={inputInline}
+                                  value={quickRole}
+                                  onChange={(e) => {
+                                    setQuickRole(e.target.value);
+                                    setQuickAssignee("");
+                                  }}
+                                >
+                                  <option value="">
+                                    Tutti i ruoli
+                                  </option>
+                                  {staffRoles.map((r) => (
+                                    <option key={r} value={r}>
+                                      {r}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  style={inputInline}
+                                  value={quickAssignee}
+                                  onChange={(e) =>
+                                    setQuickAssignee(e.target.value)
+                                  }
+                                >
+                                  <option value="">
+                                    Nessun assegnatario
+                                  </option>
+                                  {quickAvailableAssignees.map((m) => (
+                                    <option key={m.id} value={m.name}>
+                                      {m.name}
+                                      {m.role ? ` (${m.role})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* costi + ore */}
                               <div
                                 style={{
                                   display: "grid",
@@ -1240,6 +1349,8 @@ function Staff() {
                                   }
                                 />
                               </div>
+
+                              {/* note */}
                               <textarea
                                 style={{
                                   ...inputInline,
@@ -1252,6 +1363,7 @@ function Staff() {
                                   setQuickNotes(e.target.value)
                                 }
                               />
+
                               <button
                                 type="submit"
                                 style={{
