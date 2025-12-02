@@ -28,6 +28,21 @@ function addDays(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+// Ruoli fissi allineati all'enum StaffRole del backend
+const ROLE_OPTIONS = [
+  { value: "housekeeping", label: "Housekeeping (pulizie / camere)" },
+  { value: "kitchen", label: "Cucina / Colazioni" },
+  { value: "reception_day", label: "Reception (giorno)" },
+  { value: "reception_night", label: "Reception (notte)" },
+  { value: "manager", label: "Manager / Amministratore" },
+];
+
+function getRoleLabel(value) {
+  if (!value) return "";
+  const opt = ROLE_OPTIONS.find((r) => r.value === value);
+  return opt ? opt.label : value;
+}
+
 function Staff() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -194,13 +209,17 @@ function Staff() {
     return { total, byStatus, hours, costTotal };
   }, [filteredTasks]);
 
-  // lista ruoli (da anagrafica staff)
+  // lista ruoli (da anagrafica staff, come ENUM values)
   const staffRoles = useMemo(() => {
     const set = new Set();
     staffMembers.forEach((m) => {
       if (m.role) set.add(m.role);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    const arr = Array.from(set);
+    arr.sort((a, b) =>
+      getRoleLabel(a).localeCompare(getRoleLabel(b))
+    );
+    return arr;
   }, [staffMembers]);
 
   // lista assignee per colonne della board
@@ -1296,7 +1315,7 @@ function Staff() {
                                   </option>
                                   {staffRoles.map((r) => (
                                     <option key={r} value={r}>
-                                      {r}
+                                      {getRoleLabel(r)}
                                     </option>
                                   ))}
                                 </select>
@@ -1313,7 +1332,11 @@ function Staff() {
                                   {quickAvailableAssignees.map((m) => (
                                     <option key={m.id} value={m.name}>
                                       {m.name}
-                                      {m.role ? ` (${m.role})` : ""}
+                                      {m.role
+                                        ? ` (${getRoleLabel(
+                                            m.role
+                                          )})`
+                                        : ""}
                                     </option>
                                   ))}
                                 </select>

@@ -15,6 +15,21 @@ const COLOR_SWATCHES = [
   "#16a34a", // altro verde
 ];
 
+// Ruoli fissi allineati al backend (StaffRole enum)
+const ROLE_OPTIONS = [
+  { value: "housekeeping", label: "Housekeeping (pulizie / camere)" },
+  { value: "kitchen", label: "Cucina / Colazioni" },
+  { value: "reception_day", label: "Reception (giorno)" },
+  { value: "reception_night", label: "Reception (notte)" },
+  { value: "manager", label: "Manager / Amministratore" },
+];
+
+function getRoleLabel(value) {
+  if (!value) return "—";
+  const opt = ROLE_OPTIONS.find((r) => r.value === value);
+  return opt ? opt.label : value;
+}
+
 function StaffDirectory() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +41,7 @@ function StaffDirectory() {
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(""); // ora è il value dell'enum
   const [hourlyCost, setHourlyCost] = useState("");
   const [colorHex, setColorHex] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -74,6 +89,7 @@ function StaffDirectory() {
   function startEdit(m) {
     setEditingId(m.id);
     setName(m.name || "");
+    // m.role è la stringa enum (es. "housekeeping")
     setRole(m.role || "");
     setHourlyCost(
       m.hourly_cost === null || m.hourly_cost === undefined
@@ -94,6 +110,7 @@ function StaffDirectory() {
     try {
       const payload = {
         name: name.trim(),
+        // il backend si aspetta l'enum StaffRole, ma lato JSON è la stringa (es. "housekeeping")
         role: role || null,
         color_hex: colorHex || null,
         hourly_cost:
@@ -128,7 +145,7 @@ function StaffDirectory() {
       }
       resetForm();
     } catch (err) {
-      alert("Errore salvando membro staff: " + err.message);
+      alert("Errore salvando membro staff: " + (err.message || "Errore"));
     } finally {
       setSaving(false);
     }
@@ -150,7 +167,7 @@ function StaffDirectory() {
           })
       );
     } catch (err) {
-      alert("Errore aggiornando stato: " + err.message);
+      alert("Errore aggiornando stato: " + (err.message || "Errore"));
     }
   }
 
@@ -165,7 +182,7 @@ function StaffDirectory() {
       await deactivateStaffMember(id); // DELETE /staff-members/{id}
       setMembers((prev) => prev.filter((m) => m.id !== id));
     } catch (err) {
-      alert("Errore eliminando membro: " + err.message);
+      alert("Errore eliminando membro: " + (err.message || "Errore"));
     }
   }
 
@@ -350,12 +367,22 @@ function StaffDirectory() {
             </div>
             <div style={field}>
               <label style={label}>Ruolo</label>
-              <input
+              <select
                 style={input}
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                placeholder="Es. Pulizie, Manutenzione..."
-              />
+              >
+                <option value="">Seleziona ruolo...</option>
+                {ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: 11, color: "#6b7280" }}>
+                Ruoli fissi usati per le assegnazioni automatiche (check-in,
+                pulizie, colazioni, ecc.).
+              </span>
             </div>
             <div style={field}>
               <label style={label}>Costo orario indicativo (€)</label>
@@ -534,7 +561,7 @@ function StaffDirectory() {
                             {m.name}
                           </div>
                         </td>
-                        <td style={tdBase}>{m.role || "—"}</td>
+                        <td style={tdBase}>{getRoleLabel(m.role)}</td>
                         <td style={tdBase}>
                           {m.hourly_cost != null
                             ? `€ ${m.hourly_cost.toFixed(2)}`
