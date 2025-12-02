@@ -1,16 +1,5 @@
 const BASE_URL = "http://localhost:8000";
 
-function buildQuery(params = {}) {
-  const esc = encodeURIComponent;
-  const entries = Object.entries(params).filter(
-    ([, value]) => value !== undefined && value !== null && value !== ""
-  );
-  if (!entries.length) return "";
-  return entries
-    .map(([k, v]) => `${esc(k)}=${esc(String(v))}`)
-    .join("&");
-}
-
 async function handleResponse(res) {
   if (!res.ok) {
     const text = await res.text();
@@ -19,9 +8,21 @@ async function handleResponse(res) {
   return res.json();
 }
 
+function buildQuery(params = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") {
+      searchParams.append(k, v);
+    }
+  });
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/* --------- LOW LEVEL WRAPPERS --------- */
+
 export async function apiGet(path, params) {
-  const qs = params ? buildQuery(params) : "";
-  const url = qs ? `${BASE_URL}${path}?${qs}` : `${BASE_URL}${path}`;
+  const url = `${BASE_URL}${path}${buildQuery(params)}`;
   const res = await fetch(url);
   return handleResponse(res);
 }
@@ -52,26 +53,26 @@ export async function apiDelete(path) {
     const text = await res.text();
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
-  return true;
+  return;
 }
 
-// --------- BASE ---------
+/* --------- BASIC --------- */
 
 export function getHealth() {
   return apiGet("/health");
 }
 
-// --------- UNITS ---------
+/* --------- UNITS --------- */
 
 export function getUnits() {
   return apiGet("/units");
 }
 
-export function getUnitSchedule(unitId, params = {}) {
-  return apiGet(`/units/${unitId}/schedule`, params);
+export function updateUnit(unitId, payload) {
+  return apiPut(`/units/${unitId}`, payload);
 }
 
-// --------- BOOKINGS ---------
+/* --------- BOOKINGS --------- */
 
 export function getBookings() {
   return apiGet("/bookings");
@@ -89,10 +90,34 @@ export function deleteBooking(id) {
   return apiDelete(`/bookings/${id}`);
 }
 
-// --------- STAFF TASKS ---------
+/**
+ * Calendario/schedule per singola unità
+ * params può contenere: { from_date: "2025-11-01", to_date: "2025-11-30" }
+ */
+export function getUnitSchedule(unitId, params = {}) {
+  return apiGet(`/units/${unitId}/schedule`, params);
+}
+
+/* --------- ANALYTICS --------- */
+
+// riepilogo base (se lo usiamo ancora in Dashboard)
+export function getMonthSummary(year, month) {
+  return apiGet("/analytics/month-summary", { year, month });
+}
+
+// ricavi, costi, profitto per mese (pagina Business)
+export function getMonthPnL(year, month) {
+  return apiGet("/analytics/month-pnl", { year, month });
+}
+
+// righe di costo dettagliate per il mese (booking + staff + costi manuali)
+export function getMonthCostLines(year, month) {
+  return apiGet("/analytics/month-cost-lines", { year, month });
+}
+
+/* --------- STAFF TASKS --------- */
 
 export function getStaffTasks(params = {}) {
-  // supporta from_date, to_date, date=YYYY-MM-DD
   return apiGet("/staff-tasks", params);
 }
 
@@ -108,19 +133,9 @@ export function deleteStaffTask(id) {
   return apiDelete(`/staff-tasks/${id}`);
 }
 
-// --------- STAFF DEFAULTS (impostazioni automatiche) ---------
-
-export function getStaffDefaults() {
-  return apiGet("/staff-defaults");
-}
-
-export function updateStaffDefaults(payload) {
-  return apiPut("/staff-defaults", payload);
-}
-// --------- COST ITEMS ---------
+/* --------- COST ITEMS --------- */
 
 export function getCostItems(params = {}) {
-  // supporta from_date, to_date
   return apiGet("/cost-items", params);
 }
 
@@ -136,8 +151,46 @@ export function deleteCostItem(id) {
   return apiDelete(`/cost-items/${id}`);
 }
 
-// --------- ANALYTICS / BUSINESS ---------
+/* --------- STAFF DEFAULTS (config automatismi) --------- */
 
-export function getMonthSummary(year, month) {
-  return apiGet("/analytics/month-summary", { year, month });
+export function getStaffDefaults() {
+  return apiGet("/staff-defaults");
+}
+
+export function updateStaffDefaults(payload) {
+  return apiPut("/staff-defaults", payload);
+}
+
+/* --------- STAFF MEMBERS (ANAGRAFICA) --------- */
+
+export function getStaffMembers(params = {}) {
+  return apiGet("/staff-members", params);
+}
+
+export function createStaffMember(payload) {
+  return apiPost("/staff-members", payload);
+}
+
+export function updateStaffMember(id, payload) {
+  return apiPut(`/staff-members/${id}`, payload);
+}
+
+// soft delete -> mette is_active = false
+export function deactivateStaffMember(id) {
+  return apiDelete(`/staff-members/${id}`);
+}
+
+// hard delete -> cancella dal DB
+export function deleteStaffMember(id) {
+  return apiDelete(`/staff-members/${id}/hard-delete`);
+}
+
+/* --------- PRICING DEFAULTS --------- */
+
+export function getPricingDefaults() {
+  return apiGet("/pricing-defaults");
+}
+
+export function updatePricingDefaults(payload) {
+  return apiPut("/pricing-defaults", payload);
 }

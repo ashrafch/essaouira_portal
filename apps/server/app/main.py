@@ -1,4 +1,6 @@
-from datetime import date
+from datetime import date, timedelta, time, datetime
+from typing import Optional, Dict, List
+from enum import Enum
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +12,10 @@ from app.models.unit import Unit
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
-from app.models.staff_defaults import StaffDefaults  # <-- nuovo import
+from app.models.staff_defaults import StaffDefaults
+from app.models.staff_member import StaffMember
+from app.models.pricing_defaults import PricingDefaults
+
 
 app = FastAPI(title="Portale Essaouira API")
 
@@ -26,6 +31,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------- STAFF ROLES ENUM ----------
+
+class StaffRole(str, Enum):
+    housekeeping = "housekeeping"
+    kitchen = "kitchen"
+    reception_day = "reception_day"
+    reception_night = "reception_night"
+    manager = "manager"
 
 
 @app.on_event("startup")
@@ -59,6 +74,61 @@ def on_startup():
         db.add(defaults)
         db.commit()
 
+    # seed staff members se non esistono
+    if db.query(StaffMember).count() == 0:
+        staff_seed = [
+            StaffMember(
+                name="Fatima (Housekeeping)",
+                role=StaffRole.housekeeping.value,
+                color_hex="#0f766e",
+                is_active=True,
+                hourly_cost=None,
+            ),
+            StaffMember(
+                name="Ali (Cucina)",
+                role=StaffRole.kitchen.value,
+                color_hex="#f97316",
+                is_active=True,
+                hourly_cost=None,
+            ),
+            StaffMember(
+                name="Sara (Reception giorno)",
+                role=StaffRole.reception_day.value,
+                color_hex="#2563eb",
+                is_active=True,
+                hourly_cost=None,
+            ),
+            StaffMember(
+                name="Youssef (Reception notte)",
+                role=StaffRole.reception_night.value,
+                color_hex="#1d4ed8",
+                is_active=True,
+                hourly_cost=None,
+            ),
+            StaffMember(
+                name="Ashraf (Manager)",
+                role=StaffRole.manager.value,
+                color_hex="#a855f7",
+                is_active=True,
+                hourly_cost=None,
+            ),
+        ]
+        db.add_all(staff_seed)
+        db.commit()
+
+    # seed pricing defaults se non esistono
+    if db.query(PricingDefaults).count() == 0:
+        pricing_defaults = PricingDefaults(
+            default_cleaning_fee=None,
+            default_city_tax_per_night=None,
+            default_channel_commission_percent=None,
+            currency="EUR",
+        )
+        db.add(pricing_defaults)
+        db.commit()
+
+
+# ---------- HEALTH CHECK ----------
 
 @app.get("/health")
 def health():
@@ -80,10 +150,40 @@ class UnitOut(BaseModel):
         from_attributes = True
 
 
+class UnitUpdate(BaseModel):
+    name: str | None = None
+    size_m2: int | None = None
+    capacity: int | None = None
+    base_nightly_rate: float | None = None
+    currency: str | None = None
+
+
 @app.get("/units", response_model=list[UnitOut])
 def list_units(db: Session = Depends(get_db)):
     units = db.query(Unit).all()
     return units
+
+
+@app.put("/units/{unit_id}", response_model=UnitOut)
+def update_unit(unit_id: int, payload: UnitUpdate, db: Session = Depends(get_db)):
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unità non trovata")
+
+    if payload.name is not None:
+        unit.name = payload.name
+    if payload.size_m2 is not None:
+        unit.size_m2 = payload.size_m2
+    if payload.capacity is not None:
+        unit.capacity = payload.capacity
+    if payload.base_nightly_rate is not None:
+        unit.base_nightly_rate = payload.base_nightly_rate
+    if payload.currency is not None:
+        unit.currency = payload.currency
+
+    db.commit()
+    db.refresh(unit)
+    return unit
 
 
 # ---------- BOOKING Schemas ----------
@@ -107,6 +207,9 @@ class BookingBase(BaseModel):
     currency: str = "EUR"
     is_paid: bool = False
 
+    # late check-out
+    has_late_checkout: bool = False
+
 
 class BookingCreate(BookingBase):
     pass
@@ -123,13 +226,7 @@ class BookingOut(BookingBase):
         from_attributes = True
 
 
-# ---------- BOOKING endpoints ----------
-
-
-@app.get("/bookings", response_model=list[BookingOut])
-def list_bookings(db: Session = Depends(get_db)):
-    bookings = db.query(Booking).order_by(Booking.checkin_date).all()
-    return bookings
+# ---------- HELPERS: STAFF DEFAULTS & PRICING DEFAULTS ----------
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -145,6 +242,200 @@ def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
         db.commit()
         db.refresh(defaults)
     return defaults
+
+
+def _get_or_create_pricing_defaults(db: Session) -> PricingDefaults:
+    pricing = db.query(PricingDefaults).first()
+    if not pricing:
+        pricing = PricingDefaults(
+            default_cleaning_fee=None,
+            default_city_tax_per_night=None,
+            default_channel_commission_percent=None,
+            currency="EUR",
+        )
+        db.add(pricing)
+        db.commit()
+        db.refresh(pricing)
+    return pricing
+
+
+def _find_default_assignee_for_role(
+    db: Session,
+    role: StaffRole,
+    fallback_name: str | None = None,
+) -> str | None:
+    """
+    Trova il primo membro staff ATTIVO con quel ruolo.
+    Se non esiste, usa il fallback (es. cleaning_default_assignee).
+    """
+    member = (
+        db.query(StaffMember)
+        .filter(
+            StaffMember.role == role.value,
+            StaffMember.is_active.is_(True),
+        )
+        .order_by(StaffMember.id)
+        .first()
+    )
+    if member:
+        return member.name
+    return fallback_name
+
+
+def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
+    """
+    Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione.
+
+    Logica assegnazione:
+    - usa membri staff attivi divisi per ruolo:
+      - housekeeping → pulizie
+      - kitchen → colazioni
+      - reception_day → check-in / check-out
+    - se non trova nessuno per quel ruolo, usa defaults.cleaning_default_assignee
+
+    Non impostiamo alcun costo automatico: il campo cost resta null
+    finché non lo imposti tu a mano lato staff.
+    """
+    defaults = _get_or_create_staff_defaults(db)
+
+    # elimina tutti i task AUTO: legati a questa prenotazione
+    db.query(StaffTask).filter(
+        StaffTask.booking_id == booking.id,
+        StaffTask.notes.ilike("AUTO:%"),
+    ).delete(synchronize_session=False)
+
+    if not booking.checkin_date or not booking.checkout_date:
+        db.commit()
+        return
+
+    is_late = bool(getattr(booking, "has_late_checkout", False))
+
+    base_hours = defaults.cleaning_default_hours or 1.0
+    currency = defaults.currency or "EUR"
+
+    # scegliamo staff in base al RUOLO
+    housekeeping_assignee = _find_default_assignee_for_role(
+        db, StaffRole.housekeeping, defaults.cleaning_default_assignee
+    )
+    reception_assignee = _find_default_assignee_for_role(
+        db, StaffRole.reception_day, housekeeping_assignee
+    )
+    kitchen_assignee = _find_default_assignee_for_role(
+        db, StaffRole.kitchen, housekeeping_assignee
+    )
+
+    # orari diversi se late check-out
+    checkout_time_obj = time(10, 0)
+    cleaning_time_obj = time(11, 0)
+
+    if is_late:
+        checkout_time_obj = time(16, 0)
+        cleaning_time_obj = time(17, 0)
+
+    # 1) CHECK-IN (giorno di arrivo, orario standard 15:00, reception)
+    checkin_task = StaffTask(
+        date=booking.checkin_date,
+        time=time(15, 0),
+        task_type="checkin",
+        assignee_name=reception_assignee,
+        estimated_hours=base_hours,
+        status="planned",
+        notes=f"AUTO: Check-in per prenotazione #{booking.id}",
+        cost=None,
+        currency=currency,
+        booking_id=booking.id,
+        unit_id=booking.unit_id,
+    )
+    db.add(checkin_task)
+
+    # 2) CHECK-OUT (reception)
+    checkout_task = StaffTask(
+        date=booking.checkout_date,
+        time=checkout_time_obj,
+        task_type="checkout",
+        assignee_name=reception_assignee,
+        estimated_hours=base_hours,
+        status="planned",
+        notes=(
+            f"AUTO: Check-out (late) per prenotazione #{booking.id}"
+            if is_late
+            else f"AUTO: Check-out per prenotazione #{booking.id}"
+        ),
+        cost=None,
+        currency=currency,
+        booking_id=booking.id,
+        unit_id=booking.unit_id,
+    )
+    db.add(checkout_task)
+
+    # 3) PULIZIA principale dopo il check-out (housekeeping)
+    cleaning_task = StaffTask(
+        date=booking.checkout_date,
+        time=cleaning_time_obj,
+        task_type="cleaning",
+        assignee_name=housekeeping_assignee,
+        estimated_hours=base_hours if not is_late else base_hours * 1.5,
+        status="planned",
+        notes=(
+            f"AUTO: Pulizia post late check-out per prenotazione #{booking.id}"
+            if is_late
+            else f"AUTO: Pulizia per prenotazione #{booking.id}"
+        ),
+        cost=None,
+        currency=currency,
+        booking_id=booking.id,
+        unit_id=booking.unit_id,
+    )
+    db.add(cleaning_task)
+
+    # 4) Extra pulizia se late check-out (housekeeping)
+    if is_late:
+        extra_clean_task = StaffTask(
+            date=booking.checkout_date,
+            time=time(19, 0),
+            task_type="cleaning",
+            assignee_name=housekeeping_assignee,
+            estimated_hours=base_hours * 0.5,
+            status="planned",
+            notes=f"AUTO: Extra pulizia (late check-out) per prenotazione #{booking.id}",
+            cost=None,
+            currency=currency,
+            booking_id=booking.id,
+            unit_id=booking.unit_id,
+        )
+        db.add(extra_clean_task)
+
+    # 5) COLAZIONI (tutti i giorni intermedi) → cucina
+    current = booking.checkin_date + timedelta(days=1)
+    last_breakfast_day = booking.checkout_date - timedelta(days=1)
+
+    while current <= last_breakfast_day:
+        breakfast_task = StaffTask(
+            date=current,
+            time=time(8, 30),
+            task_type="breakfast",
+            assignee_name=kitchen_assignee,
+            estimated_hours=base_hours * 0.5,
+            status="planned",
+            notes=f"AUTO: Colazione per prenotazione #{booking.id}",
+            cost=None,
+            currency=currency,
+            booking_id=booking.id,
+            unit_id=booking.unit_id,
+        )
+        db.add(breakfast_task)
+        current += timedelta(days=1)
+
+    db.commit()
+
+
+# ---------- BOOKING endpoints ----------
+
+
+@app.get("/bookings", response_model=list[BookingOut])
+def list_bookings(db: Session = Depends(get_db)):
+    bookings = db.query(Booking).order_by(Booking.checkin_date).all()
+    return bookings
 
 
 @app.post("/bookings", response_model=BookingOut)
@@ -186,6 +477,29 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
 
     total_price = payload.total_price or base_total
 
+    # applica eventuali default tariffari
+    pricing = _get_or_create_pricing_defaults(db)
+
+    cleaning_fee = payload.cleaning_fee
+    if cleaning_fee is None and getattr(pricing, "default_cleaning_fee", None) is not None:
+        cleaning_fee = float(pricing.default_cleaning_fee)
+
+    city_tax = payload.city_tax
+    if city_tax is None and getattr(pricing, "default_city_tax_per_night", None) is not None:
+        city_tax = float(pricing.default_city_tax_per_night) * nights
+
+    channel_fee = payload.channel_fee
+    if (
+        channel_fee is None
+        and getattr(pricing, "default_channel_commission_percent", None) is not None
+        and total_price is not None
+    ):
+        channel_fee = (
+            float(pricing.default_channel_commission_percent)
+            * float(total_price)
+            / 100.0
+        )
+
     booking = Booking(
         unit_id=payload.unit_id,
         guest_name=payload.guest_name,
@@ -196,34 +510,19 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         notes=payload.notes,
         nightly_rate=nightly_rate,
         total_price=total_price,
-        cleaning_fee=payload.cleaning_fee,
-        city_tax=payload.city_tax,
-        channel_fee=payload.channel_fee,
+        cleaning_fee=cleaning_fee,
+        city_tax=city_tax,
+        channel_fee=channel_fee,
         currency=payload.currency,
         is_paid=payload.is_paid,
+        has_late_checkout=payload.has_late_checkout,
     )
     db.add(booking)
     db.commit()
     db.refresh(booking)
 
-    # 🔁 CREA TASK STAFF AUTOMATICA (es. pulizia post-checkout)
-    defaults = _get_or_create_staff_defaults(db)
-
-    auto_task = StaffTask(
-        date=payload.checkout_date,  # giorno di checkout -> pulizia
-        time=None,
-        task_type="cleaning",
-        assignee_name=defaults.cleaning_default_assignee,
-        estimated_hours=defaults.cleaning_default_hours,
-        status="planned",
-        notes=f"Pulizia automatica per prenotazione #{booking.id}",
-        cost=defaults.cleaning_default_cost,
-        currency=defaults.currency,
-        booking_id=booking.id,
-        unit_id=booking.unit_id,
-    )
-    db.add(auto_task)
-    db.commit()
+    # task staff automatici
+    _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
 
@@ -274,6 +573,29 @@ def update_booking(
 
     total_price = payload.total_price or base_total
 
+    # riapplica default tariffari solo se i campi sono None
+    pricing = _get_or_create_pricing_defaults(db)
+
+    cleaning_fee = payload.cleaning_fee
+    if cleaning_fee is None and getattr(pricing, "default_cleaning_fee", None) is not None:
+        cleaning_fee = float(pricing.default_cleaning_fee)
+
+    city_tax = payload.city_tax
+    if city_tax is None and getattr(pricing, "default_city_tax_per_night", None) is not None:
+        city_tax = float(pricing.default_city_tax_per_night) * nights
+
+    channel_fee = payload.channel_fee
+    if (
+        channel_fee is None
+        and getattr(pricing, "default_channel_commission_percent", None) is not None
+        and total_price is not None
+    ):
+        channel_fee = (
+            float(pricing.default_channel_commission_percent)
+            * float(total_price)
+            / 100.0
+        )
+
     booking.unit_id = payload.unit_id
     booking.guest_name = payload.guest_name
     booking.guest_email = payload.guest_email
@@ -283,14 +605,19 @@ def update_booking(
     booking.notes = payload.notes
     booking.nightly_rate = nightly_rate
     booking.total_price = total_price
-    booking.cleaning_fee = payload.cleaning_fee
-    booking.city_tax = payload.city_tax
-    booking.channel_fee = payload.channel_fee
+    booking.cleaning_fee = cleaning_fee
+    booking.city_tax = city_tax
+    booking.channel_fee = channel_fee
     booking.currency = payload.currency
     booking.is_paid = payload.is_paid
+    booking.has_late_checkout = payload.has_late_checkout
 
     db.commit()
     db.refresh(booking)
+
+    # riallinea i task automatici con le nuove date / late checkout
+    _create_auto_staff_tasks_for_booking(db, booking)
+
     return booking
 
 
@@ -303,6 +630,136 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     db.delete(booking)
     db.commit()
     return
+
+
+# ---------- UNIT SCHEDULE (TIMELINE SINGOLA UNITÀ) ----------
+
+
+@app.get("/units/{unit_id}/schedule")
+def get_unit_schedule(
+    unit_id: int,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    # verifica che l'unità esista
+    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unità non trovata")
+
+    # default range: mese corrente se non specificato
+    if from_date is None or to_date is None:
+        today = date.today()
+        month_start = today.replace(day=1)
+        if month_start.month == 12:
+            next_month_start = date(month_start.year + 1, 1, 1)
+        else:
+            next_month_start = date(month_start.year, month_start.month + 1, 1)
+        from_date = from_date or month_start
+        to_date = to_date or next_month_start
+
+    # prenotazioni che INTERSECANO il range richiesto
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.unit_id == unit_id,
+            Booking.checkin_date < to_date,
+            Booking.checkout_date > from_date,
+        )
+        .order_by(Booking.checkin_date)
+        .all()
+    )
+
+    # task staff collegati a questa unità nel range
+    staff_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.unit_id == unit_id,
+            StaffTask.date >= from_date,
+            StaffTask.date <= to_date,
+        )
+        .order_by(StaffTask.date)
+        .all()
+    )
+
+    # ---- costruiamo items per la timeline ----
+    items: list[dict] = []
+
+    # prenotazioni → blocchi orizzontali
+    for b in bookings:
+        items.append(
+            {
+                "kind": "booking",
+                "id": b.id,
+                "unit_id": unit.id,
+                "label": b.guest_name or f"Booking #{b.id}",
+                "start_date": b.checkin_date,
+                "end_date": b.checkout_date,
+                "source": b.source,
+                "is_paid": b.is_paid,
+                "total_price": b.total_price,
+            }
+        )
+
+    # task staff → punti / tag legati al giorno
+    for t in staff_tasks:
+        items.append(
+            {
+                "kind": "staff_task",
+                "id": t.id,
+                "unit_id": unit.id,
+                "label": t.task_type,
+                "date": t.date,
+                "task_type": t.task_type,  # per colori/filtri frontend
+                "assignee_name": t.assignee_name,
+                "status": t.status,
+                "estimated_hours": t.estimated_hours,
+                "cost": t.cost,
+                "currency": t.currency,
+            }
+        )
+
+    # opzionale: ordiniamo gli items per data inizio
+    def sort_key(item: dict):
+        if item["kind"] == "booking":
+            return (item["start_date"], 0)
+        else:
+            return (item["date"], 1)
+
+    items.sort(key=sort_key)
+
+    return {
+        "unit_id": unit.id,
+        "unit_name": unit.name,
+        "from_date": from_date,
+        "to_date": to_date,
+        "items": items,
+        "bookings": [
+            {
+                "id": b.id,
+                "guest_name": b.guest_name,
+                "checkin_date": b.checkin_date,
+                "checkout_date": b.checkout_date,
+                "source": b.source,
+                "total_price": b.total_price,
+                "is_paid": b.is_paid,
+            }
+            for b in bookings
+        ],
+        "staff_tasks": [
+            {
+                "id": t.id,
+                "date": t.date,
+                "task_type": t.task_type,
+                "assignee_name": t.assignee_name,
+                "status": t.status,
+                "estimated_hours": t.estimated_hours,
+                "cost": t.cost,
+                "currency": t.currency,
+            }
+            for t in staff_tasks
+        ],
+    }
 
 
 # ---------- ANALYTICS / BUSINESS ----------
@@ -415,21 +872,342 @@ def month_summary(
     )
 
 
+# ---------- ANALYTICS: PROFIT & LOSS (Ricavi - Costi) ----------
+
+
+class CostByCategory(BaseModel):
+    category: str
+    total: float
+
+
+class PnLMonthSummary(BaseModel):
+    year: int
+    month: int
+
+    nights_total: int
+    nights_occupied: int
+    occupancy_rate: float
+    adr: float | None
+
+    revenue_total: float
+    revenue_by_source: Dict[str, float]
+    revenue_by_unit: List[RevenueByUnit]
+
+    costs_total: float
+    costs_by_category: List[CostByCategory]
+
+    profit: float
+
+
+class MonthCostLine(BaseModel):
+    date: date
+    category: str
+    description: str | None = None
+    amount: float
+    currency: str = "EUR"
+    unit_id: int | None = None
+    booking_id: int | None = None
+    staff_task_id: int | None = None
+    origin: str
+
+    class Config:
+        from_attributes = True
+
+
+def _get_month_range(year: int, month: int):
+    month_start = date(year, month, 1)
+    if month == 12:
+        next_month_start = date(year + 1, 1, 1)
+    else:
+        next_month_start = date(year, month + 1, 1)
+    days_in_month = (next_month_start - month_start).days
+    return month_start, next_month_start, days_in_month
+
+
+def _collect_costs_for_month(
+    db: Session, month_start: date, next_month_start: date
+):
+    costs_total = 0.0
+    costs_by_category_map: Dict[str, float] = {}
+    cost_lines: list[dict] = []
+
+    # --- Costi manuali (CostItem) ---
+    cost_items = (
+        db.query(CostItem)
+        .filter(
+            CostItem.date >= month_start,
+            CostItem.date < next_month_start,
+        )
+        .all()
+    )
+
+    for c in cost_items:
+        amount = float(c.amount)
+        costs_total += amount
+        cat = c.category or "Altro"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+        cost_lines.append(
+            {
+                "date": c.date,
+                "category": cat,
+                "description": c.description,
+                "amount": amount,
+                "currency": c.currency or "EUR",
+                "unit_id": c.unit_id,
+                "booking_id": None,
+                "staff_task_id": None,
+                "origin": "manual",
+            }
+        )
+
+    # --- Costi da prenotazioni (cleaning_fee, channel_fee, city_tax) ---
+    bookings_for_costs = (
+        db.query(Booking)
+        .filter(
+            Booking.checkout_date >= month_start,
+            Booking.checkout_date < next_month_start,
+        )
+        .all()
+    )
+
+    for b in bookings_for_costs:
+        desc = (
+            f"Prenotazione #{b.id} - {b.guest_name}"
+            if b.guest_name
+            else f"Prenotazione #{b.id}"
+        )
+        curr = b.currency or "EUR"
+
+        # cleaning fee
+        if b.cleaning_fee is not None:
+            cf = float(b.cleaning_fee)
+            costs_total += cf
+            cat = "Booking - Cleaning fee"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + cf
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": cf,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_cleaning_fee",
+                }
+            )
+
+        # commissioni canale
+        if b.channel_fee is not None:
+            ch = float(b.channel_fee)
+            costs_total += ch
+            cat = "Booking - Channel fee"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + ch
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": ch,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_channel_fee",
+                }
+            )
+
+        # tassa di soggiorno → trattata come costo/pass-through
+        if b.city_tax is not None:
+            ct = float(b.city_tax)
+            costs_total += ct
+            cat = "Booking - City tax"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + ct
+
+            cost_lines.append(
+                {
+                    "date": b.checkout_date,
+                    "category": cat,
+                    "description": desc,
+                    "amount": ct,
+                    "currency": curr,
+                    "unit_id": b.unit_id,
+                    "booking_id": b.id,
+                    "staff_task_id": None,
+                    "origin": "booking_city_tax",
+                }
+            )
+
+    # --- Costi staff (StaffTask.cost) ---
+    staff_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.date >= month_start,
+            StaffTask.date < next_month_start,
+        )
+        .all()
+    )
+
+    for t in staff_tasks:
+        if t.cost is None:
+            continue
+        amount = float(t.cost)
+        costs_total += amount
+        cat = f"Staff - {t.task_type or 'Altro'}"
+        costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+
+        desc = t.notes or f"Task staff #{t.id}"
+        cost_lines.append(
+            {
+                "date": t.date,
+                "category": cat,
+                "description": desc,
+                "amount": amount,
+                "currency": t.currency or "EUR",
+                "unit_id": t.unit_id,
+                "booking_id": t.booking_id,
+                "staff_task_id": t.id,
+                "origin": "staff_task",
+            }
+        )
+
+    return costs_total, costs_by_category_map, cost_lines
+
+
+@app.get("/analytics/month-pnl", response_model=PnLMonthSummary)
+def month_pnl(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    # calcolo range mese
+    month_start, next_month_start, days_in_month = _get_month_range(year, month)
+
+    # --- Prenotazioni per il mese (ricavi e occupancy) ---
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+
+    units_count = db.query(Unit).count()
+    nights_total = days_in_month * units_count
+
+    occupied_nights = 0
+    revenue_total = 0.0
+    revenue_by_source: Dict[str, float] = {}
+    revenue_by_unit_map: Dict[int, RevenueByUnit] = {}
+
+    for b in bookings:
+        # notti di questa prenotazione dentro il mese
+        stay_start = max(b.checkin_date, month_start)
+        stay_end = min(b.checkout_date, next_month_start)
+        nights_in_month = (stay_end - stay_start).days
+
+        occupied_nights += nights_in_month
+
+        # ricavo allocato nel mese
+        if (
+            b.total_price is not None
+            and b.checkin_date >= month_start
+            and b.checkout_date <= next_month_start
+        ):
+            booking_revenue = float(b.total_price)
+        else:
+            if b.nightly_rate is not None:
+                booking_revenue = float(b.nightly_rate) * nights_in_month
+            else:
+                booking_revenue = 0.0
+
+        revenue_total += booking_revenue
+
+        # per sorgente
+        src = b.source or "unknown"
+        revenue_by_source[src] = revenue_by_source.get(src, 0.0) + booking_revenue
+
+        # per unità
+        u = b.unit
+        if u:
+            existing = revenue_by_unit_map.get(u.id)
+            if existing is None:
+                revenue_by_unit_map[u.id] = RevenueByUnit(
+                    unit_id=u.id,
+                    unit_name=u.name,
+                    revenue=booking_revenue,
+                    nights_occupied=nights_in_month,
+                )
+            else:
+                existing.revenue += booking_revenue
+                existing.nights_occupied += nights_in_month
+
+    occupancy_rate = (
+        (occupied_nights / nights_total) * 100 if nights_total > 0 else 0.0
+    )
+    adr = revenue_total / occupied_nights if occupied_nights > 0 else None
+
+    # --- Costi del mese (da helper condiviso) ---
+    costs_total, costs_by_category_map, _ = _collect_costs_for_month(
+        db, month_start, next_month_start
+    )
+
+    costs_by_category = [
+        CostByCategory(category=cat, total=round(total, 2))
+        for cat, total in costs_by_category_map.items()
+    ]
+    costs_by_category.sort(key=lambda x: x.category)
+
+    profit = revenue_total - costs_total
+
+    return PnLMonthSummary(
+        year=year,
+        month=month,
+        nights_total=nights_total,
+        nights_occupied=occupied_nights,
+        occupancy_rate=round(occupancy_rate, 2),
+        adr=round(adr, 2) if adr is not None else None,
+        revenue_total=round(revenue_total, 2),
+        revenue_by_source={k: round(v, 2) for k, v in revenue_by_source.items()},
+        revenue_by_unit=list(revenue_by_unit_map.values()),
+        costs_total=round(costs_total, 2),
+        costs_by_category=costs_by_category,
+        profit=round(profit, 2),
+    )
+
+
+@app.get("/analytics/month-cost-lines", response_model=List[MonthCostLine])
+def month_cost_lines(
+    year: int = Query(..., ge=2000, le=12),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, _ = _get_month_range(year, month)
+    _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
+    return [MonthCostLine(**line) for line in cost_lines]
+
+
 # ---------- STAFF TASKS ----------
 
 
 class StaffTaskBase(BaseModel):
     date: date
-    time: str | None = None  # "HH:MM" opzionale
+    # lato API: stringa "HH:MM" oppure null
+    time: str | None = None
     task_type: str
-    assignee_name: str | None = None
-    estimated_hours: float | None = None
+    assignee_name: Optional[str] = None
+    estimated_hours: Optional[float] = None
     status: str = "planned"
-    notes: str | None = None
-    cost: float | None = None
+    notes: Optional[str] = None
+    cost: Optional[float] = None
     currency: str = "EUR"
-    booking_id: int | None = None
-    unit_id: int | None = None
+    booking_id: Optional[int] = None
+    unit_id: Optional[int] = None
 
 
 class StaffTaskCreate(StaffTaskBase):
@@ -447,6 +1225,33 @@ class StaffTaskOut(StaffTaskBase):
         from_attributes = True
 
 
+def _parse_time_str(value: str | None) -> Optional[time]:
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        # accettiamo "HH:MM" (senza secondi)
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        # se qualcuno manda anche i secondi, proviamo "HH:MM:SS"
+        try:
+            return datetime.strptime(value, "%H:%M:%S").time()
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
+            )
+
+
+def _format_time_value(t: Optional[time]) -> Optional[str]:
+    if t is None:
+        return None
+    # sempre "HH:MM"
+    return t.strftime("%H:%M")
+
+
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])
 def list_staff_tasks(
     db: Session = Depends(get_db),
@@ -462,7 +1267,29 @@ def list_staff_tasks(
             q = q.filter(StaffTask.date >= from_date)
         if to_date:
             q = q.filter(StaffTask.date <= to_date)
-    return q.all()
+
+    tasks = q.all()
+
+    # serializziamo noi a dict per controllare bene il campo time
+    result: list[dict] = []
+    for t in tasks:
+        result.append(
+            {
+                "id": t.id,
+                "date": t.date,
+                "time": _format_time_value(t.time),
+                "task_type": t.task_type,
+                "assignee_name": t.assignee_name,
+                "estimated_hours": t.estimated_hours,
+                "status": t.status,
+                "notes": t.notes,
+                "cost": t.cost,
+                "currency": t.currency,
+                "booking_id": t.booking_id,
+                "unit_id": t.unit_id,
+            }
+        )
+    return result
 
 
 @app.post("/staff-tasks", response_model=StaffTaskOut)
@@ -485,9 +1312,11 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
                 detail="Unità collegata inesistente (unit_id).",
             )
 
+    task_time = _parse_time_str(payload.time)
+
     task = StaffTask(
         date=payload.date,
-        time=payload.time,
+        time=task_time,
         task_type=payload.task_type,
         assignee_name=payload.assignee_name,
         estimated_hours=payload.estimated_hours,
@@ -501,7 +1330,21 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
     db.add(task)
     db.commit()
     db.refresh(task)
-    return task
+
+    return {
+        "id": task.id,
+        "date": task.date,
+        "time": _format_time_value(task.time),
+        "task_type": task.task_type,
+        "assignee_name": task.assignee_name,
+        "estimated_hours": task.estimated_hours,
+        "status": task.status,
+        "notes": task.notes,
+        "cost": task.cost,
+        "currency": task.currency,
+        "booking_id": task.booking_id,
+        "unit_id": task.unit_id,
+    }
 
 
 @app.put("/staff-tasks/{task_id}", response_model=StaffTaskOut)
@@ -528,8 +1371,10 @@ def update_staff_task(
                 detail="Unità collegata inesistente (unit_id).",
             )
 
+    task_time = _parse_time_str(payload.time)
+
     task.date = payload.date
-    task.time = payload.time
+    task.time = task_time
     task.task_type = payload.task_type
     task.assignee_name = payload.assignee_name
     task.estimated_hours = payload.estimated_hours
@@ -542,7 +1387,21 @@ def update_staff_task(
 
     db.commit()
     db.refresh(task)
-    return task
+
+    return {
+        "id": task.id,
+        "date": task.date,
+        "time": _format_time_value(task.time),
+        "task_type": task.task_type,
+        "assignee_name": task.assignee_name,
+        "estimated_hours": task.estimated_hours,
+        "status": task.status,
+        "notes": task.notes,
+        "cost": task.cost,
+        "currency": task.currency,
+        "booking_id": task.booking_id,
+        "unit_id": task.unit_id,
+    }
 
 
 @app.delete("/staff-tasks/{task_id}", status_code=204)
@@ -641,7 +1500,7 @@ def delete_cost_item(item_id: int, db: Session = Depends(get_db)):
 
     db.delete(item)
     db.commit()
-    return
+    return item
 
 
 # ---------- STAFF DEFAULTS (impostazioni automatiche) ----------
@@ -688,3 +1547,153 @@ def update_staff_defaults_endpoint(
     db.commit()
     db.refresh(defaults)
     return defaults
+
+
+# ---------- STAFF MEMBERS (ANAGRAFICA) ----------
+
+class StaffMemberBase(BaseModel):
+    name: str
+    role: StaffRole | None = None
+    color_hex: str | None = None
+    hourly_cost: float | None = None
+    is_active: bool = True
+
+
+class StaffMemberCreate(StaffMemberBase):
+    pass
+
+
+class StaffMemberUpdate(BaseModel):
+    name: str | None = None
+    role: StaffRole | None = None
+    color_hex: str | None = None
+    hourly_cost: float | None = None
+    is_active: bool | None = None
+
+
+class StaffMemberOut(StaffMemberBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+@app.get("/staff-members", response_model=List[StaffMemberOut])
+def list_staff_members(
+    db: Session = Depends(get_db),
+    active_only: bool = False,
+):
+    q = db.query(StaffMember)
+    if active_only:
+        q = q.filter(StaffMember.is_active.is_(True))
+    members = q.order_by(StaffMember.name).all()
+    return members
+
+
+@app.post("/staff-members", response_model=StaffMemberOut)
+def create_staff_member(
+    payload: StaffMemberCreate, db: Session = Depends(get_db)
+):
+    member = StaffMember(
+        name=payload.name,
+        role=payload.role.value if payload.role is not None else None,
+        color_hex=payload.color_hex,
+        hourly_cost=payload.hourly_cost,
+        is_active=payload.is_active,
+    )
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@app.put("/staff-members/{member_id}", response_model=StaffMemberOut)
+def update_staff_member(
+    member_id: int, payload: StaffMemberUpdate, db: Session = Depends(get_db)
+):
+    member = db.query(StaffMember).filter(StaffMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Staff member non trovato")
+
+    if payload.name is not None:
+        member.name = payload.name
+    if payload.role is not None:
+        member.role = payload.role.value
+    if payload.color_hex is not None:
+        member.color_hex = payload.color_hex
+    if payload.hourly_cost is not None:
+        member.hourly_cost = payload.hourly_cost
+    if payload.is_active is not None:
+        member.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@app.delete("/staff-members/{member_id}", status_code=204)
+def delete_staff_member(member_id: int, db: Session = Depends(get_db)):
+    """Eliminazione definitiva del record staff."""
+    member = db.query(StaffMember).filter(StaffMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Staff member non trovato")
+
+    db.delete(member)
+    db.commit()
+    return
+
+
+# ---------- PRICING DEFAULTS ----------
+
+
+class PricingDefaultsOut(BaseModel):
+    default_cleaning_fee: float | None = None
+    default_city_tax_per_night: float | None = None
+    default_channel_fee_percent: float | None = None
+    default_currency: str = "EUR"
+
+
+class PricingDefaultsUpdate(BaseModel):
+    default_cleaning_fee: float | None = None
+    default_city_tax_per_night: float | None = None
+    default_channel_fee_percent: float | None = None
+    default_currency: str | None = None
+
+
+@app.get("/pricing-defaults", response_model=PricingDefaultsOut)
+def get_pricing_defaults_endpoint(db: Session = Depends(get_db)):
+    pricing = _get_or_create_pricing_defaults(db)
+    return PricingDefaultsOut(
+        default_cleaning_fee=pricing.default_cleaning_fee,
+        default_city_tax_per_night=pricing.default_city_tax_per_night,
+        default_channel_fee_percent=pricing.default_channel_commission_percent,
+        default_currency=pricing.currency,
+    )
+
+
+@app.put("/pricing-defaults", response_model=PricingDefaultsOut)
+def update_pricing_defaults_endpoint(
+    payload: PricingDefaultsUpdate, db: Session = Depends(get_db)
+):
+    pricing = _get_or_create_pricing_defaults(db)
+
+    if payload.default_cleaning_fee is not None:
+        pricing.default_cleaning_fee = payload.default_cleaning_fee
+    if payload.default_city_tax_per_night is not None:
+        pricing.default_city_tax_per_night = payload.default_city_tax_per_night
+    if payload.default_channel_fee_percent is not None:
+        pricing.default_channel_commission_percent = (
+            payload.default_channel_fee_percent
+        )
+    if payload.default_currency is not None:
+        pricing.currency = payload.default_currency
+
+    db.commit()
+    db.refresh(pricing)
+
+    return PricingDefaultsOut(
+        default_cleaning_fee=pricing.default_cleaning_fee,
+        default_city_tax_per_night=pricing.default_city_tax_per_night,
+        default_channel_fee_percent=pricing.default_channel_commission_percent,
+        default_currency=pricing.currency,
+    )

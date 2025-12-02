@@ -26,8 +26,16 @@ function diffNights(checkin, checkout) {
   return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
 }
 
+function hasOverlap(b, start, end) {
+  const bIn = parseDate(b.checkin_date);
+  const bOut = parseDate(b.checkout_date);
+  if (!bIn || !bOut) return false;
+  return bIn < end && bOut > start;
+}
+
 function Bookings() {
   const location = useLocation();
+
   const [units, setUnits] = useState([]);
   const [bookings, setBookings] = useState([]);
 
@@ -54,8 +62,13 @@ function Bookings() {
   const [channelFee, setChannelFee] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [isPaid, setIsPaid] = useState(false);
+  const [hasLateCheckout, setHasLateCheckout] = useState(false);
 
-  // inizializzazione dati
+  // filtri lista destra
+  const [unitFilter, setUnitFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all"); // all | paid | unpaid
+
+  // init data
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -64,6 +77,9 @@ function Bookings() {
         const [bks, uns] = await Promise.all([getBookings(), getUnits()]);
         setBookings(bks);
         setUnits(uns);
+        if (!unitId && uns[0]?.id) {
+          setUnitId(String(uns[0].id));
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -73,21 +89,19 @@ function Bookings() {
     load();
   }, []);
 
-  // se vengo dal calendario con un giorno pre-selezionato o booking da modificare
+  // stato da Calendar (nuova o modifica)
   useEffect(() => {
     const state = location.state;
     if (!state) return;
 
-    // nuova prenotazione a partire da un giorno
     if (state.newBookingDate) {
       const d = state.newBookingDate;
       setFormMode("create");
       setEditingId(null);
       setCheckinDate(d);
-      setCheckoutDate(d); // l'utente poi sistema
+      setCheckoutDate(d);
     }
 
-    // modifica prenotazione
     if (state.editBookingId && bookings.length > 0) {
       const b = bookings.find((bk) => bk.id === state.editBookingId);
       if (b) {
@@ -109,6 +123,48 @@ function Bookings() {
   const parsedCheckout = parseDate(checkoutDate);
   const nights = diffNights(parsedCheckin, parsedCheckout);
 
+  // ---- disponibilità / conflitti per intervallo selezionato ----
+  const availability = useMemo(() => {
+    if (!parsedCheckin || !parsedCheckout || units.length === 0) {
+      return {
+        freeUnits: [],
+        occupiedUnits: [],
+        conflictForSelectedUnit: false,
+        conflictBookings: [],
+      };
+    }
+
+    const freeUnits = [];
+    const occupiedUnits = [];
+    let conflictForSelectedUnit = false;
+    const conflictBookings = [];
+
+    const selectedIdNum = unitId ? Number(unitId) : null;
+
+    units.forEach((u) => {
+      const conflictsForUnit = bookings.filter((b) =>
+        b.unit_id === u.id ? hasOverlap(b, parsedCheckin, parsedCheckout) : false
+      );
+      if (conflictsForUnit.length === 0) {
+        freeUnits.push(u);
+      } else {
+        occupiedUnits.push(u);
+      }
+
+      if (selectedIdNum && u.id === selectedIdNum && conflictsForUnit.length > 0) {
+        conflictForSelectedUnit = true;
+        conflictBookings.push(...conflictsForUnit);
+      }
+    });
+
+    return {
+      freeUnits,
+      occupiedUnits,
+      conflictForSelectedUnit,
+      conflictBookings,
+    };
+  }, [bookings, units, parsedCheckin, parsedCheckout, unitId]);
+
   const suggestedTotal = useMemo(() => {
     const nr = nightlyRate ? Number(nightlyRate) : NaN;
     const cf = cleaningFee ? Number(cleaningFee) : 0;
@@ -120,10 +176,29 @@ function Bookings() {
     return total;
   }, [nightlyRate, nights, cleaningFee, cityTax, channelFee]);
 
+  const filteredBookings = useMemo(() => {
+    return bookings
+      .filter((b) => {
+        if (unitFilter !== "all" && String(b.unit_id) !== unitFilter) {
+          return false;
+        }
+        if (paymentFilter === "paid" && !b.is_paid) return false;
+        if (paymentFilter === "unpaid" && b.is_paid) return false;
+        return true;
+      })
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.checkin_date).getTime() - new Date(b.checkout_date).getTime()
+      );
+  }, [bookings, unitFilter, paymentFilter]);
+
+  const shownCount = filteredBookings.length;
+  const totalCount = bookings.length;
+
   function resetForm() {
     setFormMode("create");
     setEditingId(null);
-    setUnitId(units[0]?.id ? String(units[0].id) : "");
     setGuestName("");
     setGuestEmail("");
     setSource("direct");
@@ -137,6 +212,12 @@ function Bookings() {
     setChannelFee("");
     setCurrency("EUR");
     setIsPaid(false);
+    setHasLateCheckout(false);
+    if (units[0]?.id) {
+      setUnitId(String(units[0].id));
+    } else {
+      setUnitId("");
+    }
   }
 
   function loadBookingIntoForm(b) {
@@ -165,9 +246,7 @@ function Bookings() {
         : ""
     );
     setCityTax(
-      b.city_tax != null && b.city_tax !== undefined
-        ? String(b.city_tax)
-        : ""
+      b.city_tax != null && b.city_tax !== undefined ? String(b.city_tax) : ""
     );
     setChannelFee(
       b.channel_fee != null && b.channel_fee !== undefined
@@ -176,6 +255,7 @@ function Bookings() {
     );
     setCurrency(b.currency || "EUR");
     setIsPaid(Boolean(b.is_paid));
+    setHasLateCheckout(Boolean(b.has_late_checkout));
   }
 
   async function handleSubmit(e) {
@@ -200,6 +280,7 @@ function Bookings() {
       channel_fee: channelFee !== "" ? Number(channelFee) : null,
       currency,
       is_paid: isPaid,
+      has_late_checkout: hasLateCheckout,
     };
 
     setSaving(true);
@@ -208,9 +289,7 @@ function Bookings() {
       let saved;
       if (formMode === "edit" && editingId != null) {
         saved = await updateBooking(editingId, payload);
-        setBookings((prev) =>
-          prev.map((b) => (b.id === saved.id ? saved : b))
-        );
+        setBookings((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
       } else {
         saved = await createBooking(payload);
         setBookings((prev) => [...prev, saved]);
@@ -237,9 +316,11 @@ function Bookings() {
     }
   }
 
+  // ---- styles ----
+
   const container = {
     display: "grid",
-    gridTemplateColumns: "minmax(260px, 320px) 1fr",
+    gridTemplateColumns: "minmax(260px, 340px) 1fr",
     gap: 16,
     alignItems: "flex-start",
   };
@@ -319,14 +400,15 @@ function Bookings() {
   };
 
   const td = {
-    padding: "6px 4px",
+    padding: "8px 4px",
     borderBottom: "1px solid #f3f4f6",
+    verticalAlign: "top",
   };
 
   const pillPaid = (paid) => ({
     display: "inline-flex",
     alignItems: "center",
-    padding: "2px 8px",
+    padding: "2px 10px",
     borderRadius: 999,
     fontSize: 11,
     fontWeight: 500,
@@ -342,13 +424,109 @@ function Bookings() {
     alignItems: "flex-end",
   };
 
+  const chip = (bg, color) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "3px 10px",
+    borderRadius: 999,
+    fontSize: 11,
+    backgroundColor: bg,
+    color,
+    border: "1px solid rgba(148,163,184,0.5)",
+  });
+
+  const conflictBox = {
+    marginTop: 6,
+    padding: "8px 10px",
+    borderRadius: 10,
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    fontSize: 12,
+    color: "#b91c1c",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+  };
+
+  const conflictIcon = {
+    width: 20,
+    height: 20,
+    borderRadius: "999px",
+    background: "#b91c1c",
+    color: "white",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 12,
+    fontWeight: 700,
+    flexShrink: 0,
+    marginTop: 1,
+  };
+
+  const filtersRow = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+    fontSize: 12,
+    flexWrap: "wrap",
+  };
+
+  const pillSource = (src) => {
+    if (src === "airbnb") {
+      return chip("#fee2e2", "#b91c1c");
+    }
+    if (src === "booking") {
+      return chip("#e0f2fe", "#0369a1");
+    }
+    if (src === "direct") {
+      return chip("#dcfce7", "#166534");
+    }
+    return chip("#f3f4f6", "#4b5563");
+  };
+
+  // --- checkbox styles nuovi ---
+  const checkboxRow = {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    backgroundColor: "#f9fafb",
+  };
+
+  const checkboxInput = {
+    width: 16,
+    height: 16,
+    accentColor: "#0f766e",
+    cursor: "pointer",
+    marginTop: 2,
+    flexShrink: 0,
+  };
+
+  const checkboxLabelMain = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#111827",
+  };
+
+  const checkboxLabelSub = {
+    fontSize: 11,
+    color: "#6b7280",
+    marginTop: 2,
+    lineHeight: 1.4,
+  };
+
   return (
     <div>
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Prenotazioni</h1>
           <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Gestisci le prenotazioni con informazioni economiche complete.
+            Gestisci le prenotazioni con informazioni economiche complete e
+            controlli immediati di disponibilità.
           </p>
         </div>
       </div>
@@ -386,6 +564,92 @@ function Bookings() {
                   ))}
                 </select>
               </div>
+
+              {/* disponibilità e conflitti */}
+              {parsedCheckin && parsedCheckout && (
+                <div style={{ fontSize: 12, marginBottom: 10 }}>
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                      Libere:
+                    </span>{" "}
+                    {availability.freeUnits.length === 0 ? (
+                      <span style={{ color: "#6b7280" }}>nessuna</span>
+                    ) : (
+                      availability.freeUnits.map((u) => (
+                        <span
+                          key={u.id}
+                          style={{
+                            ...chip("#ecfdf5", "#166534"),
+                            marginRight: 4,
+                          }}
+                        >
+                          {u.name}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  {availability.occupiedUnits.length > 0 && (
+                    <div>
+                      <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                        Occupate:
+                      </span>{" "}
+                      {availability.occupiedUnits.map((u) => (
+                        <span
+                          key={u.id}
+                          style={{
+                            ...chip("#fee2e2", "#b91c1c"),
+                            marginRight: 4,
+                          }}
+                        >
+                          {u.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {availability.conflictForSelectedUnit && (
+                    <div style={conflictBox}>
+                      <div style={conflictIcon}>!</div>
+                      <div>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            marginBottom: 2,
+                          }}
+                        >
+                          Attenzione: questa unità è già occupata nelle date
+                          selezionate.
+                        </div>
+                        {availability.conflictBookings.length > 0 && (
+                          <ul
+                            style={{
+                              margin: 0,
+                              paddingLeft: 16,
+                              listStyle: "disc",
+                            }}
+                          >
+                            {availability.conflictBookings.map((b) => (
+                              <li key={b.id}>
+                                {b.guest_name || "Ospite"} ·{" "}
+                                {parseDate(
+                                  b.checkin_date
+                                )?.toLocaleDateString("it-IT")}{" "}
+                                →{" "}
+                                {parseDate(
+                                  b.checkout_date
+                                )?.toLocaleDateString("it-IT")}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ marginTop: 4, color: "#7f1d1d" }}>
+                          Puoi cambiare unità oppure modificare il periodo.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={field}>
                 <label style={label}>Ospite</label>
@@ -450,7 +714,13 @@ function Bookings() {
               </div>
 
               {nights > 0 && (
-                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#6b7280",
+                    marginBottom: 8,
+                  }}
+                >
                   Notti: <strong>{nights}</strong>
                 </div>
               )}
@@ -572,30 +842,56 @@ function Bookings() {
                   <strong>
                     {currency} {suggestedTotal.toFixed(2)}
                   </strong>{" "}
-                  (notti × tariffa + extra).
-                  <br />
-                  Puoi lasciare vuoto il campo totale per usare questo valore
-                  calcolato automaticamente.
+                  (notti × tariffa + extra). Puoi lasciare vuoto il campo totale
+                  per usare questo valore calcolato automaticamente.
                 </div>
               )}
 
+              {/* flag pagata + late checkout – versione sistemata */}
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 6,
+                  flexDirection: "column",
+                  gap: 8,
                   marginBottom: 10,
                 }}
               >
-                <input
-                  id="isPaid"
-                  type="checkbox"
-                  checked={isPaid}
-                  onChange={(e) => setIsPaid(e.target.checked)}
-                />
-                <label htmlFor="isPaid" style={{ fontSize: 12, color: "#374151" }}>
-                  Pagata
-                </label>
+                <div style={checkboxRow}>
+                  <input
+                    id="isPaid"
+                    type="checkbox"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                    style={checkboxInput}
+                  />
+                  <div>
+                    <label htmlFor="isPaid" style={checkboxLabelMain}>
+                      Pagata
+                    </label>
+                    <div style={checkboxLabelSub}>
+                      Segna la prenotazione come già incassata.
+                    </div>
+                  </div>
+                </div>
+
+                <div style={checkboxRow}>
+                  <input
+                    id="hasLateCheckout"
+                    type="checkbox"
+                    checked={hasLateCheckout}
+                    onChange={(e) => setHasLateCheckout(e.target.checked)}
+                    style={checkboxInput}
+                  />
+                  <div>
+                    <label htmlFor="hasLateCheckout" style={checkboxLabelMain}>
+                      Late check-out
+                    </label>
+                    <div style={checkboxLabelSub}>
+                      Uscita nel pomeriggio; il sistema adegua automaticamente
+                      costi e pulizie.
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div style={field}>
@@ -615,11 +911,7 @@ function Bookings() {
                   marginTop: 10,
                 }}
               >
-                <button
-                  type="submit"
-                  style={buttonPrimary}
-                  disabled={saving}
-                >
+                <button type="submit" style={buttonPrimary} disabled={saving}>
                   {saving
                     ? "Salvataggio..."
                     : formMode === "create"
@@ -641,108 +933,198 @@ function Bookings() {
 
           {/* LISTA PRENOTAZIONI */}
           <div style={card}>
-            <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-              Elenco prenotazioni
-            </h2>
-            {bookings.length === 0 ? (
+            <div style={filtersRow}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                Elenco prenotazioni
+                <div
+                  style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}
+                >
+                  Mostrate: {shownCount} / {totalCount}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: "#6b7280" }}>Unità</span>
+                  <select
+                    style={{
+                      ...input,
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      width: 120,
+                    }}
+                    value={unitFilter}
+                    onChange={(e) => setUnitFilter(e.target.value)}
+                  >
+                    <option value="all">Tutte</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: "#6b7280" }}>
+                    Pagamento
+                  </span>
+                  <select
+                    style={{
+                      ...input,
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      width: 140,
+                    }}
+                    value={paymentFilter}
+                    onChange={(e) => setPaymentFilter(e.target.value)}
+                  >
+                    <option value="all">Tutte</option>
+                    <option value="unpaid">Da incassare</option>
+                    <option value="paid">Pagate</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {filteredBookings.length === 0 ? (
               <p style={{ fontSize: 13, color: "#6b7280" }}>
-                Nessuna prenotazione registrata.
+                Nessuna prenotazione per i filtri selezionati.
               </p>
             ) : (
-              <div style={{ overflowX: "auto" }}>
+              <div style={{ overflowX: "auto", marginTop: 4 }}>
                 <table style={table}>
                   <thead>
                     <tr>
-                      <th style={th}>Ospite</th>
+                      <th style={th}>Ospite / Canale</th>
+                      <th style={th}>Periodo</th>
                       <th style={th}>Unità</th>
-                      <th style={th}>Date</th>
-                      <th style={th}>Notti</th>
                       <th style={th}>Totale</th>
-                      <th style={th}>Canale</th>
                       <th style={th}>Stato</th>
                       <th style={th}>Azioni</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          new Date(a.checkin_date) - new Date(b.checkin_date)
-                      )
-                      .map((b) => {
-                        const unit = unitMap[b.unit_id];
-                        const cIn = parseDate(b.checkin_date);
-                        const cOut = parseDate(b.checkout_date);
-                        const n = diffNights(cIn, cOut);
-                        const total =
-                          b.total_price != null
-                            ? Number(b.total_price)
-                            : b.nightly_rate != null
-                            ? Number(b.nightly_rate) * n
-                            : null;
+                    {filteredBookings.map((b) => {
+                      const unit = unitMap[b.unit_id];
+                      const cIn = parseDate(b.checkin_date);
+                      const cOut = parseDate(b.checkout_date);
+                      const n = diffNights(cIn, cOut);
+                      const total =
+                        b.total_price != null
+                          ? Number(b.total_price)
+                          : b.nightly_rate != null
+                          ? Number(b.nightly_rate) * n
+                          : null;
 
-                        return (
-                          <tr key={b.id}>
-                            <td style={td}>{b.guest_name}</td>
-                            <td style={td}>{unit?.name || `Unit #${b.unit_id}`}</td>
-                            <td style={td}>
-                              {cIn?.toLocaleDateString("it-IT")} →{" "}
-                              {cOut?.toLocaleDateString("it-IT")}
-                            </td>
-                            <td style={td}>{n}</td>
-                            <td style={td}>
-                              {total != null ? (
-                                <>
-                                  {b.currency || "EUR"} {total.toFixed(2)}
-                                </>
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                            <td style={td}>
-                              {b.source === "direct"
-                                ? "Diretta"
-                                : b.source === "airbnb"
-                                ? "Airbnb"
-                                : b.source === "booking"
-                                ? "Booking.com"
-                                : b.source || "—"}
-                            </td>
-                            <td style={td}>
-                              <span style={pillPaid(b.is_paid)}>
-                                {b.is_paid ? "Pagata" : "Da incassare"}
+                      return (
+                        <tr key={b.id}>
+                          <td style={td}>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                              }}
+                            >
+                              <span style={{ fontWeight: 500 }}>
+                                {b.guest_name}
                               </span>
-                            </td>
-                            <td style={{ ...td, whiteSpace: "nowrap" }}>
-                              <button
-                                type="button"
+                              <span>
+                                <span style={pillSource(b.source)}>
+                                  {b.source === "direct"
+                                    ? "Diretta"
+                                    : b.source === "airbnb"
+                                    ? "Airbnb"
+                                    : b.source === "booking"
+                                    ? "Booking.com"
+                                    : b.source || "Altro"}
+                                </span>
+                              </span>
+                            </div>
+                          </td>
+                          <td style={td}>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                              }}
+                            >
+                              <span>
+                                {cIn?.toLocaleDateString("it-IT")} →{" "}
+                                {cOut?.toLocaleDateString("it-IT")}
+                              </span>
+                              <span
                                 style={{
-                                  ...buttonSecondary,
-                                  padding: "4px 10px",
-                                  fontSize: 12,
+                                  fontSize: 11,
+                                  color: "#6b7280",
                                 }}
-                                onClick={() => loadBookingIntoForm(b)}
                               >
-                                Modifica
-                              </button>{" "}
-                              <button
-                                type="button"
-                                style={{
-                                  ...buttonSecondary,
-                                  padding: "4px 10px",
-                                  fontSize: 12,
-                                  borderColor: "#fecaca",
-                                  color: "#b91c1c",
-                                }}
-                                onClick={() => handleDelete(b.id)}
-                              >
-                                Elimina
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                                {n} notte{n !== 1 ? "i" : ""}
+                              </span>
+                              {b.has_late_checkout && (
+                                <span
+                                  style={{
+                                    ...chip("#fef9c3", "#92400e"),
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  Late check-out
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={td}>{unit?.name || `Unit #${b.unit_id}`}</td>
+                          <td style={td}>
+                            {total != null ? (
+                              <>
+                                {b.currency || "EUR"} {total.toFixed(2)}
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td style={td}>
+                            <span style={pillPaid(b.is_paid)}>
+                              {b.is_paid ? "Pagata" : "Da incassare"}
+                            </span>
+                          </td>
+                          <td style={{ ...td, whiteSpace: "nowrap" }}>
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
+                              }}
+                              onClick={() => loadBookingIntoForm(b)}
+                            >
+                              Modifica
+                            </button>{" "}
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
+                                borderColor: "#fecaca",
+                                color: "#b91c1c",
+                              }}
+                              onClick={() => handleDelete(b.id)}
+                            >
+                              Elimina
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
