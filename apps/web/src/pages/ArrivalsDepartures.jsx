@@ -7,6 +7,7 @@ import {
   updateBooking,
   updateStaffTask,
 } from "../services/api";
+import MessageModal from "../components/MessageModal";
 
 function formatDate(d) {
   if (!d) return "";
@@ -39,6 +40,10 @@ function ArrivalsDepartures() {
 
   const [savingBookingId, setSavingBookingId] = useState(null);
   const [savingTaskId, setSavingTaskId] = useState(null);
+
+  // Stato per il modale messaggi
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [selectedBookingForMessage, setSelectedBookingForMessage] = useState(null);
 
   const unitMap = useMemo(
     () =>
@@ -118,6 +123,11 @@ function ArrivalsDepartures() {
   }, [staffTasks]);
 
   // ---- azioni ----
+
+  function openMessageModal(b) {
+    setSelectedBookingForMessage(b);
+    setMessageModalOpen(true);
+  }
 
   async function handleMarkPaid(b) {
     if (b.is_paid) return;
@@ -285,6 +295,17 @@ function ArrivalsDepartures() {
     fontSize: 11,
     background: "white",
     cursor: "pointer",
+  };
+
+  const iconButton = {
+    ...smallButton,
+    padding: 0,
+    width: 24,
+    height: 24,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
   };
 
   const pillStatus = (paid) =>
@@ -464,7 +485,7 @@ function ArrivalsDepartures() {
                               <span style={{ fontWeight: 600, fontSize: 13 }}>
                                 {b.guest_name}
                               </span>
-                              
+
                               {/* NUOVI DETTAGLI OSPITE */}
                               <div style={{ fontSize: 11, color: "#4b5563", display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 <span>
@@ -476,22 +497,37 @@ function ArrivalsDepartures() {
                                   </span>
                                 )}
                               </div>
-                              
+
                               {b.guest_phone && (
-                                <div style={{ marginTop: 2 }}>
+                                <div style={{ marginTop: 2, display: "flex", alignItems: "center" }}>
                                   <a
                                     href={whatsappLink(b.guest_phone)}
                                     target="_blank"
                                     rel="noreferrer"
-                                    style={{ fontSize: 11, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                    style={{ fontSize: 11, color: "#2563eb", textDecoration: "none", marginRight: 6 }}
                                   >
                                     <span>📞</span> {b.guest_phone}
                                   </a>
+                                  <button
+                                    type="button"
+                                    title="Invia Messaggio Template"
+                                    style={{
+                                        ...iconButton,
+                                        backgroundColor: "#dcfce7",
+                                        color: "#166534",
+                                        border: "1px solid #86efac",
+                                        fontSize: 12,
+                                    }}
+                                    onClick={() => openMessageModal(b)}
+                                  >
+                                    💬
+                                  </button>
                                 </div>
                               )}
-
+                              
                               <span style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
-                                {b.nightly_rate != null && b.total_price != null
+                                {b.nightly_rate != null &&
+                                b.total_price != null
                                   ? `Soggiorno: ${b.nightly_rate} €/notte`
                                   : ""}
                               </span>
@@ -542,17 +578,17 @@ function ArrivalsDepartures() {
                               >
                                 {hasCheckin && (
                                   <span style={{ fontSize: 11 }}>
-                                    • Task check-in
+                                    • Check-in
                                   </span>
                                 )}
                                 {hasCleaning && (
                                   <span style={{ fontSize: 11 }}>
-                                    • Pulizia collegata al soggiorno
+                                    • Pulizia
                                   </span>
                                 )}
                                 {!hasCheckin && !hasCleaning && (
                                   <span style={{ fontSize: 11 }}>
-                                    • {relatedTasks.length} task staff
+                                    • {relatedTasks.length} task
                                   </span>
                                 )}
                               </div>
@@ -581,10 +617,10 @@ function ArrivalsDepartures() {
                                 onClick={() => handleMarkPaid(b)}
                               >
                                 {b.is_paid
-                                  ? "Già pagata"
+                                  ? "Incassato"
                                   : savingBookingId === b.id
                                   ? "Aggiorno..."
-                                  : "Segna pagata"}
+                                  : "Incassa"}
                               </button>
                               <button
                                 type="button"
@@ -595,18 +631,7 @@ function ArrivalsDepartures() {
                                 }}
                                 onClick={() => openBooking(b)}
                               >
-                                Apri prenotazione
-                              </button>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "#6366f1",
-                                  color: "#4338ca",
-                                }}
-                                onClick={() => openStaffForBooking(b)}
-                              >
-                                Vedi task staff
+                                Dettagli
                               </button>
                             </div>
                           </td>
@@ -634,7 +659,7 @@ function ArrivalsDepartures() {
                       <th style={th}>Ospite</th>
                       <th style={th}>Unità</th>
                       <th style={th}>Periodo</th>
-                      <th style={th}>Task / Pulizia</th>
+                      <th style={th}>Check-out</th>
                       <th style={th}>Azioni</th>
                     </tr>
                   </thead>
@@ -706,10 +731,10 @@ function ArrivalsDepartures() {
                             </div>
                           </td>
                           <td style={td}>
-                            {relatedTasks.length === 0 ? (
-                              <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                                Nessun task di giornata
-                              </span>
+                            {checkoutTasks.length === 0 ? (
+                                <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                                No task
+                                </span>
                             ) : (
                               <div
                                 style={{
@@ -729,38 +754,7 @@ function ArrivalsDepartures() {
                                     }}
                                   >
                                     <span style={{ fontSize: 11 }}>
-                                      Check-out{" "}
-                                      {t.time ? `· ${t.time}` : ""}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      style={pillTaskStatus(t.status)}
-                                      onClick={() =>
-                                        handleToggleTaskStatus(t)
-                                      }
-                                      disabled={savingTaskId === t.id}
-                                    >
-                                      {savingTaskId === t.id
-                                        ? "..."
-                                        : t.status === "done"
-                                        ? "Fatto"
-                                        : "Da fare"}
-                                    </button>
-                                  </div>
-                                ))}
-                                {cleaningTasks.map((t) => (
-                                  <div
-                                    key={`cl-${t.id}`}
-                                    style={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      gap: 6,
-                                      alignItems: "center",
-                                    }}
-                                  >
-                                    <span style={{ fontSize: 11 }}>
-                                      Pulizia{" "}
-                                      {t.time ? `· ${t.time}` : ""}
+                                      {t.time || "Any"}
                                     </span>
                                     <button
                                       type="button"
@@ -915,6 +909,19 @@ function ArrivalsDepartures() {
               </div>
             )}
           </div>
+
+          {/* MODALE MESSAGGI */}
+          {messageModalOpen && selectedBookingForMessage && (
+            <MessageModal
+              isOpen={messageModalOpen}
+              onClose={() => {
+                setMessageModalOpen(false);
+                setSelectedBookingForMessage(null);
+              }}
+              booking={selectedBookingForMessage}
+              unitName={unitMap[selectedBookingForMessage.unit_id]?.name}
+            />
+          )}
         </>
       )}
     </div>
