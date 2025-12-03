@@ -16,7 +16,6 @@ function formatDate(d) {
 
 function whatsappLink(phone) {
   if (!phone) return null;
-  // Rimuove tutto tranne numeri e +
   const clean = phone.replace(/[^0-9+]/g, "");
   return `https://wa.me/${clean}`;
 }
@@ -25,7 +24,6 @@ function ArrivalsDepartures() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
 
-  // se la tua pagina staff ha un path diverso, cambia qui
   const STAFF_ROUTE = "/staff";
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -41,7 +39,6 @@ function ArrivalsDepartures() {
   const [savingBookingId, setSavingBookingId] = useState(null);
   const [savingTaskId, setSavingTaskId] = useState(null);
 
-  // Stato per il modale messaggi
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedBookingForMessage, setSelectedBookingForMessage] = useState(null);
 
@@ -54,7 +51,6 @@ function ArrivalsDepartures() {
     [units]
   );
 
-  // carica dati ogni volta che cambia la data
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -77,8 +73,6 @@ function ArrivalsDepartures() {
 
     load();
   }, [selectedDate]);
-
-  // ---- derivati filtrati per giorno + unità ----
 
   const arrivals = useMemo(
     () =>
@@ -122,18 +116,20 @@ function ArrivalsDepartures() {
     return map;
   }, [staffTasks]);
 
-  // ---- azioni ----
-
   function openMessageModal(b) {
     setSelectedBookingForMessage(b);
     setMessageModalOpen(true);
+  }
+
+  function openDocument(b) {
+    // Apre la pagina di stampa in una nuova scheda
+    window.open(`/bookings/${b.id}/document`, "_blank");
   }
 
   async function handleMarkPaid(b) {
     if (b.is_paid) return;
     setSavingBookingId(b.id);
     try {
-      // Nota: inviamo tutti i campi necessari per l'update
       const payload = {
         unit_id: b.unit_id,
         guest_name: b.guest_name,
@@ -428,16 +424,10 @@ function ArrivalsDepartures() {
         <p style={{ fontSize: 13 }}>Caricamento dati operativi...</p>
       ) : (
         <>
-          <div style={filtersRow}>
-            <span>
-              Arrivi: <strong>{arrivals.length}</strong>
-            </span>
-            <span>
-              Partenze: <strong>{departures.length}</strong>
-            </span>
-            <span>
-              Task staff: <strong>{visibleStaffTasks.length}</strong>
-            </span>
+          <div style={{ display: "flex", gap: 12, fontSize: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <span>Arrivi: <strong>{arrivals.length}</strong></span>
+            <span>Partenze: <strong>{departures.length}</strong></span>
+            <span>Task staff: <strong>{visibleStaffTasks.length}</strong></span>
           </div>
 
           <div style={cardGrid}>
@@ -633,6 +623,17 @@ function ArrivalsDepartures() {
                               >
                                 Dettagli
                               </button>
+                              <button
+                                type="button"
+                                style={{
+                                  ...smallButton,
+                                  borderColor: "#6366f1",
+                                  color: "#4338ca",
+                                }}
+                                onClick={() => openDocument(b)}
+                              >
+                                📄 Stampa
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -776,38 +777,35 @@ function ArrivalsDepartures() {
                             )}
                           </td>
                           <td style={td}>
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                              }}
-                            >
-                              <span style={pillStatus(b.is_paid)}>
-                                {b.is_paid ? "Pagata" : "Da incassare"}
-                              </span>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "#0f766e",
-                                  color: "#0f766e",
-                                }}
-                                onClick={() => openBooking(b)}
-                              >
-                                Apri prenotazione
-                              </button>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "#6366f1",
-                                  color: "#4338ca",
-                                }}
-                                onClick={() => openStaffForBooking(b)}
-                              >
-                                Vedi task staff
-                              </button>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                               <button
+                                  type="button"
+                                  title="Invia Messaggio"
+                                  style={{
+                                    ...iconButton,
+                                    backgroundColor: "#dcfce7",
+                                    color: "#166534",
+                                    border: "1px solid #86efac",
+                                    width: 26, height: 26, fontSize: 14
+                                  }}
+                                  onClick={() => openMessageModal(b)}
+                                >
+                                  💬
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Stampa"
+                                  style={{
+                                    ...iconButton,
+                                    backgroundColor: "#e0e7ff",
+                                    color: "#3730a3",
+                                    border: "1px solid #c7d2fe",
+                                    width: 26, height: 26, fontSize: 14
+                                  }}
+                                  onClick={() => openDocument(b)}
+                                >
+                                  📄
+                                </button>
                             </div>
                           </td>
                         </tr>
@@ -817,97 +815,6 @@ function ArrivalsDepartures() {
                 </table>
               )}
             </div>
-          </div>
-
-          {/* TASK STAFF DEL GIORNO */}
-          <div style={card}>
-            <div
-              style={{
-                ...sectionTitle,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span>
-                Task staff del {formatDate(selectedDate)} (
-                {visibleStaffTasks.length})
-              </span>
-              <button
-                type="button"
-                style={{
-                  ...smallButton,
-                  borderColor: "#0f766e",
-                  color: "#0f766e",
-                }}
-                onClick={openStaffForDate}
-              >
-                Apri pagina staff
-              </button>
-            </div>
-            {visibleStaffTasks.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#6b7280" }}>
-                Nessun task staff pianificato per questa data (con i filtri
-                attuali).
-              </p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={table}>
-                  <thead>
-                    <tr>
-                      <th style={th}>Ora</th>
-                      <th style={th}>Tipo</th>
-                      <th style={th}>Unità</th>
-                      <th style={th}>Assegnato a</th>
-                      <th style={th}>Stato</th>
-                      <th style={th}>Costo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleStaffTasks.map((t) => {
-                      const unit = t.unit_id ? unitMap[t.unit_id] : null;
-                      return (
-                        <tr key={t.id}>
-                          <td style={td}>{t.time || "—"}</td>
-                          <td style={td}>{getTaskLabel(t)}</td>
-                          <td style={td}>
-                            {unit?.name ||
-                              (t.unit_id ? `Unit #${t.unit_id}` : "—")}
-                          </td>
-                          <td style={td}>{t.assignee_name || "—"}</td>
-                          <td style={td}>
-                            <button
-                              type="button"
-                              style={pillTaskStatus(t.status)}
-                              onClick={() => handleToggleTaskStatus(t)}
-                              disabled={savingTaskId === t.id}
-                            >
-                              {savingTaskId === t.id
-                                ? "..."
-                                : t.status === "done"
-                                ? "Fatto"
-                                : "Da fare"}
-                            </button>
-                          </td>
-                          <td style={td}>
-                            {t.cost != null ? (
-                              <>
-                                {t.currency || "EUR"}{" "}
-                                {Number(t.cost).toFixed(2)}
-                              </>
-                            ) : (
-                              <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                                non impostato
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
 
           {/* MODALE MESSAGGI */}

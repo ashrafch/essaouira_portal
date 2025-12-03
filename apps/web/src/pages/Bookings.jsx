@@ -280,6 +280,11 @@ function Bookings() {
     setHasLateCheckout(Boolean(b.has_late_checkout));
   }
 
+  // Funzione per aprire la pagina di stampa
+  function openDocument(b) {
+    window.open(`/bookings/${b.id}/document`, "_blank");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!unitId || !guestName || !checkinDate || !checkoutDate) {
@@ -1185,6 +1190,20 @@ function Bookings() {
                               onClick={() => loadBookingIntoForm(b)}
                             >
                               Modifica
+                            </button>{" "}
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
+                                borderColor: "#6366f1",
+                                color: "#4338ca",
+                                marginRight: 4
+                              }}
+                              onClick={() => openDocument(b)}
+                            >
+                              Stampa
                             </button>{" "}
                             <button
                               type="button"
