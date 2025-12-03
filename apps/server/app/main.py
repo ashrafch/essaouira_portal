@@ -193,6 +193,15 @@ class BookingBase(BaseModel):
     unit_id: int
     guest_name: str
     guest_email: str | None = None
+    
+    # --- NUOVI CAMPI OSPITE ---
+    guest_phone: str | None = None
+    num_adults: int = 1
+    num_children: int = 0
+    # time | None permette a Pydantic di gestire automaticamente la conversione da stringa "HH:MM" a time
+    estimated_arrival_time: time | None = None  
+    # --------------------------
+
     source: str = "direct"
     checkin_date: date
     checkout_date: date
@@ -226,7 +235,31 @@ class BookingOut(BookingBase):
         from_attributes = True
 
 
-# ---------- HELPERS: STAFF DEFAULTS & PRICING DEFAULTS ----------
+# ---------- HELPERS: TIME, DEFAULTS & LOGIC ----------
+
+def _parse_time_str(value: str | None) -> Optional[time]:
+    """Helper per parsing manuale (usato SOLO per i Task Staff che passano stringhe grezze)."""
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        # accettiamo "HH:MM" (senza secondi)
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        try:
+            return datetime.strptime(value, "%H:%M:%S").time()
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
+            )
+
+def _format_time_value(t: Optional[time]) -> Optional[str]:
+    if t is None:
+        return None
+    return t.strftime("%H:%M")
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -266,7 +299,6 @@ def _find_default_assignee_for_role(
 ) -> str | None:
     """
     Trova il primo membro staff ATTIVO con quel ruolo.
-    Se non esiste, usa il fallback (es. cleaning_default_assignee).
     """
     member = (
         db.query(StaffMember)
@@ -285,16 +317,6 @@ def _find_default_assignee_for_role(
 def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     """
     Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione.
-
-    Logica assegnazione:
-    - usa membri staff attivi divisi per ruolo:
-      - housekeeping → pulizie
-      - kitchen → colazioni
-      - reception_day → check-in / check-out
-    - se non trova nessuno per quel ruolo, usa defaults.cleaning_default_assignee
-
-    Non impostiamo alcun costo automatico: il campo cost resta null
-    finché non lo imposti tu a mano lato staff.
     """
     defaults = _get_or_create_staff_defaults(db)
 
@@ -500,10 +522,18 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
             / 100.0
         )
 
+    # MODIFICA RISPETTO A PRIMA:
+    # payload.estimated_arrival_time è già un oggetto time (grazie a Pydantic)
+    # NON DOBBIAMO PARSARLO DI NUOVO
     booking = Booking(
         unit_id=payload.unit_id,
         guest_name=payload.guest_name,
         guest_email=payload.guest_email,
+        guest_phone=payload.guest_phone,
+        num_adults=payload.num_adults,
+        num_children=payload.num_children,
+        estimated_arrival_time=payload.estimated_arrival_time, 
+        
         source=payload.source,
         checkin_date=payload.checkin_date,
         checkout_date=payload.checkout_date,
@@ -599,6 +629,14 @@ def update_booking(
     booking.unit_id = payload.unit_id
     booking.guest_name = payload.guest_name
     booking.guest_email = payload.guest_email
+    
+    booking.guest_phone = payload.guest_phone
+    booking.num_adults = payload.num_adults
+    booking.num_children = payload.num_children
+    
+    # MODIFICA: assegnazione diretta, niente parsing
+    booking.estimated_arrival_time = payload.estimated_arrival_time
+
     booking.source = payload.source
     booking.checkin_date = payload.checkin_date
     booking.checkout_date = payload.checkout_date
@@ -1183,14 +1221,13 @@ def month_pnl(
 
 @app.get("/analytics/month-cost-lines", response_model=List[MonthCostLine])
 def month_cost_lines(
-    year: int = Query(..., ge=2000, le=12),
+    year: int = Query(..., ge=2000, le=2100),  # <--- CORRETTO: le=2100
     month: int = Query(..., ge=1, le=12),
     db: Session = Depends(get_db),
 ):
     month_start, next_month_start, _ = _get_month_range(year, month)
     _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
     return [MonthCostLine(**line) for line in cost_lines]
-
 
 # ---------- STAFF TASKS ----------
 
@@ -1223,33 +1260,6 @@ class StaffTaskOut(StaffTaskBase):
 
     class Config:
         from_attributes = True
-
-
-def _parse_time_str(value: str | None) -> Optional[time]:
-    if not value:
-        return None
-    value = value.strip()
-    if not value:
-        return None
-    try:
-        # accettiamo "HH:MM" (senza secondi)
-        return datetime.strptime(value, "%H:%M").time()
-    except ValueError:
-        # se qualcuno manda anche i secondi, proviamo "HH:MM:SS"
-        try:
-            return datetime.strptime(value, "%H:%M:%S").time()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
-            )
-
-
-def _format_time_value(t: Optional[time]) -> Optional[str]:
-    if t is None:
-        return None
-    # sempre "HH:MM"
-    return t.strftime("%H:%M")
 
 
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])

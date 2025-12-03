@@ -13,6 +13,13 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString("it-IT");
 }
 
+function whatsappLink(phone) {
+  if (!phone) return null;
+  // Rimuove tutto tranne numeri e +
+  const clean = phone.replace(/[^0-9+]/g, "");
+  return `https://wa.me/${clean}`;
+}
+
 function ArrivalsDepartures() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
@@ -116,10 +123,16 @@ function ArrivalsDepartures() {
     if (b.is_paid) return;
     setSavingBookingId(b.id);
     try {
+      // Nota: inviamo tutti i campi necessari per l'update
       const payload = {
         unit_id: b.unit_id,
         guest_name: b.guest_name,
         guest_email: b.guest_email,
+        guest_phone: b.guest_phone,
+        num_adults: b.num_adults,
+        num_children: b.num_children,
+        estimated_arrival_time: b.estimated_arrival_time,
+        
         source: b.source,
         checkin_date: b.checkin_date,
         checkout_date: b.checkout_date,
@@ -448,12 +461,37 @@ function ArrivalsDepartures() {
                                 gap: 2,
                               }}
                             >
-                              <span style={{ fontWeight: 500 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>
                                 {b.guest_name}
                               </span>
-                              <span style={{ fontSize: 11, color: "#6b7280" }}>
-                                {b.nightly_rate != null &&
-                                b.total_price != null
+                              
+                              {/* NUOVI DETTAGLI OSPITE */}
+                              <div style={{ fontSize: 11, color: "#4b5563", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                <span>
+                                  👥 {(b.num_adults || 1) + (b.num_children || 0)} pax
+                                </span>
+                                {b.estimated_arrival_time && (
+                                  <span style={{ color: "#0f766e", fontWeight: 500 }}>
+                                    🕒 {String(b.estimated_arrival_time).slice(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {b.guest_phone && (
+                                <div style={{ marginTop: 2 }}>
+                                  <a
+                                    href={whatsappLink(b.guest_phone)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ fontSize: 11, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                  >
+                                    <span>📞</span> {b.guest_phone}
+                                  </a>
+                                </div>
+                              )}
+
+                              <span style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                                {b.nightly_rate != null && b.total_price != null
                                   ? `Soggiorno: ${b.nightly_rate} €/notte`
                                   : ""}
                               </span>

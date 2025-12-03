@@ -50,6 +50,13 @@ function Bookings() {
   const [unitId, setUnitId] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  
+  // NUOVI CAMPI OSPITE
+  const [guestPhone, setGuestPhone] = useState("");
+  const [numAdults, setNumAdults] = useState("2");
+  const [numChildren, setNumChildren] = useState("0");
+  const [arrivalTime, setArrivalTime] = useState("");
+
   const [source, setSource] = useState("direct");
   const [checkinDate, setCheckinDate] = useState("");
   const [checkoutDate, setCheckoutDate] = useState("");
@@ -201,6 +208,13 @@ function Bookings() {
     setEditingId(null);
     setGuestName("");
     setGuestEmail("");
+    
+    // Reset nuovi campi
+    setGuestPhone("");
+    setNumAdults("2");
+    setNumChildren("0");
+    setArrivalTime("");
+
     setSource("direct");
     setCheckinDate("");
     setCheckoutDate("");
@@ -226,6 +240,14 @@ function Bookings() {
     setUnitId(String(b.unit_id));
     setGuestName(b.guest_name || "");
     setGuestEmail(b.guest_email || "");
+    
+    // Load nuovi campi
+    setGuestPhone(b.guest_phone || "");
+    setNumAdults(b.num_adults != null ? String(b.num_adults) : "2");
+    setNumChildren(b.num_children != null ? String(b.num_children) : "0");
+    // arrival time potrebbe arrivare come "HH:MM:SS" o "HH:MM"
+    setArrivalTime(b.estimated_arrival_time ? String(b.estimated_arrival_time).slice(0,5) : "");
+
     setSource(b.source || "direct");
     setCheckinDate(formatDate(b.checkin_date));
     setCheckoutDate(formatDate(b.checkout_date));
@@ -269,6 +291,13 @@ function Bookings() {
       unit_id: Number(unitId),
       guest_name: guestName,
       guest_email: guestEmail || null,
+      
+      // Nuovi payload
+      guest_phone: guestPhone || null,
+      num_adults: Number(numAdults) || 1,
+      num_children: Number(numChildren) || 0,
+      estimated_arrival_time: arrivalTime || null,
+
       source,
       checkin_date: checkinDate,
       checkout_date: checkoutDate,
@@ -651,25 +680,74 @@ function Bookings() {
                 </div>
               )}
 
+              {/* SEZIONE OSPITE RINNOVATA */}
+              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 12, marginBottom: 6 }}>
+                Dati Ospite
+              </div>
+
               <div style={field}>
-                <label style={label}>Ospite</label>
+                <label style={label}>Nome e Cognome</label>
                 <input
                   style={input}
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Nome dell'ospite"
+                  placeholder="Es. Mario Rossi"
                 />
               </div>
 
-              <div style={field}>
-                <label style={label}>Email ospite (opzionale)</label>
-                <input
-                  style={input}
-                  type="email"
-                  value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
-                  placeholder="email@example.com"
-                />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={field}>
+                  <label style={label}>Email</label>
+                  <input
+                    style={input}
+                    type="email"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div style={field}>
+                  <label style={label}>Telefono / WhatsApp</label>
+                  <input
+                    style={input}
+                    type="tel"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="+39 333..."
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                <div style={field}>
+                  <label style={label}>Adulti</label>
+                  <input
+                    style={input}
+                    type="number"
+                    min="1"
+                    value={numAdults}
+                    onChange={(e) => setNumAdults(e.target.value)}
+                  />
+                </div>
+                <div style={field}>
+                  <label style={label}>Bambini</label>
+                  <input
+                    style={input}
+                    type="number"
+                    min="0"
+                    value={numChildren}
+                    onChange={(e) => setNumChildren(e.target.value)}
+                  />
+                </div>
+                <div style={field}>
+                  <label style={label}>Ora Arrivo</label>
+                  <input
+                    style={input}
+                    type="time"
+                    value={arrivalTime}
+                    onChange={(e) => setArrivalTime(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div style={field}>
@@ -847,7 +925,7 @@ function Bookings() {
                 </div>
               )}
 
-              {/* flag pagata + late checkout – versione sistemata */}
+              {/* flag pagata + late checkout */}
               <div
                 style={{
                   display: "flex",

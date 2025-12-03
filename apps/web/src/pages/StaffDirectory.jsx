@@ -15,19 +15,19 @@ const COLOR_SWATCHES = [
   "#16a34a", // altro verde
 ];
 
-// Ruoli fissi allineati al backend (StaffRole enum)
-const ROLE_OPTIONS = [
-  { value: "housekeeping", label: "Housekeeping (pulizie / camere)" },
+// 👇 RUOLI DEFINITIVI (devono combaciare con l'enum lato backend)
+const STAFF_ROLES = [
+  { value: "housekeeping", label: "Housekeeping (Pulizie)" },
   { value: "kitchen", label: "Cucina / Colazioni" },
-  { value: "reception_day", label: "Reception (giorno)" },
-  { value: "reception_night", label: "Reception (notte)" },
-  { value: "manager", label: "Manager / Amministratore" },
+  { value: "reception_day", label: "Reception (Giorno)" },
+  { value: "reception_night", label: "Reception (Notte)" },
+  { value: "manager", label: "Amministratore / Manager" },
 ];
 
-function getRoleLabel(value) {
-  if (!value) return "—";
-  const opt = ROLE_OPTIONS.find((r) => r.value === value);
-  return opt ? opt.label : value;
+function getRoleLabel(roleValue) {
+  if (!roleValue) return "—";
+  const found = STAFF_ROLES.find((r) => r.value === roleValue);
+  return found ? found.label : roleValue; // se in futuro aggiungi un ruolo nuovo
 }
 
 function StaffDirectory() {
@@ -41,7 +41,7 @@ function StaffDirectory() {
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
-  const [role, setRole] = useState(""); // ora è il value dell'enum
+  const [role, setRole] = useState("");           // 👈 ora è uno dei value di STAFF_ROLES
   const [hourlyCost, setHourlyCost] = useState("");
   const [colorHex, setColorHex] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -80,7 +80,7 @@ function StaffDirectory() {
   function resetForm() {
     setEditingId(null);
     setName("");
-    setRole("");
+    setRole("");       // 👈 nessun ruolo selezionato
     setHourlyCost("");
     setColorHex("");
     setIsActive(true);
@@ -89,8 +89,7 @@ function StaffDirectory() {
   function startEdit(m) {
     setEditingId(m.id);
     setName(m.name || "");
-    // m.role è la stringa enum (es. "housekeeping")
-    setRole(m.role || "");
+    setRole(m.role || ""); // 👈 deve già essere uno dei value validi
     setHourlyCost(
       m.hourly_cost === null || m.hourly_cost === undefined
         ? ""
@@ -110,8 +109,7 @@ function StaffDirectory() {
     try {
       const payload = {
         name: name.trim(),
-        // il backend si aspetta l'enum StaffRole, ma lato JSON è la stringa (es. "housekeeping")
-        role: role || null,
+        role: role || null, // 👈 se non selezioni nulla, va a NULL lato backend
         color_hex: colorHex || null,
         hourly_cost:
           hourlyCost === "" || hourlyCost == null
@@ -145,7 +143,7 @@ function StaffDirectory() {
       }
       resetForm();
     } catch (err) {
-      alert("Errore salvando membro staff: " + (err.message || "Errore"));
+      alert("Errore salvando membro staff: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -167,7 +165,7 @@ function StaffDirectory() {
           })
       );
     } catch (err) {
-      alert("Errore aggiornando stato: " + (err.message || "Errore"));
+      alert("Errore aggiornando stato: " + err.message);
     }
   }
 
@@ -182,7 +180,7 @@ function StaffDirectory() {
       await deactivateStaffMember(id); // DELETE /staff-members/{id}
       setMembers((prev) => prev.filter((m) => m.id !== id));
     } catch (err) {
-      alert("Errore eliminando membro: " + (err.message || "Errore"));
+      alert("Errore eliminando membro: " + err.message);
     }
   }
 
@@ -289,9 +287,9 @@ function StaffDirectory() {
         <div>
           <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
           <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Gestisci i membri dello staff della struttura. I nomi dovrebbero
-            essere coerenti con gli <code>assignee</code> usati nei task e nel
-            planner staff.
+            Gestisci i membri dello staff della struttura. I ruoli sono
+            standardizzati (housekeeping, reception, cucina, manager) per gli
+            automatismi sulle task.
           </p>
         </div>
 
@@ -372,16 +370,16 @@ function StaffDirectory() {
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >
-                <option value="">Seleziona ruolo...</option>
-                {ROLE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                <option value="">Nessun ruolo</option>
+                {STAFF_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
                   </option>
                 ))}
               </select>
               <span style={{ fontSize: 11, color: "#6b7280" }}>
-                Ruoli fissi usati per le assegnazioni automatiche (check-in,
-                pulizie, colazioni, ecc.).
+                Usa uno di questi ruoli per far funzionare bene gli automatismi
+                (pulizie, check-in, colazioni, ecc.).
               </span>
             </div>
             <div style={field}>

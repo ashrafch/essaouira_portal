@@ -5,6 +5,10 @@ async function handleResponse(res) {
     const text = await res.text();
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
+  // Gestione risposta 204 No Content (es. dopo una delete o update senza ritorno)
+  if (res.status === 204) {
+    return null;
+  }
   return res.json();
 }
 
@@ -181,8 +185,9 @@ export function deactivateStaffMember(id) {
 }
 
 // hard delete -> cancella dal DB
+// ATTENZIONE: Endpoint corretto è DELETE /staff-members/{id} (il backend fa hard delete)
 export function deleteStaffMember(id) {
-  return apiDelete(`/staff-members/${id}/hard-delete`);
+  return apiDelete(`/staff-members/${id}`);
 }
 
 /* --------- PRICING DEFAULTS --------- */
