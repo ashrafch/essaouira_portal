@@ -199,3 +199,21 @@ export function getPricingDefaults() {
 export function updatePricingDefaults(payload) {
   return apiPut("/pricing-defaults", payload);
 }
+
+/* --------- MAINTENANCE --------- */
+
+export function getMaintenanceTickets() {
+  return apiGet("/maintenance");
+}
+
+export function createMaintenanceTicket(payload) {
+  return apiPost("/maintenance", payload);
+}
+
+export function updateMaintenanceTicket(id, payload) {
+  return apiPut(`/maintenance/${id}`, payload);
+}
+
+export function deleteMaintenanceTicket(id) {
+  return apiDelete(`/maintenance/${id}`);
+}

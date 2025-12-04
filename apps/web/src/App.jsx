@@ -13,6 +13,7 @@ import ArrivalsDepartures from "./pages/ArrivalsDepartures";
 import StaffDirectory from "./pages/StaffDirectory";
 import Pricing from "./pages/Pricing";
 import BookingDocument from "./pages/BookingDocument";
+import Maintenance from "./pages/Maintenance"; // <-- IMPORT NUOVO
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
               <Route path="/business" element={<Business />} />
               <Route path="/staff-anagrafica" element={<StaffDirectory />} />
               <Route path="/tariffe-canali" element={<Pricing />} />
+              <Route path="/maintenance" element={<Maintenance />} /> {/* <-- NUOVA ROTTA */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

@@ -7,6 +7,7 @@ import {
   getStaffDefaults,
   updateStaffDefaults,
   getStaffMembers,
+  getMaintenanceTickets,
 } from "../services/api";
 
 function formatDate(d) {
@@ -52,6 +53,8 @@ function Staff() {
   const [units, setUnits] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [staffMembers, setStaffMembers] = useState([]);
+  const [maintenanceTickets, setMaintenanceTickets] = useState([]);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -60,7 +63,7 @@ function Staff() {
 
   const [savingTaskId, setSavingTaskId] = useState(null);
 
-  // defaults staff (come nel vecchio Staff)
+  // defaults staff
   const [defaultsLoading, setDefaultsLoading] = useState(true);
   const [defaultsSaving, setDefaultsSaving] = useState(false);
   const [defaultsMessage, setDefaultsMessage] = useState("");
@@ -69,8 +72,23 @@ function Staff() {
   const [defHours, setDefHours] = useState("1");
   const [defCurrency, setDefCurrency] = useState("EUR");
 
-  // quick-create su cella (giorno + colonna assignee)
-  const [quickCreateTarget, setQuickCreateTarget] = useState(null); // { date, assignee }
+  // form task singolo (modale / edit)
+  const [formMode, setFormMode] = useState("create"); 
+  const [editingId, setEditingId] = useState(null);
+  const [date, setDate] = useState("");
+  const [taskType, setTaskType] = useState("cleaning");
+  const [assigneeName, setAssigneeName] = useState("");
+  const [unitId, setUnitId] = useState("");
+  const [bookingId, setBookingId] = useState("");
+  const [estimatedHours, setEstimatedHours] = useState("");
+  const [status, setStatus] = useState("planned");
+  const [cost, setCost] = useState("");
+  const [currency, setCurrency] = useState("EUR");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // quick-create su cella
+  const [quickCreateTarget, setQuickCreateTarget] = useState(null); 
   const [quickType, setQuickType] = useState("cleaning");
   const [quickUnitId, setQuickUnitId] = useState("");
   const [quickCost, setQuickCost] = useState("");
@@ -78,7 +96,6 @@ function Staff() {
   const [quickNotes, setQuickNotes] = useState("");
   const [creatingTask, setCreatingTask] = useState(false);
 
-  // nuovo: scelta ruolo + assegnatario per il quick-create
   const [quickRole, setQuickRole] = useState("");
   const [quickAssignee, setQuickAssignee] = useState("");
 
@@ -92,7 +109,7 @@ function Staff() {
     [units]
   );
 
-  // range date in base alla modalità
+  // range date
   const { from_date, to_date, days } = useMemo(() => {
     if (mode === "day") {
       return {
@@ -113,18 +130,22 @@ function Staff() {
     };
   }, [mode, selectedDate]);
 
-  // caricamento units + defaults + staff una volta sola
+  // caricamento iniziale
   useEffect(() => {
     async function loadBase() {
       setDefaultsLoading(true);
       try {
-        const [uns, defs, staff] = await Promise.all([
+        const [uns, defs, staff, tickets] = await Promise.all([
           getUnits(),
           getStaffDefaults(),
-          getStaffMembers({ active_only: true }), // <-- usa solo staff attivi
+          getStaffMembers({ active_only: true }),
+          getMaintenanceTickets(),
         ]);
+        
         setUnits(uns || []);
         setStaffMembers(staff || []);
+        setMaintenanceTickets(tickets || []);
+        
         if (defs) {
           setDefAssignee(defs.cleaning_default_assignee || "Operatore 1");
           setDefCost(
@@ -140,7 +161,7 @@ function Staff() {
           setDefCurrency(defs.currency || "EUR");
         }
       } catch (err) {
-        console.error("Errore caricando units/defaults/staff:", err);
+        console.error("Errore caricando dati base:", err);
       } finally {
         setDefaultsLoading(false);
       }
@@ -148,7 +169,7 @@ function Staff() {
     loadBase();
   }, []);
 
-  // carica tasks in base a data/modalità
+  // carica tasks
   useEffect(() => {
     async function loadTasks() {
       setLoading(true);
@@ -169,7 +190,6 @@ function Staff() {
     loadTasks();
   }, [mode, selectedDate, from_date, to_date]);
 
-  // filtri base (unità, tipo)
   const filteredTasks = useMemo(
     () =>
       tasks.filter((t) => {
@@ -188,7 +208,6 @@ function Staff() {
     [tasks, unitFilter, taskTypeFilter]
   );
 
-  // KPI
   const kpi = useMemo(() => {
     const total = filteredTasks.length;
     const byStatus = filteredTasks.reduce(
@@ -209,7 +228,6 @@ function Staff() {
     return { total, byStatus, hours, costTotal };
   }, [filteredTasks]);
 
-  // lista ruoli (da anagrafica staff, come ENUM values)
   const staffRoles = useMemo(() => {
     const set = new Set();
     staffMembers.forEach((m) => {
@@ -222,41 +240,29 @@ function Staff() {
     return arr;
   }, [staffMembers]);
 
-  // lista assignee per colonne della board
   const assignees = useMemo(() => {
     const nameSet = new Set();
-
-    // 1) membri staff attivi (da Anagrafica)
     staffMembers
       .filter((m) => m.is_active)
       .forEach((m) => {
         if (m.name) nameSet.add(m.name);
       });
-
-    // 2) nomi che compaiono nei task
     for (const t of filteredTasks) {
       const name = t.assignee_name || "Non assegnato";
       nameSet.add(name);
     }
-
     let arr = Array.from(nameSet);
-
-    // togli eventuali duplicati e ordina (lasciando "Non assegnato" alla fine)
     const unassigned = "Non assegnato";
     arr = arr.filter((n) => n !== unassigned).sort((a, b) => a.localeCompare(b));
     arr.push(unassigned);
-
-    // se esiste un default assignee, mettilo in testa
     if (defAssignee && arr.includes(defAssignee)) {
       arr = [defAssignee, ...arr.filter((x) => x !== defAssignee)];
     }
-
     return arr;
   }, [filteredTasks, defAssignee, staffMembers]);
 
   const assigneeOptions = assignees;
 
-  // mappa nome → colore da Anagrafica
   const staffColorMap = useMemo(() => {
     const map = {};
     for (const m of staffMembers) {
@@ -267,7 +273,6 @@ function Staff() {
     return map;
   }, [staffMembers]);
 
-  // task per assignee + giorno
   const tasksByAssigneeAndDay = useMemo(() => {
     const map = {};
     for (const t of filteredTasks) {
@@ -306,7 +311,93 @@ function Staff() {
     return taskType || "Altro";
   }
 
-  // ---- azioni su singolo task ----
+  const openTickets = useMemo(() => {
+    return maintenanceTickets.filter(t => t.status !== 'done');
+  }, [maintenanceTickets]);
+
+  // Funzioni per il form completo (nel container in basso)
+  function resetForm() {
+    setFormMode("create");
+    setEditingId(null);
+    setDate("");
+    setTaskType("cleaning");
+    setAssigneeName("");
+    setUnitId("");
+    setBookingId("");
+    setEstimatedHours("");
+    setStatus("planned");
+    setCost("");
+    setCurrency("EUR");
+    setNotes("");
+  }
+
+  function loadTaskIntoForm(t) {
+    setFormMode("edit");
+    setEditingId(t.id);
+    setDate(t.date || "");
+    setTaskType(t.task_type || "cleaning");
+    setAssigneeName(t.assignee_name || "");
+    setUnitId(t.unit_id ? String(t.unit_id) : "");
+    setBookingId(t.booking_id ? String(t.booking_id) : "");
+    setEstimatedHours(
+      t.estimated_hours != null ? String(t.estimated_hours) : ""
+    );
+    setStatus(t.status || "planned");
+    setCost(t.cost != null ? String(t.cost) : "");
+    setCurrency(t.currency || "EUR");
+    setNotes(t.notes || "");
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!date || !taskType) {
+      alert("La data e il tipo di task sono obbligatori.");
+      return;
+    }
+
+    const payload = {
+      date,
+      task_type: taskType,
+      assignee_name: assigneeName || null,
+      estimated_hours: estimatedHours !== "" ? Number(estimatedHours) : null,
+      status,
+      notes: notes || null,
+      cost: cost !== "" ? Number(cost) : null,
+      currency,
+      booking_id: bookingId !== "" ? Number(bookingId) : null,
+      unit_id: unitId !== "" ? Number(unitId) : null,
+      time: null, 
+    };
+
+    setSaving(true);
+    setError(null);
+    try {
+      let saved;
+      if (formMode === "edit" && editingId != null) {
+        saved = await updateStaffTask(editingId, payload);
+        setTasks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+      } else {
+        saved = await createStaffTask(payload);
+        setTasks((prev) => [...prev, saved]);
+      }
+      resetForm();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Eliminare questo task staff?")) return;
+    try {
+      await deleteStaffTask(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      if (editingId === id) resetForm();
+    } catch (err) {
+      alert("Errore eliminando il task: " + err.message);
+    }
+  }
 
   async function saveTask(taskId, partial) {
     const existing = tasks.find((t) => t.id === taskId);
@@ -327,7 +418,6 @@ function Staff() {
         unit_id: existing.unit_id,
         ...partial,
       };
-
       const updated = await updateStaffTask(taskId, payload);
       setTasks((prev) =>
         prev.map((t) => (t.id === updated.id ? updated : t))
@@ -376,22 +466,18 @@ function Staff() {
     saveTask(task.id, { estimated_hours: task.estimated_hours ?? null });
   }
 
-  // cambio assegnatario da select
   function handleChangeAssignee(task, newName) {
     const assignee =
       !newName || newName === "Non assegnato" ? null : newName;
-
-    // ottimista: sposto la card di colonna
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id ? { ...t, assignee_name: assignee } : t
       )
     );
-
     saveTask(task.id, { assignee_name: assignee });
   }
 
-  // ---- quick-create su cella ----
+  // ---- QUICK CREATE ----
 
   function openQuickCreate(date, assignee) {
     setQuickCreateTarget({ date, assignee });
@@ -415,7 +501,6 @@ function Staff() {
     setQuickAssignee("");
   }
 
-  // assignees disponibili nel quick-create (filtrati per ruolo se selezionato)
   const quickAvailableAssignees = useMemo(() => {
     let list = staffMembers.filter((m) => m.is_active);
     if (quickRole) {
@@ -428,15 +513,12 @@ function Staff() {
     if (e) e.preventDefault();
     if (!quickCreateTarget) return;
     const { date, assignee } = quickCreateTarget;
-
-    // priorità: quickAssignee selezionato
     let chosenAssignee = null;
     if (quickAssignee && quickAssignee !== "Non assegnato") {
       chosenAssignee = quickAssignee;
     } else if (assignee && assignee !== "Non assegnato") {
       chosenAssignee = assignee;
     }
-
     const payload = {
       date,
       time: null,
@@ -450,7 +532,6 @@ function Staff() {
       booking_id: null,
       unit_id: quickUnitId !== "" ? Number(quickUnitId) : null,
     };
-
     setCreatingTask(true);
     try {
       const created = await createStaffTask(payload);
@@ -462,8 +543,6 @@ function Staff() {
       setCreatingTask(false);
     }
   }
-
-  // ---- impostazioni defaults staff ----
 
   async function handleSaveDefaults(e) {
     e.preventDefault();
@@ -534,6 +613,29 @@ function Staff() {
     padding: "4px 10px",
     fontSize: 11,
     background: "white",
+    cursor: "pointer",
+  };
+
+  // Ecco i bottoni che mancavano prima!
+  const buttonPrimary = {
+    borderRadius: 999,
+    border: "none",
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    backgroundColor: "#0f766e",
+    color: "white",
+    cursor: "pointer",
+  };
+
+  const buttonSecondary = {
+    borderRadius: 999,
+    border: "1px solid #d1d5db",
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 500,
+    backgroundColor: "white",
+    color: "#374151",
     cursor: "pointer",
   };
 
@@ -676,26 +778,10 @@ function Staff() {
     ...input,
   };
 
-  const buttonPrimary = {
-    borderRadius: 999,
-    border: "none",
-    padding: "7px 12px",
-    fontSize: 12,
-    fontWeight: 600,
-    backgroundColor: "#0f766e",
-    color: "white",
-    cursor: "pointer",
-  };
-
-  const buttonSecondary = {
-    borderRadius: 999,
-    border: "1px solid #d1d5db",
-    padding: "6px 10px",
-    fontSize: 11,
-    fontWeight: 500,
-    backgroundColor: "white",
-    color: "#374151",
-    cursor: "pointer",
+  const textarea = {
+    ...input,
+    minHeight: 60,
+    resize: "vertical",
   };
 
   const kpiGrid = {
@@ -731,6 +817,34 @@ function Staff() {
     display: "flex",
     flexDirection: "column",
     gap: 4,
+  };
+
+  const ticketCardStyle = {
+    backgroundColor: "#fffbeb",
+    border: "1px solid #fcd34d",
+    borderRadius: 8,
+    padding: "10px",
+    marginBottom: 8,
+    fontSize: 12,
+  };
+  
+  const table = {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: 13,
+  };
+
+  const th = {
+    textAlign: "left",
+    borderBottom: "1px solid #e5e7eb",
+    padding: "6px 4px",
+    color: "#6b7280",
+    fontSize: 12,
+  };
+
+  const td = {
+    padding: "6px 4px",
+    borderBottom: "1px solid #f3f4f6",
   };
 
   return (
@@ -855,13 +969,39 @@ function Staff() {
       )}
 
       <div style={layout}>
-        {/* COLONNA SINISTRA: Defaults + KPI rapidi */}
+        {/* COLONNA SINISTRA: Manutenzione + KPI + Defaults */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          
+          {/* WIDGET TICKET MANUTENZIONE */}
+          <div style={card}>
+             <div style={sectionTitle}>🔧 Segnalazioni Aperte ({openTickets.length})</div>
+             {openTickets.length === 0 ? (
+                 <p style={{ fontSize: 12, color: "#6b7280" }}>Nessuna manutenzione pendente.</p>
+             ) : (
+                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                     {openTickets.map(t => (
+                         <div key={t.id} style={ticketCardStyle}>
+                             <div style={{ fontWeight: 600, marginBottom: 2 }}>{t.title}</div>
+                             <div style={{ color: "#4b5563", marginBottom: 4 }}>
+                                 {t.unit_id ? (unitMap[t.unit_id]?.name || `Unit #${t.unit_id}`) : "Struttura"} · {t.priority}
+                             </div>
+                             {t.assigned_to_id && (
+                                 <div style={{ color: "#059669" }}>
+                                     Assegnato a: {staffMembers.find(s => s.id === t.assigned_to_id)?.name || "?"}
+                                 </div>
+                             )}
+                         </div>
+                     ))}
+                 </div>
+             )}
+          </div>
+
+          {/* KPI Card */}
           <div style={card}>
             <div style={sectionTitle}>Riepilogo carico staff</div>
             <div style={kpiGrid}>
               <div style={kpiCard}>
-                <div style={tinyLabel}>Task totali (filtrati)</div>
+                <div style={tinyLabel}>Task totali</div>
                 <div style={tinyValue}>{kpi.total}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af" }}>
                   Done: {kpi.byStatus.done || 0} · Planned:{" "}
@@ -872,25 +1012,25 @@ function Staff() {
                 <div style={tinyLabel}>Ore stimate</div>
                 <div style={tinyValue}>{kpi.hours.toFixed(1)}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                  Somma di tutte le task filtrate
+                  Totale task filtrate
                 </div>
               </div>
               <div style={kpiCard}>
-                <div style={tinyLabel}>Costo complessivo</div>
+                <div style={tinyLabel}>Costo</div>
                 <div style={tinyValue}>€ {kpi.costTotal.toFixed(2)}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                  Finisce nella pagina Business (Staff)
+                  Business (Staff)
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Default settings */}
           <div style={card}>
             <div style={sectionTitle}>Impostazioni staff & default</div>
             <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
               Questi valori vengono usati quando il sistema crea automaticamente
-              task (es. pulizie al check-out). L'operatore di default appare
-              anche come prima colonna nella board.
+              task (es. pulizie al check-out).
             </p>
             {defaultsLoading ? (
               <p style={{ fontSize: 12 }}>Caricamento impostazioni...</p>
@@ -913,7 +1053,7 @@ function Staff() {
                     />
                   </div>
                   <div style={field}>
-                    <label style={label}>Costo base (€) per task</label>
+                    <label style={label}>Costo base (€)</label>
                     <input
                       style={input}
                       type="number"
@@ -1425,6 +1565,287 @@ function Staff() {
             </div>
           )}
         </div>
+
+        {/* Form Task Singolo in fondo alla pagina */}
+        <div style={{ gridColumn: "1 / -1", ...card }}>
+          <h2 style={{ fontSize: 14, marginBottom: 10 }}>
+            {formMode === "create"
+              ? "Nuovo task staff (dettagliato)"
+              : `Modifica task #${editingId}`}
+          </h2>
+
+          <form onSubmit={handleSubmit}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <div style={field}>
+                <label style={label}>Data</label>
+                <input
+                  type="date"
+                  style={input}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+              </div>
+
+              <div style={field}>
+                <label style={label}>Tipo task</label>
+                <select
+                  style={select}
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value)}
+                >
+                  <option value="cleaning">Pulizie</option>
+                  <option value="checkin">Check-in</option>
+                  <option value="checkout">Check-out</option>
+                  <option value="breakfast">Colazione</option>
+                  <option value="maintenance">Manutenzione</option>
+                  <option value="other">Altro</option>
+                </select>
+              </div>
+
+              <div style={field}>
+                <label style={label}>Assegnato a</label>
+                <input
+                  style={input}
+                  value={assigneeName}
+                  onChange={(e) => setAssigneeName(e.target.value)}
+                  placeholder="Nome dello staff"
+                />
+              </div>
+
+              <div style={field}>
+                <label style={label}>Appartamento (opzionale)</label>
+                <select
+                  style={select}
+                  value={unitId}
+                  onChange={(e) => setUnitId(e.target.value)}
+                >
+                  <option value="">Nessuno</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={field}>
+                <label style={label}>Ore stimate</label>
+                <input
+                  style={input}
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={estimatedHours}
+                  onChange={(e) => setEstimatedHours(e.target.value)}
+                  placeholder="es. 1.5"
+                />
+              </div>
+
+              <div style={field}>
+                <label style={label}>Stato</label>
+                <select
+                  style={select}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="planned">Planned</option>
+                  <option value="in_progress">In corso</option>
+                  <option value="done">Completato</option>
+                  <option value="cancelled">Annullato</option>
+                </select>
+              </div>
+
+              <div style={field}>
+                <label style={label}>Costo stimato</label>
+                <input
+                  style={input}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
+                  placeholder="es. 20"
+                />
+              </div>
+
+              <div style={field}>
+                <label style={label}>Valuta</label>
+                <select
+                  style={select}
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                >
+                  <option value="EUR">EUR</option>
+                  <option value="MAD">MAD</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={field}>
+              <label style={label}>Note interne</label>
+              <textarea
+                style={textarea}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Note per lo staff (es. orario preferito, richieste speciali...)"
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 10,
+              }}
+            >
+              <button
+                type="submit"
+                style={buttonPrimary}
+                disabled={saving}
+              >
+                {saving
+                  ? "Salvataggio..."
+                  : formMode === "create"
+                  ? "Crea task"
+                  : "Salva modifiche"}
+              </button>
+              {formMode === "edit" && (
+                <button
+                  type="button"
+                  style={buttonSecondary}
+                  onClick={resetForm}
+                >
+                  Annulla modifica
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* LISTA TASK GLOBALE */}
+        <div style={{ gridColumn: "1 / -1", ...card }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+              gap: 8,
+            }}
+          >
+            <h2 style={{ fontSize: 14 }}>Agenda staff (lista completa)</h2>
+          </div>
+
+          {filteredTasks.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#6b7280" }}>
+              Nessun task staff per i filtri selezionati.
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Data</th>
+                    <th style={th}>Tipo</th>
+                    <th style={th}>Staff</th>
+                    <th style={th}>Unità</th>
+                    <th style={th}>Ore</th>
+                    <th style={th}>Costo</th>
+                    <th style={th}>Stato</th>
+                    <th style={th}>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTasks
+                    .slice()
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map((t) => {
+                      const u = t.unit_id ? unitMap[t.unit_id] : null;
+                      return (
+                        <tr key={t.id}>
+                          <td style={td}>
+                            {t.date
+                              ? new Date(t.date).toLocaleDateString("it-IT")
+                              : "—"}
+                          </td>
+                          <td style={td}>
+                            {getTaskLabel(t.task_type)}
+                          </td>
+                          <td style={td}>{t.assignee_name || "—"}</td>
+                          <td style={td}>
+                            {u
+                              ? u.name
+                              : t.unit_id
+                              ? `Unit #${t.unit_id}`
+                              : "—"}
+                          </td>
+                          <td style={td}>
+                            {t.estimated_hours != null
+                              ? t.estimated_hours.toFixed(1)
+                              : "—"}
+                          </td>
+                          <td style={td}>
+                            {t.cost != null
+                              ? `${t.currency || "EUR"} ${Number(
+                                  t.cost
+                                ).toFixed(2)}`
+                              : "—"}
+                          </td>
+                          <td style={td}>
+                            <span style={pillStatus(t.status)}>
+                              {t.status === "planned"
+                                ? "Planned"
+                                : t.status === "in_progress"
+                                ? "In corso"
+                                : t.status === "done"
+                                ? "Completato"
+                                : t.status === "cancelled"
+                                ? "Annullato"
+                                : t.status}
+                            </span>
+                          </td>
+                          <td style={{ ...td, whiteSpace: "nowrap" }}>
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
+                              }}
+                              onClick={() => loadTaskIntoForm(t)}
+                            >
+                              Modifica
+                            </button>{" "}
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
+                                borderColor: "#fecaca",
+                                color: "#b91c1c",
+                              }}
+                              onClick={() => handleDelete(t.id)}
+                            >
+                              Elimina
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
