@@ -5,6 +5,10 @@ async function handleResponse(res) {
     const text = await res.text();
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
+  // Gestione risposta 204 No Content (es. dopo una delete o update senza ritorno)
+  if (res.status === 204) {
+    return null;
+  }
   return res.json();
 }
 
@@ -181,8 +185,9 @@ export function deactivateStaffMember(id) {
 }
 
 // hard delete -> cancella dal DB
+// ATTENZIONE: Endpoint corretto è DELETE /staff-members/{id} (il backend fa hard delete)
 export function deleteStaffMember(id) {
-  return apiDelete(`/staff-members/${id}/hard-delete`);
+  return apiDelete(`/staff-members/${id}`);
 }
 
 /* --------- PRICING DEFAULTS --------- */
@@ -193,4 +198,22 @@ export function getPricingDefaults() {
 
 export function updatePricingDefaults(payload) {
   return apiPut("/pricing-defaults", payload);
+}
+
+/* --------- MAINTENANCE --------- */
+
+export function getMaintenanceTickets() {
+  return apiGet("/maintenance");
+}
+
+export function createMaintenanceTicket(payload) {
+  return apiPost("/maintenance", payload);
+}
+
+export function updateMaintenanceTicket(id, payload) {
+  return apiPut(`/maintenance/${id}`, payload);
+}
+
+export function deleteMaintenanceTicket(id) {
+  return apiDelete(`/maintenance/${id}`);
 }

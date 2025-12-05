@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     Numeric,
     Boolean,
+    Time,
 )
 from sqlalchemy.orm import relationship
 
@@ -29,6 +30,14 @@ class Booking(Base):
     # ----------------------
     guest_name = Column(String, nullable=False)
     guest_email = Column(String, nullable=True)
+    guest_phone = Column(String, nullable=True)  # <-- Nuovo: Telefono/WhatsApp
+
+    # Composizione gruppo
+    num_adults = Column(Integer, nullable=False, default=1)  # <-- Nuovo
+    num_children = Column(Integer, nullable=False, default=0)  # <-- Nuovo
+
+    # Orario previsto di arrivo
+    estimated_arrival_time = Column(Time, nullable=True)  # <-- Nuovo
 
     # direct / airbnb / booking / other
     source = Column(String, nullable=False, default="direct")
@@ -55,6 +64,6 @@ class Booking(Base):
     is_paid = Column(Boolean, nullable=False, default=False)
 
     # ----------------------
-    #   ⚠️ NUOVO CAMPO LATE CHECKOUT
+    #   LATE CHECKOUT
     # ----------------------
     has_late_checkout = Column(Boolean, nullable=False, default=False)

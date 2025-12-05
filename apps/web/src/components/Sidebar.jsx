@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { getBookings, getStaffTasks } from "../services/api";
+import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
 
 const wrapper = {
   padding: "20px 16px",
@@ -129,6 +129,7 @@ function Sidebar() {
     bookings: false,
     property: false,
     staff: false,
+    facility: true, // Apro la nuova sezione per evidenziarla
   });
 
   const [todayStats, setTodayStats] = useState({
@@ -136,6 +137,7 @@ function Sidebar() {
     departures: 0,
     stays: 0,
     staffTasks: 0,
+    openTickets: 0,
   });
 
   const topLinkStyle = makeLinkStyle({ level: "top" });
@@ -161,6 +163,7 @@ function Sidebar() {
       items: [
         { to: "/units", label: "Appartamenti", badge: null },
         { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null },
+        { to: "/expenses", label: "Spese Generali", badge: null },
         {
           to: "/business",
           label: "Business (Ricavi & Costi)",
@@ -189,13 +192,37 @@ function Sidebar() {
         },
       ],
     },
+    {
+      id: "facility",
+      title: "Facility",
+      items: [
+        {
+          to: "/maintenance",
+          label: "Manutenzioni",
+          badge: "openTickets",
+        },
+      ],
+    },
   ];
 
-    // carico badge ogni volta che cambio pagina
+  // carico badge ogni volta che cambio pagina
   useEffect(() => {
     async function loadStats() {
       try {
         const todayStr = new Date().toISOString().slice(0, 10);
+
+        let maintenanceCount = 0;
+        try {
+            // Recupera i ticket per il badge
+            const tickets = await getMaintenanceTickets();
+            // Conta solo quelli aperti (todo o in_progress)
+            if (Array.isArray(tickets)) {
+              maintenanceCount = tickets.filter(t => t.status !== 'done').length;
+            }
+        } catch (e) {
+            // Ignora errori se la tabella non esiste ancora
+            console.log("Tabella maintenance forse non pronta");
+        }
 
         const [bookings, tasksToday] = await Promise.all([
           getBookings(),
@@ -223,6 +250,7 @@ function Sidebar() {
           departures,
           stays,
           staffTasks: (tasksToday || []).length,
+          openTickets: maintenanceCount,
         });
       } catch (err) {
         console.error("Errore caricando badge sidebar:", err);
@@ -277,6 +305,13 @@ function Sidebar() {
       const { staffTasks } = todayStats;
       if (!staffTasks) return null;
       return <span style={badgePill}>{staffTasks}</span>;
+    }
+
+    if (type === "openTickets") {
+        const { openTickets } = todayStats;
+        if (!openTickets) return null;
+        // Rosso per i problemi aperti
+        return <span style={{...badgePill, backgroundColor: "#fee2e2", color: "#b91c1c"}}>{openTickets}</span>;
     }
 
     return null;

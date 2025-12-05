@@ -7,17 +7,23 @@ import {
   updateBooking,
   updateStaffTask,
 } from "../services/api";
+import MessageModal from "../components/MessageModal";
 
 function formatDate(d) {
   if (!d) return "";
   return new Date(d).toLocaleDateString("it-IT");
 }
 
+function whatsappLink(phone) {
+  if (!phone) return null;
+  const clean = phone.replace(/[^0-9+]/g, "");
+  return `https://wa.me/${clean}`;
+}
+
 function ArrivalsDepartures() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
 
-  // se la tua pagina staff ha un path diverso, cambia qui
   const STAFF_ROUTE = "/staff";
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -33,6 +39,9 @@ function ArrivalsDepartures() {
   const [savingBookingId, setSavingBookingId] = useState(null);
   const [savingTaskId, setSavingTaskId] = useState(null);
 
+  const [messageModalOpen, setMessageModalOpen] = useState(false);
+  const [selectedBookingForMessage, setSelectedBookingForMessage] = useState(null);
+
   const unitMap = useMemo(
     () =>
       units.reduce((acc, u) => {
@@ -42,7 +51,6 @@ function ArrivalsDepartures() {
     [units]
   );
 
-  // carica dati ogni volta che cambia la data
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -65,8 +73,6 @@ function ArrivalsDepartures() {
 
     load();
   }, [selectedDate]);
-
-  // ---- derivati filtrati per giorno + unità ----
 
   const arrivals = useMemo(
     () =>
@@ -110,7 +116,15 @@ function ArrivalsDepartures() {
     return map;
   }, [staffTasks]);
 
-  // ---- azioni ----
+  function openMessageModal(b) {
+    setSelectedBookingForMessage(b);
+    setMessageModalOpen(true);
+  }
+
+  function openDocument(b) {
+    // Apre la pagina di stampa in una nuova scheda
+    window.open(`/bookings/${b.id}/document`, "_blank");
+  }
 
   async function handleMarkPaid(b) {
     if (b.is_paid) return;
@@ -120,6 +134,11 @@ function ArrivalsDepartures() {
         unit_id: b.unit_id,
         guest_name: b.guest_name,
         guest_email: b.guest_email,
+        guest_phone: b.guest_phone,
+        num_adults: b.num_adults,
+        num_children: b.num_children,
+        estimated_arrival_time: b.estimated_arrival_time,
+        
         source: b.source,
         checkin_date: b.checkin_date,
         checkout_date: b.checkout_date,
@@ -274,6 +293,17 @@ function ArrivalsDepartures() {
     cursor: "pointer",
   };
 
+  const iconButton = {
+    ...smallButton,
+    padding: 0,
+    width: 24,
+    height: 24,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "999px",
+  };
+
   const pillStatus = (paid) =>
     badge(
       paid ? "#dcfce7" : "#fee2e2",
@@ -394,16 +424,10 @@ function ArrivalsDepartures() {
         <p style={{ fontSize: 13 }}>Caricamento dati operativi...</p>
       ) : (
         <>
-          <div style={filtersRow}>
-            <span>
-              Arrivi: <strong>{arrivals.length}</strong>
-            </span>
-            <span>
-              Partenze: <strong>{departures.length}</strong>
-            </span>
-            <span>
-              Task staff: <strong>{visibleStaffTasks.length}</strong>
-            </span>
+          <div style={{ display: "flex", gap: 12, fontSize: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <span>Arrivi: <strong>{arrivals.length}</strong></span>
+            <span>Partenze: <strong>{departures.length}</strong></span>
+            <span>Task staff: <strong>{visibleStaffTasks.length}</strong></span>
           </div>
 
           <div style={cardGrid}>
@@ -448,10 +472,50 @@ function ArrivalsDepartures() {
                                 gap: 2,
                               }}
                             >
-                              <span style={{ fontWeight: 500 }}>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>
                                 {b.guest_name}
                               </span>
-                              <span style={{ fontSize: 11, color: "#6b7280" }}>
+
+                              {/* NUOVI DETTAGLI OSPITE */}
+                              <div style={{ fontSize: 11, color: "#4b5563", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                <span>
+                                  👥 {(b.num_adults || 1) + (b.num_children || 0)} pax
+                                </span>
+                                {b.estimated_arrival_time && (
+                                  <span style={{ color: "#0f766e", fontWeight: 500 }}>
+                                    🕒 {String(b.estimated_arrival_time).slice(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {b.guest_phone && (
+                                <div style={{ marginTop: 2, display: "flex", alignItems: "center" }}>
+                                  <a
+                                    href={whatsappLink(b.guest_phone)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ fontSize: 11, color: "#2563eb", textDecoration: "none", marginRight: 6 }}
+                                  >
+                                    <span>📞</span> {b.guest_phone}
+                                  </a>
+                                  <button
+                                    type="button"
+                                    title="Invia Messaggio Template"
+                                    style={{
+                                        ...iconButton,
+                                        backgroundColor: "#dcfce7",
+                                        color: "#166534",
+                                        border: "1px solid #86efac",
+                                        fontSize: 12,
+                                    }}
+                                    onClick={() => openMessageModal(b)}
+                                  >
+                                    💬
+                                  </button>
+                                </div>
+                              )}
+                              
+                              <span style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
                                 {b.nightly_rate != null &&
                                 b.total_price != null
                                   ? `Soggiorno: ${b.nightly_rate} €/notte`
@@ -504,17 +568,17 @@ function ArrivalsDepartures() {
                               >
                                 {hasCheckin && (
                                   <span style={{ fontSize: 11 }}>
-                                    • Task check-in
+                                    • Check-in
                                   </span>
                                 )}
                                 {hasCleaning && (
                                   <span style={{ fontSize: 11 }}>
-                                    • Pulizia collegata al soggiorno
+                                    • Pulizia
                                   </span>
                                 )}
                                 {!hasCheckin && !hasCleaning && (
                                   <span style={{ fontSize: 11 }}>
-                                    • {relatedTasks.length} task staff
+                                    • {relatedTasks.length} task
                                   </span>
                                 )}
                               </div>
@@ -543,10 +607,10 @@ function ArrivalsDepartures() {
                                 onClick={() => handleMarkPaid(b)}
                               >
                                 {b.is_paid
-                                  ? "Già pagata"
+                                  ? "Incassato"
                                   : savingBookingId === b.id
                                   ? "Aggiorno..."
-                                  : "Segna pagata"}
+                                  : "Incassa"}
                               </button>
                               <button
                                 type="button"
@@ -557,7 +621,7 @@ function ArrivalsDepartures() {
                                 }}
                                 onClick={() => openBooking(b)}
                               >
-                                Apri prenotazione
+                                Dettagli
                               </button>
                               <button
                                 type="button"
@@ -566,9 +630,9 @@ function ArrivalsDepartures() {
                                   borderColor: "#6366f1",
                                   color: "#4338ca",
                                 }}
-                                onClick={() => openStaffForBooking(b)}
+                                onClick={() => openDocument(b)}
                               >
-                                Vedi task staff
+                                📄 Stampa
                               </button>
                             </div>
                           </td>
@@ -596,7 +660,7 @@ function ArrivalsDepartures() {
                       <th style={th}>Ospite</th>
                       <th style={th}>Unità</th>
                       <th style={th}>Periodo</th>
-                      <th style={th}>Task / Pulizia</th>
+                      <th style={th}>Check-out</th>
                       <th style={th}>Azioni</th>
                     </tr>
                   </thead>
@@ -668,10 +732,10 @@ function ArrivalsDepartures() {
                             </div>
                           </td>
                           <td style={td}>
-                            {relatedTasks.length === 0 ? (
-                              <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                                Nessun task di giornata
-                              </span>
+                            {checkoutTasks.length === 0 ? (
+                                <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                                No task
+                                </span>
                             ) : (
                               <div
                                 style={{
@@ -691,38 +755,7 @@ function ArrivalsDepartures() {
                                     }}
                                   >
                                     <span style={{ fontSize: 11 }}>
-                                      Check-out{" "}
-                                      {t.time ? `· ${t.time}` : ""}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      style={pillTaskStatus(t.status)}
-                                      onClick={() =>
-                                        handleToggleTaskStatus(t)
-                                      }
-                                      disabled={savingTaskId === t.id}
-                                    >
-                                      {savingTaskId === t.id
-                                        ? "..."
-                                        : t.status === "done"
-                                        ? "Fatto"
-                                        : "Da fare"}
-                                    </button>
-                                  </div>
-                                ))}
-                                {cleaningTasks.map((t) => (
-                                  <div
-                                    key={`cl-${t.id}`}
-                                    style={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      gap: 6,
-                                      alignItems: "center",
-                                    }}
-                                  >
-                                    <span style={{ fontSize: 11 }}>
-                                      Pulizia{" "}
-                                      {t.time ? `· ${t.time}` : ""}
+                                      {t.time || "Any"}
                                     </span>
                                     <button
                                       type="button"
@@ -744,38 +777,35 @@ function ArrivalsDepartures() {
                             )}
                           </td>
                           <td style={td}>
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                              }}
-                            >
-                              <span style={pillStatus(b.is_paid)}>
-                                {b.is_paid ? "Pagata" : "Da incassare"}
-                              </span>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "#0f766e",
-                                  color: "#0f766e",
-                                }}
-                                onClick={() => openBooking(b)}
-                              >
-                                Apri prenotazione
-                              </button>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "#6366f1",
-                                  color: "#4338ca",
-                                }}
-                                onClick={() => openStaffForBooking(b)}
-                              >
-                                Vedi task staff
-                              </button>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                               <button
+                                  type="button"
+                                  title="Invia Messaggio"
+                                  style={{
+                                    ...iconButton,
+                                    backgroundColor: "#dcfce7",
+                                    color: "#166534",
+                                    border: "1px solid #86efac",
+                                    width: 26, height: 26, fontSize: 14
+                                  }}
+                                  onClick={() => openMessageModal(b)}
+                                >
+                                  💬
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Stampa"
+                                  style={{
+                                    ...iconButton,
+                                    backgroundColor: "#e0e7ff",
+                                    color: "#3730a3",
+                                    border: "1px solid #c7d2fe",
+                                    width: 26, height: 26, fontSize: 14
+                                  }}
+                                  onClick={() => openDocument(b)}
+                                >
+                                  📄
+                                </button>
                             </div>
                           </td>
                         </tr>
@@ -787,96 +817,18 @@ function ArrivalsDepartures() {
             </div>
           </div>
 
-          {/* TASK STAFF DEL GIORNO */}
-          <div style={card}>
-            <div
-              style={{
-                ...sectionTitle,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+          {/* MODALE MESSAGGI */}
+          {messageModalOpen && selectedBookingForMessage && (
+            <MessageModal
+              isOpen={messageModalOpen}
+              onClose={() => {
+                setMessageModalOpen(false);
+                setSelectedBookingForMessage(null);
               }}
-            >
-              <span>
-                Task staff del {formatDate(selectedDate)} (
-                {visibleStaffTasks.length})
-              </span>
-              <button
-                type="button"
-                style={{
-                  ...smallButton,
-                  borderColor: "#0f766e",
-                  color: "#0f766e",
-                }}
-                onClick={openStaffForDate}
-              >
-                Apri pagina staff
-              </button>
-            </div>
-            {visibleStaffTasks.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#6b7280" }}>
-                Nessun task staff pianificato per questa data (con i filtri
-                attuali).
-              </p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={table}>
-                  <thead>
-                    <tr>
-                      <th style={th}>Ora</th>
-                      <th style={th}>Tipo</th>
-                      <th style={th}>Unità</th>
-                      <th style={th}>Assegnato a</th>
-                      <th style={th}>Stato</th>
-                      <th style={th}>Costo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleStaffTasks.map((t) => {
-                      const unit = t.unit_id ? unitMap[t.unit_id] : null;
-                      return (
-                        <tr key={t.id}>
-                          <td style={td}>{t.time || "—"}</td>
-                          <td style={td}>{getTaskLabel(t)}</td>
-                          <td style={td}>
-                            {unit?.name ||
-                              (t.unit_id ? `Unit #${t.unit_id}` : "—")}
-                          </td>
-                          <td style={td}>{t.assignee_name || "—"}</td>
-                          <td style={td}>
-                            <button
-                              type="button"
-                              style={pillTaskStatus(t.status)}
-                              onClick={() => handleToggleTaskStatus(t)}
-                              disabled={savingTaskId === t.id}
-                            >
-                              {savingTaskId === t.id
-                                ? "..."
-                                : t.status === "done"
-                                ? "Fatto"
-                                : "Da fare"}
-                            </button>
-                          </td>
-                          <td style={td}>
-                            {t.cost != null ? (
-                              <>
-                                {t.currency || "EUR"}{" "}
-                                {Number(t.cost).toFixed(2)}
-                              </>
-                            ) : (
-                              <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                                non impostato
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+              booking={selectedBookingForMessage}
+              unitName={unitMap[selectedBookingForMessage.unit_id]?.name}
+            />
+          )}
         </>
       )}
     </div>

@@ -15,6 +15,7 @@ from app.models.cost_item import CostItem
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
+from app.models.maintenance import MaintenanceTicket
 
 
 app = FastAPI(title="Portale Essaouira API")
@@ -193,6 +194,12 @@ class BookingBase(BaseModel):
     unit_id: int
     guest_name: str
     guest_email: str | None = None
+    
+    guest_phone: str | None = None
+    num_adults: int = 1
+    num_children: int = 0
+    estimated_arrival_time: time | None = None  
+
     source: str = "direct"
     checkin_date: date
     checkout_date: date
@@ -209,6 +216,13 @@ class BookingBase(BaseModel):
 
     # late check-out
     has_late_checkout: bool = False
+    
+    class Config:
+        from_attributes = True
+        # Aiuta pydantic v1/v2 compatibilità con oggetti time
+        json_encoders = {
+            time: lambda v: v.strftime("%H:%M")
+        }
 
 
 class BookingCreate(BookingBase):
@@ -222,11 +236,30 @@ class BookingUpdate(BookingBase):
 class BookingOut(BookingBase):
     id: int
 
-    class Config:
-        from_attributes = True
 
+# ---------- HELPERS: TIME, DEFAULTS & LOGIC ----------
 
-# ---------- HELPERS: STAFF DEFAULTS & PRICING DEFAULTS ----------
+def _parse_time_str(value: str | None) -> Optional[time]:
+    if not value:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%H:%M").time()
+    except ValueError:
+        try:
+            return datetime.strptime(value, "%H:%M:%S").time()
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
+            )
+
+def _format_time_value(t: Optional[time]) -> Optional[str]:
+    if t is None:
+        return None
+    return t.strftime("%H:%M")
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -264,10 +297,6 @@ def _find_default_assignee_for_role(
     role: StaffRole,
     fallback_name: str | None = None,
 ) -> str | None:
-    """
-    Trova il primo membro staff ATTIVO con quel ruolo.
-    Se non esiste, usa il fallback (es. cleaning_default_assignee).
-    """
     member = (
         db.query(StaffMember)
         .filter(
@@ -283,22 +312,8 @@ def _find_default_assignee_for_role(
 
 
 def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
-    """
-    Crea o RIGENERA i task AUTOMATICI (AUTO:) collegati a una prenotazione.
-
-    Logica assegnazione:
-    - usa membri staff attivi divisi per ruolo:
-      - housekeeping → pulizie
-      - kitchen → colazioni
-      - reception_day → check-in / check-out
-    - se non trova nessuno per quel ruolo, usa defaults.cleaning_default_assignee
-
-    Non impostiamo alcun costo automatico: il campo cost resta null
-    finché non lo imposti tu a mano lato staff.
-    """
     defaults = _get_or_create_staff_defaults(db)
 
-    # elimina tutti i task AUTO: legati a questa prenotazione
     db.query(StaffTask).filter(
         StaffTask.booking_id == booking.id,
         StaffTask.notes.ilike("AUTO:%"),
@@ -313,7 +328,6 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     base_hours = defaults.cleaning_default_hours or 1.0
     currency = defaults.currency or "EUR"
 
-    # scegliamo staff in base al RUOLO
     housekeeping_assignee = _find_default_assignee_for_role(
         db, StaffRole.housekeeping, defaults.cleaning_default_assignee
     )
@@ -324,7 +338,6 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         db, StaffRole.kitchen, housekeeping_assignee
     )
 
-    # orari diversi se late check-out
     checkout_time_obj = time(10, 0)
     cleaning_time_obj = time(11, 0)
 
@@ -332,7 +345,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         checkout_time_obj = time(16, 0)
         cleaning_time_obj = time(17, 0)
 
-    # 1) CHECK-IN (giorno di arrivo, orario standard 15:00, reception)
+    # 1) CHECK-IN
     checkin_task = StaffTask(
         date=booking.checkin_date,
         time=time(15, 0),
@@ -348,7 +361,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     )
     db.add(checkin_task)
 
-    # 2) CHECK-OUT (reception)
+    # 2) CHECK-OUT
     checkout_task = StaffTask(
         date=booking.checkout_date,
         time=checkout_time_obj,
@@ -368,7 +381,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     )
     db.add(checkout_task)
 
-    # 3) PULIZIA principale dopo il check-out (housekeeping)
+    # 3) PULIZIA
     cleaning_task = StaffTask(
         date=booking.checkout_date,
         time=cleaning_time_obj,
@@ -388,7 +401,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
     )
     db.add(cleaning_task)
 
-    # 4) Extra pulizia se late check-out (housekeeping)
+    # 4) Extra pulizia se late check-out
     if is_late:
         extra_clean_task = StaffTask(
             date=booking.checkout_date,
@@ -405,7 +418,7 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         )
         db.add(extra_clean_task)
 
-    # 5) COLAZIONI (tutti i giorni intermedi) → cucina
+    # 5) COLAZIONI
     current = booking.checkin_date + timedelta(days=1)
     last_breakfast_day = booking.checkout_date - timedelta(days=1)
 
@@ -477,7 +490,6 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
 
     total_price = payload.total_price or base_total
 
-    # applica eventuali default tariffari
     pricing = _get_or_create_pricing_defaults(db)
 
     cleaning_fee = payload.cleaning_fee
@@ -504,6 +516,11 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         unit_id=payload.unit_id,
         guest_name=payload.guest_name,
         guest_email=payload.guest_email,
+        guest_phone=payload.guest_phone,
+        num_adults=payload.num_adults,
+        num_children=payload.num_children,
+        estimated_arrival_time=payload.estimated_arrival_time, 
+        
         source=payload.source,
         checkin_date=payload.checkin_date,
         checkout_date=payload.checkout_date,
@@ -521,7 +538,6 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(booking)
 
-    # task staff automatici
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -573,7 +589,6 @@ def update_booking(
 
     total_price = payload.total_price or base_total
 
-    # riapplica default tariffari solo se i campi sono None
     pricing = _get_or_create_pricing_defaults(db)
 
     cleaning_fee = payload.cleaning_fee
@@ -599,6 +614,12 @@ def update_booking(
     booking.unit_id = payload.unit_id
     booking.guest_name = payload.guest_name
     booking.guest_email = payload.guest_email
+    
+    booking.guest_phone = payload.guest_phone
+    booking.num_adults = payload.num_adults
+    booking.num_children = payload.num_children
+    booking.estimated_arrival_time = payload.estimated_arrival_time
+
     booking.source = payload.source
     booking.checkin_date = payload.checkin_date
     booking.checkout_date = payload.checkout_date
@@ -615,7 +636,6 @@ def update_booking(
     db.commit()
     db.refresh(booking)
 
-    # riallinea i task automatici con le nuove date / late checkout
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -642,12 +662,10 @@ def get_unit_schedule(
     to_date: date | None = None,
     db: Session = Depends(get_db),
 ):
-    # verifica che l'unità esista
     unit = db.query(Unit).filter(Unit.id == unit_id).first()
     if not unit:
         raise HTTPException(status_code=404, detail="Unità non trovata")
 
-    # default range: mese corrente se non specificato
     if from_date is None or to_date is None:
         today = date.today()
         month_start = today.replace(day=1)
@@ -658,7 +676,6 @@ def get_unit_schedule(
         from_date = from_date or month_start
         to_date = to_date or next_month_start
 
-    # prenotazioni che INTERSECANO il range richiesto
     bookings = (
         db.query(Booking)
         .filter(
@@ -670,7 +687,6 @@ def get_unit_schedule(
         .all()
     )
 
-    # task staff collegati a questa unità nel range
     staff_tasks = (
         db.query(StaffTask)
         .filter(
@@ -682,10 +698,8 @@ def get_unit_schedule(
         .all()
     )
 
-    # ---- costruiamo items per la timeline ----
     items: list[dict] = []
 
-    # prenotazioni → blocchi orizzontali
     for b in bookings:
         items.append(
             {
@@ -701,7 +715,6 @@ def get_unit_schedule(
             }
         )
 
-    # task staff → punti / tag legati al giorno
     for t in staff_tasks:
         items.append(
             {
@@ -710,7 +723,7 @@ def get_unit_schedule(
                 "unit_id": unit.id,
                 "label": t.task_type,
                 "date": t.date,
-                "task_type": t.task_type,  # per colori/filtri frontend
+                "task_type": t.task_type,
                 "assignee_name": t.assignee_name,
                 "status": t.status,
                 "estimated_hours": t.estimated_hours,
@@ -719,7 +732,6 @@ def get_unit_schedule(
             }
         )
 
-    # opzionale: ordiniamo gli items per data inizio
     def sort_key(item: dict):
         if item["kind"] == "booking":
             return (item["start_date"], 0)
@@ -1075,6 +1087,36 @@ def _collect_costs_for_month(
             }
         )
 
+    # 4. 🔥 NUOVO: COSTI MANUTENZIONE 🔥
+    # Convertiamo le date in datetime per confrontare con created_at (che è timestamp)
+    ms_dt = datetime.combine(month_start, time.min)
+    nms_dt = datetime.combine(next_month_start, time.min)
+    
+    tickets = db.query(MaintenanceTicket).filter(
+        MaintenanceTicket.created_at >= ms_dt,
+        MaintenanceTicket.created_at < nms_dt,
+        MaintenanceTicket.cost.isnot(None)
+    ).all()
+
+    for t in tickets:
+        amount = float(t.cost)
+        if amount > 0:
+            costs_total += amount
+            cat = "Manutenzione & Acquisti"
+            costs_by_category_map[cat] = costs_by_category_map.get(cat, 0.0) + amount
+            # Usiamo created_at come data di competenza
+            cost_lines.append({
+                "date": t.created_at.date(),
+                "category": cat,
+                "description": f"{t.ticket_type.capitalize()}: {t.title}",
+                "amount": amount,
+                "currency": t.currency,
+                "unit_id": t.unit_id,
+                "booking_id": None,
+                "staff_task_id": None,
+                "origin": "maintenance_ticket" # Nuovo tipo di origine
+            })
+
     return costs_total, costs_by_category_map, cost_lines
 
 
@@ -1183,7 +1225,7 @@ def month_pnl(
 
 @app.get("/analytics/month-cost-lines", response_model=List[MonthCostLine])
 def month_cost_lines(
-    year: int = Query(..., ge=2000, le=12),
+    year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
     db: Session = Depends(get_db),
 ):
@@ -1223,33 +1265,6 @@ class StaffTaskOut(StaffTaskBase):
 
     class Config:
         from_attributes = True
-
-
-def _parse_time_str(value: str | None) -> Optional[time]:
-    if not value:
-        return None
-    value = value.strip()
-    if not value:
-        return None
-    try:
-        # accettiamo "HH:MM" (senza secondi)
-        return datetime.strptime(value, "%H:%M").time()
-    except ValueError:
-        # se qualcuno manda anche i secondi, proviamo "HH:MM:SS"
-        try:
-            return datetime.strptime(value, "%H:%M:%S").time()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Formato orario non valido. Usa HH:MM o HH:MM:SS.",
-            )
-
-
-def _format_time_value(t: Optional[time]) -> Optional[str]:
-    if t is None:
-        return None
-    # sempre "HH:MM"
-    return t.strftime("%H:%M")
 
 
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])
@@ -1697,3 +1712,129 @@ def update_pricing_defaults_endpoint(
         default_channel_fee_percent=pricing.default_channel_commission_percent,
         default_currency=pricing.currency,
     )
+
+
+# ---------- MAINTENANCE (Manutenzioni & Migliorie) ----------
+
+
+class TicketStatus(str, Enum):
+    todo = "todo"
+    in_progress = "in_progress"
+    done = "done"
+
+
+class TicketPriority(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    urgent = "urgent"
+
+
+class TicketType(str, Enum):
+    repair = "repair"
+    improvement = "improvement"
+    purchase = "purchase"
+
+
+class MaintenanceBase(BaseModel):
+    title: str
+    description: str | None = None
+    unit_id: int | None = None
+    assigned_to_id: int | None = None
+    status: TicketStatus = TicketStatus.todo
+    priority: TicketPriority = TicketPriority.medium
+    ticket_type: TicketType = TicketType.repair
+    cost: float | None = None
+    currency: str = "EUR"
+
+
+class MaintenanceCreate(MaintenanceBase):
+    pass
+
+
+class MaintenanceUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    unit_id: int | None = None
+    assigned_to_id: int | None = None
+    status: TicketStatus | None = None
+    priority: TicketPriority | None = None
+    ticket_type: TicketType | None = None
+    cost: float | None = None
+    currency: str | None = None
+
+
+class MaintenanceOut(MaintenanceBase):
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+@app.get("/maintenance", response_model=List[MaintenanceOut])
+def list_maintenance_tickets(db: Session = Depends(get_db)):
+    # Ordina per priorità (o data)
+    tickets = db.query(MaintenanceTicket).order_by(MaintenanceTicket.created_at.desc()).all()
+    return tickets
+
+
+@app.post("/maintenance", response_model=MaintenanceOut)
+def create_maintenance_ticket(payload: MaintenanceCreate, db: Session = Depends(get_db)):
+    # Se unit_id è presente, verifichiamo esista
+    if payload.unit_id is not None:
+        unit = db.query(Unit).filter(Unit.id == payload.unit_id).first()
+        if not unit:
+             raise HTTPException(status_code=404, detail="Unit not found")
+
+    ticket = MaintenanceTicket(
+        title=payload.title,
+        description=payload.description,
+        unit_id=payload.unit_id,
+        assigned_to_id=payload.assigned_to_id,
+        status=payload.status.value,
+        priority=payload.priority.value,
+        ticket_type=payload.ticket_type.value,
+        cost=payload.cost,
+        currency=payload.currency
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    
+    # Se c'è un costo, creiamo anche un CostItem automatico? 
+    # Per ora no, lo lasciamo manuale o decidiamo in futuro.
+    
+    return ticket
+
+
+@app.put("/maintenance/{ticket_id}", response_model=MaintenanceOut)
+def update_maintenance_ticket(ticket_id: int, payload: MaintenanceUpdate, db: Session = Depends(get_db)):
+    ticket = db.query(MaintenanceTicket).filter(MaintenanceTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    if payload.title is not None: ticket.title = payload.title
+    if payload.description is not None: ticket.description = payload.description
+    if payload.unit_id is not None: ticket.unit_id = payload.unit_id
+    if payload.assigned_to_id is not None: ticket.assigned_to_id = payload.assigned_to_id
+    if payload.status is not None: ticket.status = payload.status.value
+    if payload.priority is not None: ticket.priority = payload.priority.value
+    if payload.ticket_type is not None: ticket.ticket_type = payload.ticket_type.value
+    if payload.cost is not None: ticket.cost = payload.cost
+    if payload.currency is not None: ticket.currency = payload.currency
+
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+@app.delete("/maintenance/{ticket_id}", status_code=204)
+def delete_maintenance_ticket(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = db.query(MaintenanceTicket).filter(MaintenanceTicket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    db.delete(ticket)
+    db.commit()
+    return
