@@ -178,7 +178,7 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
           <button style={btnCancel} onClick={onClose}>
             Annulla
           </button>
-          <button style={btnSend} onClick={handleSend}>
+          <button style={btnSend} onClick={handleSend} disabled={!booking.guest_phone}>
             <span>💬</span> Invia su WhatsApp
           </button>
         </div>

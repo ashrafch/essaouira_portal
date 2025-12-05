@@ -7,7 +7,7 @@ import {
   getStaffDefaults,
   updateStaffDefaults,
   getStaffMembers,
-  getMaintenanceTickets,
+  getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
 
 function formatDate(d) {
@@ -53,7 +53,7 @@ function Staff() {
   const [units, setUnits] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [staffMembers, setStaffMembers] = useState([]);
-  const [maintenanceTickets, setMaintenanceTickets] = useState([]);
+  const [maintenanceTickets, setMaintenanceTickets] = useState([]); // <-- NUOVO STATO
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -311,93 +311,13 @@ function Staff() {
     return taskType || "Altro";
   }
 
+  // -- LOGICA TICKET MANUTENZIONE --
   const openTickets = useMemo(() => {
     return maintenanceTickets.filter(t => t.status !== 'done');
   }, [maintenanceTickets]);
 
-  // Funzioni per il form completo (nel container in basso)
-  function resetForm() {
-    setFormMode("create");
-    setEditingId(null);
-    setDate("");
-    setTaskType("cleaning");
-    setAssigneeName("");
-    setUnitId("");
-    setBookingId("");
-    setEstimatedHours("");
-    setStatus("planned");
-    setCost("");
-    setCurrency("EUR");
-    setNotes("");
-  }
 
-  function loadTaskIntoForm(t) {
-    setFormMode("edit");
-    setEditingId(t.id);
-    setDate(t.date || "");
-    setTaskType(t.task_type || "cleaning");
-    setAssigneeName(t.assignee_name || "");
-    setUnitId(t.unit_id ? String(t.unit_id) : "");
-    setBookingId(t.booking_id ? String(t.booking_id) : "");
-    setEstimatedHours(
-      t.estimated_hours != null ? String(t.estimated_hours) : ""
-    );
-    setStatus(t.status || "planned");
-    setCost(t.cost != null ? String(t.cost) : "");
-    setCurrency(t.currency || "EUR");
-    setNotes(t.notes || "");
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!date || !taskType) {
-      alert("La data e il tipo di task sono obbligatori.");
-      return;
-    }
-
-    const payload = {
-      date,
-      task_type: taskType,
-      assignee_name: assigneeName || null,
-      estimated_hours: estimatedHours !== "" ? Number(estimatedHours) : null,
-      status,
-      notes: notes || null,
-      cost: cost !== "" ? Number(cost) : null,
-      currency,
-      booking_id: bookingId !== "" ? Number(bookingId) : null,
-      unit_id: unitId !== "" ? Number(unitId) : null,
-      time: null, 
-    };
-
-    setSaving(true);
-    setError(null);
-    try {
-      let saved;
-      if (formMode === "edit" && editingId != null) {
-        saved = await updateStaffTask(editingId, payload);
-        setTasks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-      } else {
-        saved = await createStaffTask(payload);
-        setTasks((prev) => [...prev, saved]);
-      }
-      resetForm();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id) {
-    if (!window.confirm("Eliminare questo task staff?")) return;
-    try {
-      await deleteStaffTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      if (editingId === id) resetForm();
-    } catch (err) {
-      alert("Errore eliminando il task: " + err.message);
-    }
-  }
+  // ---- AZIONI ----
 
   async function saveTask(taskId, partial) {
     const existing = tasks.find((t) => t.id === taskId);
@@ -544,6 +464,90 @@ function Staff() {
     }
   }
 
+  // Funzioni per il form completo (nel container in basso)
+  function resetForm() {
+    setFormMode("create");
+    setEditingId(null);
+    setDate("");
+    setTaskType("cleaning");
+    setAssigneeName("");
+    setUnitId("");
+    setBookingId("");
+    setEstimatedHours("");
+    setStatus("planned");
+    setCost("");
+    setCurrency("EUR");
+    setNotes("");
+  }
+
+  function loadTaskIntoForm(t) {
+    setFormMode("edit");
+    setEditingId(t.id);
+    setDate(t.date || "");
+    setTaskType(t.task_type || "cleaning");
+    setAssigneeName(t.assignee_name || "");
+    setUnitId(t.unit_id ? String(t.unit_id) : "");
+    setBookingId(t.booking_id ? String(t.booking_id) : "");
+    setEstimatedHours(
+      t.estimated_hours != null ? String(t.estimated_hours) : ""
+    );
+    setStatus(t.status || "planned");
+    setCost(t.cost != null ? String(t.cost) : "");
+    setCurrency(t.currency || "EUR");
+    setNotes(t.notes || "");
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!date || !taskType) {
+      alert("La data e il tipo di task sono obbligatori.");
+      return;
+    }
+
+    const payload = {
+      date,
+      task_type: taskType,
+      assignee_name: assigneeName || null,
+      estimated_hours: estimatedHours !== "" ? Number(estimatedHours) : null,
+      status,
+      notes: notes || null,
+      cost: cost !== "" ? Number(cost) : null,
+      currency,
+      booking_id: bookingId !== "" ? Number(bookingId) : null,
+      unit_id: unitId !== "" ? Number(unitId) : null,
+      time: null, 
+    };
+
+    setSaving(true);
+    setError(null);
+    try {
+      let saved;
+      if (formMode === "edit" && editingId != null) {
+        saved = await updateStaffTask(editingId, payload);
+        setTasks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+      } else {
+        saved = await createStaffTask(payload);
+        setTasks((prev) => [...prev, saved]);
+      }
+      resetForm();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Eliminare questo task staff?")) return;
+    try {
+      await deleteStaffTask(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      if (editingId === id) resetForm();
+    } catch (err) {
+      alert("Errore eliminando il task: " + err.message);
+    }
+  }
+
   async function handleSaveDefaults(e) {
     e.preventDefault();
     setDefaultsSaving(true);
@@ -616,7 +620,7 @@ function Staff() {
     cursor: "pointer",
   };
 
-  // Ecco i bottoni che mancavano prima!
+  // BOTTONI MANCANTI (AGGIUNTI)
   const buttonPrimary = {
     borderRadius: 999,
     border: "none",

@@ -194,10 +194,11 @@ function Bookings() {
         return true;
       })
       .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.checkin_date).getTime() - new Date(b.checkout_date).getTime()
-      );
+      .sort((a, b) => {
+        const aDate = new Date(a.checkin_date || a.checkout_date).getTime();
+        const bDate = new Date(b.checkin_date || b.checkout_date).getTime();
+        return aDate - bDate;
+      });
   }, [bookings, unitFilter, paymentFilter]);
 
   const shownCount = filteredBookings.length;

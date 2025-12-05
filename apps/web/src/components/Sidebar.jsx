@@ -163,6 +163,7 @@ function Sidebar() {
       items: [
         { to: "/units", label: "Appartamenti", badge: null },
         { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null },
+        { to: "/expenses", label: "Spese Generali", badge: null },
         {
           to: "/business",
           label: "Business (Ricavi & Costi)",
