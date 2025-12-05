@@ -13,17 +13,19 @@ import ArrivalsDepartures from "./pages/ArrivalsDepartures";
 import StaffDirectory from "./pages/StaffDirectory";
 import Pricing from "./pages/Pricing";
 import BookingDocument from "./pages/BookingDocument";
+import Maintenance from "./pages/Maintenance";
+import Expenses from "./pages/Expenses"; // <-- NUOVO IMPORT
 
 function App() {
   return (
     <Routes>
-      {/* 1. Rotta "STANDALONE" per la stampa (Senza Sidebar/Layout) */}
+      {/* 1. Rotta "STANDALONE" per la stampa */}
       <Route 
         path="/bookings/:bookingId/document" 
         element={<BookingDocument />} 
       />
 
-      {/* 2. Tutte le altre rotte "GESTIONALI" (Dentro il Layout) */}
+      {/* 2. Rotte GESTIONALI */}
       <Route
         path="*"
         element={
@@ -40,6 +42,8 @@ function App() {
               <Route path="/business" element={<Business />} />
               <Route path="/staff-anagrafica" element={<StaffDirectory />} />
               <Route path="/tariffe-canali" element={<Pricing />} />
+              <Route path="/maintenance" element={<Maintenance />} />
+              <Route path="/expenses" element={<Expenses />} /> {/* <-- NUOVA ROTTA */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
