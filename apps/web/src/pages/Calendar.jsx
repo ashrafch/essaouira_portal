@@ -560,20 +560,20 @@ function Calendar() {
           <div style={{ marginBottom: 4 }}>
             <div style={navControls}>
               <button style={navButton} type="button" onClick={prevMonth}>
-                ◀
+                ◀️
               </button>
               <div style={{ fontWeight: 600 }}>
                 {MONTH_LABELS[month]} {year}
               </div>
               <button style={navButton} type="button" onClick={nextMonth}>
-                ▶
+                ▶️
               </button>
             </div>
           </div>
           <div>
             <span style={fromCache ? badgeOffline : badgeInfo}>
               {fromCache
-                ? "Offline – spostamento disabilitato (solo cache)"
+                ? "Offline – spostamento dsisabilitato (solo cache)"
                 : "Dati live – drag & drop attivo"}
             </span>
           </div>
