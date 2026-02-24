@@ -8,6 +8,7 @@ from enum import Enum
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -30,6 +31,7 @@ from app.models.maintenance import MaintenanceTicket
 
 setup_logging()
 app = FastAPI(title="Portale Essaouira API")
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 cors_origins_raw = os.getenv(
     "CORS_ORIGINS",

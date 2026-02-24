@@ -98,6 +98,31 @@ npm run lint
 npm run build
 ```
 
+## Scalabilita operativa
+
+Monitoraggio (profilo ops):
+```bash
+docker compose --profile ops up -d
+```
+
+Servizi:
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
+
+Backup automatico DB:
+- servizio `db-backup` crea dump gzip ogni 24h
+- retention default 7 giorni
+- volume: `db_backups`
+
+Staging compose:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+```
+
+CI/CD:
+- pipeline CI: `.github/workflows/ci.yml`
+- pipeline staging (manual trigger): `.github/workflows/staging.yml`
+
 ## Workflow branch
 
 - Aprire sempre un branch feature da `dev`

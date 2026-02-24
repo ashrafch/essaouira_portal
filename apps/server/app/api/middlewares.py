@@ -11,6 +11,7 @@ AUTH_EXCLUDED_PATHS = {
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/metrics",
 }
 
 

@@ -51,5 +51,50 @@ services:
     ports:
       - "8080:80"
 
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    profiles: ["ops"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    profiles: ["ops"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  db-backup:
+    image: postgres:16-alpine
+    profiles: ["ops"]
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: essa
+      POSTGRES_USER: essa
+      POSTGRES_PASSWORD: essa
+      BACKUP_INTERVAL_HOURS: "24"
+      BACKUP_RETENTION_DAYS: "7"
+    volumes:
+      - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+      - db_backups:/backups
+    entrypoint: ["/bin/sh", "/usr/local/bin/db-backup.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  grafana_data:
+  db_backups:

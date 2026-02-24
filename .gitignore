@@ -3,6 +3,7 @@ venv/
 .env
 .env.*
 !.env.example
+!.env.staging.example
 __pycache__/
 *.py[cod]
 *.pyo
