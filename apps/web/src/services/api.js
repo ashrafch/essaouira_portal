@@ -127,6 +127,26 @@ export function getMonthCostLines(year, month) {
   return apiGet("/analytics/month-cost-lines", { year, month });
 }
 
+export function getAdvancedKpis(year, month) {
+  return apiGet("/analytics/advanced-kpis", { year, month });
+}
+
+export function getTodayAlerts() {
+  return apiGet("/alerts/today");
+}
+
+export async function downloadMonthCostLinesCsv(year, month) {
+  const res = await fetch(
+    `${BASE_URL}/analytics/month-cost-lines.csv${buildQuery({ year, month })}`,
+    { headers: getAuthHeaders() }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Errore export CSV ${res.status}: ${text}`);
+  }
+  return res.blob();
+}
+
 /* --------- STAFF TASKS --------- */
 
 export function getStaffTasks(params = {}) {

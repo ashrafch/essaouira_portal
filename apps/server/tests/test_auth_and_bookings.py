@@ -79,3 +79,22 @@ def test_booking_overlap_validation():
         second = client.post("/bookings", json=overlap_payload, headers=headers)
         assert second.status_code == 400
         assert "prenotazione" in second.text.lower()
+
+
+def test_analytics_and_alerts_endpoints():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+
+        kpi_resp = client.get("/analytics/advanced-kpis?year=2026&month=3", headers=headers)
+        assert kpi_resp.status_code == 200
+        body = kpi_resp.json()
+        assert "revpar" in body
+        assert "pipeline_revenue_next_30_days" in body
+
+        alerts_resp = client.get("/alerts/today", headers=headers)
+        assert alerts_resp.status_code == 200
+        assert isinstance(alerts_resp.json(), list)
+
+        csv_resp = client.get("/analytics/month-cost-lines.csv?year=2026&month=3", headers=headers)
+        assert csv_resp.status_code == 200
+        assert "text/csv" in csv_resp.headers.get("content-type", "")

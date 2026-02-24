@@ -1,10 +1,13 @@
 import os
+import csv
+import io
 from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -1178,6 +1181,209 @@ def month_cost_lines(
     month_start, next_month_start, _ = _get_month_range(year, month)
     _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
     return [MonthCostLine(**line) for line in cost_lines]
+
+
+class AdvancedKpiSummary(BaseModel):
+    year: int
+    month: int
+    revpar: float
+    avg_length_of_stay: float | None
+    direct_share_percent: float
+    paid_booking_percent: float
+    pipeline_revenue_next_30_days: float
+    upcoming_arrivals_next_7_days: int
+
+
+@app.get("/analytics/advanced-kpis", response_model=AdvancedKpiSummary)
+def advanced_kpis(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, days_in_month = _get_month_range(year, month)
+
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+    units_count = db.query(Unit).count()
+    nights_total = max(days_in_month * units_count, 1)
+
+    occupied_nights = 0
+    revenue_total = 0.0
+    direct_revenue = 0.0
+    paid_count = 0
+    lengths_of_stay: list[int] = []
+
+    for booking in bookings:
+        stay_start = max(booking.checkin_date, month_start)
+        stay_end = min(booking.checkout_date, next_month_start)
+        nights_in_month = max((stay_end - stay_start).days, 0)
+        occupied_nights += nights_in_month
+
+        if booking.total_price is not None:
+            booking_revenue = float(booking.total_price)
+        elif booking.nightly_rate is not None:
+            booking_revenue = float(booking.nightly_rate) * nights_in_month
+        else:
+            booking_revenue = 0.0
+
+        revenue_total += booking_revenue
+        if (booking.source or "").lower() == "direct":
+            direct_revenue += booking_revenue
+        if booking.is_paid:
+            paid_count += 1
+
+        if booking.checkin_date and booking.checkout_date:
+            los = max((booking.checkout_date - booking.checkin_date).days, 0)
+            if los > 0:
+                lengths_of_stay.append(los)
+
+    revpar = revenue_total / nights_total
+    avg_los = sum(lengths_of_stay) / len(lengths_of_stay) if lengths_of_stay else None
+    direct_share = (direct_revenue / revenue_total * 100) if revenue_total > 0 else 0.0
+    paid_percent = (paid_count / len(bookings) * 100) if bookings else 0.0
+
+    today = date.today()
+    next_30 = today + timedelta(days=30)
+    next_7 = today + timedelta(days=7)
+
+    upcoming_bookings = (
+        db.query(Booking)
+        .filter(Booking.checkin_date >= today, Booking.checkin_date <= next_30)
+        .all()
+    )
+    pipeline_revenue = sum(float(b.total_price or 0) for b in upcoming_bookings)
+    upcoming_arrivals_7 = sum(1 for b in upcoming_bookings if b.checkin_date <= next_7)
+
+    return AdvancedKpiSummary(
+        year=year,
+        month=month,
+        revpar=round(revpar, 2),
+        avg_length_of_stay=round(avg_los, 2) if avg_los is not None else None,
+        direct_share_percent=round(direct_share, 2),
+        paid_booking_percent=round(paid_percent, 2),
+        pipeline_revenue_next_30_days=round(pipeline_revenue, 2),
+        upcoming_arrivals_next_7_days=upcoming_arrivals_7,
+    )
+
+
+class AlertItem(BaseModel):
+    severity: str
+    code: str
+    title: str
+    count: int
+    details: str
+
+
+@app.get("/alerts/today", response_model=List[AlertItem])
+def alerts_today(db: Session = Depends(get_db)):
+    today = date.today()
+    alerts: list[AlertItem] = []
+
+    unpaid_checkouts = (
+        db.query(Booking)
+        .filter(Booking.checkout_date < today, Booking.is_paid.is_(False))
+        .count()
+    )
+    if unpaid_checkouts > 0:
+        alerts.append(
+            AlertItem(
+                severity="high",
+                code="unpaid_checkout",
+                title="Prenotazioni non saldate dopo il check-out",
+                count=unpaid_checkouts,
+                details="Verificare pagamenti e riconciliazione contabile.",
+            )
+        )
+
+    overdue_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.date < today,
+            StaffTask.status.notin_(["done", "cancelled"]),
+        )
+        .count()
+    )
+    if overdue_tasks > 0:
+        alerts.append(
+            AlertItem(
+                severity="medium",
+                code="overdue_staff_tasks",
+                title="Task staff scaduti non completati",
+                count=overdue_tasks,
+                details="Prioritizzare i task in ritardo nel planner staff.",
+            )
+        )
+
+    open_tickets = (
+        db.query(MaintenanceTicket)
+        .filter(MaintenanceTicket.status.in_(["todo", "in_progress"]))
+        .count()
+    )
+    if open_tickets > 0:
+        alerts.append(
+            AlertItem(
+                severity="medium",
+                code="open_maintenance",
+                title="Ticket manutenzione aperti",
+                count=open_tickets,
+                details="Verificare ticket urgenti e stato avanzamento.",
+            )
+        )
+
+    return alerts
+
+
+@app.get("/analytics/month-cost-lines.csv")
+def month_cost_lines_csv(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, _ = _get_month_range(year, month)
+    _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "date",
+            "category",
+            "description",
+            "amount",
+            "currency",
+            "unit_id",
+            "booking_id",
+            "staff_task_id",
+            "origin",
+        ]
+    )
+    for line in cost_lines:
+        writer.writerow(
+            [
+                line.get("date"),
+                line.get("category"),
+                line.get("description"),
+                line.get("amount"),
+                line.get("currency"),
+                line.get("unit_id"),
+                line.get("booking_id"),
+                line.get("staff_task_id"),
+                line.get("origin"),
+            ]
+        )
+
+    filename = f"month_cost_lines_{year}_{month:02d}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
+    )
 
 
 # ---------- STAFF TASKS ----------
