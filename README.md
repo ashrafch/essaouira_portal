@@ -18,6 +18,7 @@ URL:
 - Frontend: `http://localhost:8080`
 - API health: `http://localhost:8080/api/health`
 - API diretta: `http://localhost:8000/health`
+- Login default: `owner` / `owner123`
 
 Stop:
 
@@ -61,9 +62,41 @@ npm run dev
 Backend (`apps/server/.env`):
 - `DATABASE_URL`
 - `CORS_ORIGINS`
+- `AUTH_ENABLED`
+- `AUTH_SECRET_KEY`
+- `AUTH_ALGORITHM`
+- `AUTH_ACCESS_TOKEN_MINUTES`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `AUTO_CREATE_SCHEMA`
+- `AUTO_SEED_DATA`
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
+
+## Migrazioni
+
+```bash
+cd apps/server
+set DATABASE_URL=postgresql+psycopg2://essa:essa@localhost:5432/essa
+alembic -c alembic.ini upgrade head
+```
+
+## Test
+
+Backend:
+```bash
+cd apps/server
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+Frontend:
+```bash
+cd apps/web
+npm run lint
+npm run build
+```
 
 ## Workflow branch
 

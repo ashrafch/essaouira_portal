@@ -1,5 +1,12 @@
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
+const TOKEN_KEY = "essaouira_portal_token";
+
+function getAuthHeaders() {
+  const token = window.localStorage.getItem(TOKEN_KEY);
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -27,14 +34,14 @@ function buildQuery(params = {}) {
 
 export async function apiGet(path, params) {
   const url = `${BASE_URL}${path}${buildQuery(params)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getAuthHeaders() });
   return handleResponse(res);
 }
 
 export async function apiPost(path, body) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
   return handleResponse(res);
@@ -43,7 +50,7 @@ export async function apiPost(path, body) {
 export async function apiPut(path, body) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
   return handleResponse(res);
@@ -52,6 +59,7 @@ export async function apiPut(path, body) {
 export async function apiDelete(path) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "DELETE",
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const text = await res.text();

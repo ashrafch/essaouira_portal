@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
+import { isAuthenticated } from "./services/auth";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Units = lazy(() => import("./pages/Units.jsx"));
@@ -17,17 +18,39 @@ const Pricing = lazy(() => import("./pages/Pricing.jsx"));
 const BookingDocument = lazy(() => import("./pages/BookingDocument.jsx"));
 const Maintenance = lazy(() => import("./pages/Maintenance.jsx"));
 const Expenses = lazy(() => import("./pages/Expenses.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
 
 function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
+}
+
+function RequireAuth({ children }) {
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 }
 
 function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
-        <Route path="/bookings/:bookingId/document" element={<BookingDocument />} />
-        <Route element={<Layout />}>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/bookings/:bookingId/document"
+          element={
+            <RequireAuth>
+              <BookingDocument />
+            </RequireAuth>
+          }
+        />
+        <Route
+          element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }
+        >
           <Route path="/" element={<Dashboard />} />
           <Route path="/operations" element={<ArrivalsDepartures />} />
           <Route path="/units" element={<Units />} />
