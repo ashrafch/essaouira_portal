@@ -1,0 +1,15 @@
+export const APP_ROUTES = [
+  { path: "/", key: "dashboard" },
+  { path: "/operations", key: "operations" },
+  { path: "/units", key: "units" },
+  { path: "/units/:unitId/timeline", key: "unitTimeline" },
+  { path: "/bookings", key: "bookings" },
+  { path: "/calendar", key: "calendar" },
+  { path: "/staff", key: "staff" },
+  { path: "/staff-planner", key: "staffPlanner" },
+  { path: "/business", key: "business" },
+  { path: "/staff-anagrafica", key: "staffDirectory" },
+  { path: "/tariffe-canali", key: "pricing" },
+  { path: "/maintenance", key: "maintenance" },
+  { path: "/expenses", key: "expenses" },
+];

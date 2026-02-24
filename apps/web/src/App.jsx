@@ -1,7 +1,8 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
-import { isAuthenticated } from "./services/auth";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { APP_ROUTES } from "./routes/appRoutes";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Units = lazy(() => import("./pages/Units.jsx"));
@@ -24,12 +25,21 @@ function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
 }
 
-function RequireAuth({ children }) {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
-  }
-  return children;
-}
+const ROUTE_COMPONENTS = {
+  dashboard: Dashboard,
+  operations: ArrivalsDepartures,
+  units: Units,
+  unitTimeline: UnitTimeline,
+  bookings: Bookings,
+  calendar: Calendar,
+  staff: Staff,
+  staffPlanner: StaffPlanner,
+  business: Business,
+  staffDirectory: StaffDirectory,
+  pricing: Pricing,
+  maintenance: Maintenance,
+  expenses: Expenses,
+};
 
 function App() {
   return (
@@ -39,31 +49,22 @@ function App() {
         <Route
           path="/bookings/:bookingId/document"
           element={
-            <RequireAuth>
+            <ProtectedRoute>
               <BookingDocument />
-            </RequireAuth>
+            </ProtectedRoute>
           }
         />
         <Route
           element={
-            <RequireAuth>
+            <ProtectedRoute>
               <Layout />
-            </RequireAuth>
+            </ProtectedRoute>
           }
         >
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/operations" element={<ArrivalsDepartures />} />
-          <Route path="/units" element={<Units />} />
-          <Route path="/units/:unitId/timeline" element={<UnitTimeline />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/staff-planner" element={<StaffPlanner />} />
-          <Route path="/business" element={<Business />} />
-          <Route path="/staff-anagrafica" element={<StaffDirectory />} />
-          <Route path="/tariffe-canali" element={<Pricing />} />
-          <Route path="/maintenance" element={<Maintenance />} />
-          <Route path="/expenses" element={<Expenses />} />
+          {APP_ROUTES.map((route) => {
+            const Component = ROUTE_COMPONENTS[route.key];
+            return <Route key={route.path} path={route.path} element={<Component />} />;
+          })}
         </Route>
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />

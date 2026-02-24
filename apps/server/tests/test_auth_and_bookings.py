@@ -66,6 +66,12 @@ def test_booking_overlap_validation():
             "has_late_checkout": False,
         }
 
+        existing = client.get("/bookings", headers=headers)
+        assert existing.status_code == 200
+        for booking in existing.json():
+            if booking["unit_id"] == unit_id and booking["checkin_date"] == payload["checkin_date"]:
+                client.delete(f"/bookings/{booking['id']}", headers=headers)
+
         first = client.post("/bookings", json=payload, headers=headers)
         assert first.status_code == 200
 
