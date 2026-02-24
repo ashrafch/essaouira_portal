@@ -12,7 +12,13 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { getMonthPnL, getStaffTasks, getBookings } from "../services/api";
+import {
+  getMonthPnL,
+  getStaffTasks,
+  getBookings,
+  getAdvancedKpis,
+  getTodayAlerts,
+} from "../services/api";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
@@ -26,6 +32,8 @@ function Dashboard() {
   const [pnl, setPnl] = useState(null);
   const [todaysTasks, setTodaysTasks] = useState([]);
   const [todaysArrivals, setTodaysArrivals] = useState([]);
+  const [advancedKpis, setAdvancedKpis] = useState(null);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -35,14 +43,18 @@ function Dashboard() {
       setError(null);
       try {
         // Carichiamo in parallelo: Analisi Finanziaria, Task di oggi, Prenotazioni
-        const [pnlData, tasksData, bookingsData] = await Promise.all([
+        const [pnlData, tasksData, bookingsData, advancedData, alertsData] = await Promise.all([
           getMonthPnL(year, month),
           getStaffTasks({ date: todayStr }),
           getBookings(),
+          getAdvancedKpis(year, month),
+          getTodayAlerts(),
         ]);
 
         setPnl(pnlData);
         setTodaysTasks(tasksData || []);
+        setAdvancedKpis(advancedData);
+        setAlerts(alertsData || []);
 
         // Filtra arrivi di oggi lato client
         const arrivals = (bookingsData || []).filter(
@@ -152,6 +164,51 @@ function Dashboard() {
           </select>
         </div>
       </div>
+
+      <div style={gridKPI}>
+        <div style={kpiCard("#1d4ed8")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>RevPAR</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+            EUR {advancedKpis?.revpar?.toLocaleString?.() ?? 0}
+          </div>
+        </div>
+        <div style={kpiCard("#0ea5e9")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Share Direct</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+            {advancedKpis?.direct_share_percent ?? 0}%
+          </div>
+        </div>
+        <div style={kpiCard("#7c3aed")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Pipeline 30g</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+            EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.() ?? 0}
+          </div>
+        </div>
+        <div style={kpiCard("#f97316")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Alert operativi</div>
+          <div style={{ marginTop: "8px", fontSize: 13, color: "#111827" }}>
+            {alerts.length === 0
+              ? "Nessun alert attivo"
+              : `${alerts.length} alert da verificare`}
+          </div>
+        </div>
+      </div>
+
+      {alerts.length > 0 && (
+        <div style={{ ...chartCard, minHeight: "auto" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: 12, color: "#374151" }}>
+            Alert Oggi
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {alerts.map((alert) => (
+              <div key={alert.code} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{alert.title} ({alert.count})</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>{alert.details}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 1. KPI FINANZIARI */}
       <div style={gridKPI}>

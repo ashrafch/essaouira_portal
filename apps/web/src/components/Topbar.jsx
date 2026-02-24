@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clearAuthSession, getCurrentUsername } from "../services/auth";
 
 const wrapper = {
   height: "100%",
@@ -10,6 +11,7 @@ const wrapper = {
 
 function Topbar() {
   const [online, setOnline] = useState(navigator.onLine);
+  const username = getCurrentUsername() || "Owner";
 
   useEffect(() => {
     function handleOnline() {
@@ -60,8 +62,26 @@ function Topbar() {
           {online ? "Online" : "Offline (solo cache)"}
         </div>
         <div style={{ fontSize: "13px", color: "#6b7280" }}>
-          Logged as <strong>Owner</strong>
+          Logged as <strong>{username}</strong>
         </div>
+        <button
+          type="button"
+          style={{
+            fontSize: 12,
+            padding: "4px 10px",
+            borderRadius: 999,
+            border: "1px solid #d1d5db",
+            background: "white",
+            color: "#374151",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            clearAuthSession();
+            window.location.href = "/login";
+          }}
+        >
+          Logout
+        </button>
       </div>
     </div>
   );

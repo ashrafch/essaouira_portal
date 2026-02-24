@@ -1,0 +1,12 @@
+name: Staging Pipeline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  staging-compose-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.yml -f docker-compose.staging.yml config
+      - run: docker compose -f docker-compose.yml -f docker-compose.staging.yml build

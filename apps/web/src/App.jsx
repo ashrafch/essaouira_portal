@@ -1,6 +1,8 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { APP_ROUTES } from "./routes/appRoutes";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
 const Units = lazy(() => import("./pages/Units.jsx"));
@@ -17,30 +19,52 @@ const Pricing = lazy(() => import("./pages/Pricing.jsx"));
 const BookingDocument = lazy(() => import("./pages/BookingDocument.jsx"));
 const Maintenance = lazy(() => import("./pages/Maintenance.jsx"));
 const Expenses = lazy(() => import("./pages/Expenses.jsx"));
+const Login = lazy(() => import("./pages/Login.jsx"));
 
 function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
 }
 
+const ROUTE_COMPONENTS = {
+  dashboard: Dashboard,
+  operations: ArrivalsDepartures,
+  units: Units,
+  unitTimeline: UnitTimeline,
+  bookings: Bookings,
+  calendar: Calendar,
+  staff: Staff,
+  staffPlanner: StaffPlanner,
+  business: Business,
+  staffDirectory: StaffDirectory,
+  pricing: Pricing,
+  maintenance: Maintenance,
+  expenses: Expenses,
+};
+
 function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
-        <Route path="/bookings/:bookingId/document" element={<BookingDocument />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/operations" element={<ArrivalsDepartures />} />
-          <Route path="/units" element={<Units />} />
-          <Route path="/units/:unitId/timeline" element={<UnitTimeline />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/staff-planner" element={<StaffPlanner />} />
-          <Route path="/business" element={<Business />} />
-          <Route path="/staff-anagrafica" element={<StaffDirectory />} />
-          <Route path="/tariffe-canali" element={<Pricing />} />
-          <Route path="/maintenance" element={<Maintenance />} />
-          <Route path="/expenses" element={<Expenses />} />
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/bookings/:bookingId/document"
+          element={
+            <ProtectedRoute>
+              <BookingDocument />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          {APP_ROUTES.map((route) => {
+            const Component = ROUTE_COMPONENTS[route.key];
+            return <Route key={route.path} path={route.path} element={<Component />} />;
+          })}
         </Route>
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />

@@ -18,6 +18,7 @@ URL:
 - Frontend: `http://localhost:8080`
 - API health: `http://localhost:8080/api/health`
 - API diretta: `http://localhost:8000/health`
+- Login default: `owner` / `owner123`
 
 Stop:
 
@@ -61,9 +62,66 @@ npm run dev
 Backend (`apps/server/.env`):
 - `DATABASE_URL`
 - `CORS_ORIGINS`
+- `AUTH_ENABLED`
+- `AUTH_SECRET_KEY`
+- `AUTH_ALGORITHM`
+- `AUTH_ACCESS_TOKEN_MINUTES`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `AUTO_CREATE_SCHEMA`
+- `AUTO_SEED_DATA`
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
+
+## Migrazioni
+
+```bash
+cd apps/server
+set DATABASE_URL=postgresql+psycopg2://essa:essa@localhost:5432/essa
+alembic -c alembic.ini upgrade head
+```
+
+## Test
+
+Backend:
+```bash
+cd apps/server
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+Frontend:
+```bash
+cd apps/web
+npm run lint
+npm run build
+```
+
+## Scalabilita operativa
+
+Monitoraggio (profilo ops):
+```bash
+docker compose --profile ops up -d
+```
+
+Servizi:
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000` (admin/admin)
+
+Backup automatico DB:
+- servizio `db-backup` crea dump gzip ogni 24h
+- retention default 7 giorni
+- volume: `db_backups`
+
+Staging compose:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+```
+
+CI/CD:
+- pipeline CI: `.github/workflows/ci.yml`
+- pipeline staging (manual trigger): `.github/workflows/staging.yml`
 
 ## Workflow branch
 

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { getMonthPnL, getMonthCostLines, getUnits } from "../services/api";
+import {
+  downloadMonthCostLinesCsv,
+  getMonthPnL,
+  getMonthCostLines,
+  getUnits,
+} from "../services/api";
 
 function pad2(n) {
   return n < 10 ? `0${n}` : String(n);
@@ -21,6 +26,7 @@ function Business() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const [selectedCostCategory, setSelectedCostCategory] = useState("all");
 
@@ -99,6 +105,23 @@ function Business() {
         return "Staff task";
       default:
         return line.origin || "Altro";
+    }
+  }
+
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const blob = await downloadMonthCostLinesCsv(year, month);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `month_cost_lines_${year}_${pad2(month)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(`Errore export CSV: ${err.message}`);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -211,7 +234,7 @@ function Business() {
             appartamenti.
           </p>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
           <label
             style={{
               fontSize: 11,
@@ -236,6 +259,14 @@ function Business() {
               fontSize: 13,
             }}
           />
+          <button
+            type="button"
+            style={smallButton}
+            onClick={handleExportCsv}
+            disabled={exporting}
+          >
+            {exporting ? "Export..." : "Export costi CSV"}
+          </button>
         </div>
       </div>
 

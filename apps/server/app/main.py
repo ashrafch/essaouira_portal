@@ -1,14 +1,24 @@
 import os
+import csv
+import io
 from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.db import Base, engine, get_db
+from app.db import get_db
+from app.api.middlewares import authentication, request_logging
+from app.bootstrap import initialize_schema_and_seed
+from app.core.auth import authenticate_user, create_access_token
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.main_types import StaffRole
 from app.models.unit import Unit
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
@@ -19,7 +29,9 @@ from app.models.pricing_defaults import PricingDefaults
 from app.models.maintenance import MaintenanceTicket
 
 
+setup_logging()
 app = FastAPI(title="Portale Essaouira API")
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 cors_origins_raw = os.getenv(
     "CORS_ORIGINS",
@@ -35,100 +47,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ---------- STAFF ROLES ENUM ----------
-
-class StaffRole(str, Enum):
-    housekeeping = "housekeeping"
-    kitchen = "kitchen"
-    reception_day = "reception_day"
-    reception_night = "reception_night"
-    manager = "manager"
+app.middleware("http")(request_logging)
+app.middleware("http")(authentication)
 
 
 @app.on_event("startup")
 def on_startup():
-    # crea tabelle
-    Base.metadata.create_all(bind=engine)
-
-    db = next(get_db())
-
-    # seed unità se non ci sono
-    if db.query(Unit).count() == 0:
-        units_seed = [
-            Unit(name="Unit A", size_m2=64, capacity=6, base_nightly_rate=80),
-            Unit(name="Unit B", size_m2=62, capacity=6, base_nightly_rate=80),
-            Unit(name="Unit C", size_m2=60, capacity=6, base_nightly_rate=75),
-            Unit(name="Unit D", size_m2=61, capacity=6, base_nightly_rate=75),
-            Unit(name="Unit E", size_m2=63, capacity=6, base_nightly_rate=85),
-            Unit(name="Unit F", size_m2=60, capacity=6, base_nightly_rate=70),
-        ]
-        db.add_all(units_seed)
-        db.commit()
-
-    # seed defaults staff se non esistono
-    if db.query(StaffDefaults).count() == 0:
-        defaults = StaffDefaults(
-            cleaning_default_assignee="Operatore 1",
-            cleaning_default_cost=5.0,
-            cleaning_default_hours=1.0,
-            currency="EUR",
-        )
-        db.add(defaults)
-        db.commit()
-
-    # seed staff members se non esistono
-    if db.query(StaffMember).count() == 0:
-        staff_seed = [
-            StaffMember(
-                name="Fatima (Housekeeping)",
-                role=StaffRole.housekeeping.value,
-                color_hex="#0f766e",
-                is_active=True,
-                hourly_cost=None,
-            ),
-            StaffMember(
-                name="Ali (Cucina)",
-                role=StaffRole.kitchen.value,
-                color_hex="#f97316",
-                is_active=True,
-                hourly_cost=None,
-            ),
-            StaffMember(
-                name="Sara (Reception giorno)",
-                role=StaffRole.reception_day.value,
-                color_hex="#2563eb",
-                is_active=True,
-                hourly_cost=None,
-            ),
-            StaffMember(
-                name="Youssef (Reception notte)",
-                role=StaffRole.reception_night.value,
-                color_hex="#1d4ed8",
-                is_active=True,
-                hourly_cost=None,
-            ),
-            StaffMember(
-                name="Ashraf (Manager)",
-                role=StaffRole.manager.value,
-                color_hex="#a855f7",
-                is_active=True,
-                hourly_cost=None,
-            ),
-        ]
-        db.add_all(staff_seed)
-        db.commit()
-
-    # seed pricing defaults se non esistono
-    if db.query(PricingDefaults).count() == 0:
-        pricing_defaults = PricingDefaults(
-            default_cleaning_fee=None,
-            default_city_tax_per_night=None,
-            default_channel_commission_percent=None,
-            currency="EUR",
-        )
-        db.add(pricing_defaults)
-        db.commit()
+    initialize_schema_and_seed()
 
 
 # ---------- HEALTH CHECK ----------
@@ -136,6 +61,30 @@ def on_startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    username: str
+
+
+@app.post("/auth/login", response_model=AuthLoginResponse)
+def auth_login(payload: AuthLoginRequest):
+    if not settings.auth_enabled:
+        token = create_access_token("anonymous")
+        return AuthLoginResponse(access_token=token, username="anonymous")
+
+    if not authenticate_user(payload.username, payload.password):
+        raise HTTPException(status_code=401, detail="Credenziali non valide")
+
+    token = create_access_token(payload.username)
+    return AuthLoginResponse(access_token=token, username=payload.username)
 
 
 # ---------- UNITS ----------
@@ -1236,6 +1185,209 @@ def month_cost_lines(
     return [MonthCostLine(**line) for line in cost_lines]
 
 
+class AdvancedKpiSummary(BaseModel):
+    year: int
+    month: int
+    revpar: float
+    avg_length_of_stay: float | None
+    direct_share_percent: float
+    paid_booking_percent: float
+    pipeline_revenue_next_30_days: float
+    upcoming_arrivals_next_7_days: int
+
+
+@app.get("/analytics/advanced-kpis", response_model=AdvancedKpiSummary)
+def advanced_kpis(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, days_in_month = _get_month_range(year, month)
+
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+    units_count = db.query(Unit).count()
+    nights_total = max(days_in_month * units_count, 1)
+
+    occupied_nights = 0
+    revenue_total = 0.0
+    direct_revenue = 0.0
+    paid_count = 0
+    lengths_of_stay: list[int] = []
+
+    for booking in bookings:
+        stay_start = max(booking.checkin_date, month_start)
+        stay_end = min(booking.checkout_date, next_month_start)
+        nights_in_month = max((stay_end - stay_start).days, 0)
+        occupied_nights += nights_in_month
+
+        if booking.total_price is not None:
+            booking_revenue = float(booking.total_price)
+        elif booking.nightly_rate is not None:
+            booking_revenue = float(booking.nightly_rate) * nights_in_month
+        else:
+            booking_revenue = 0.0
+
+        revenue_total += booking_revenue
+        if (booking.source or "").lower() == "direct":
+            direct_revenue += booking_revenue
+        if booking.is_paid:
+            paid_count += 1
+
+        if booking.checkin_date and booking.checkout_date:
+            los = max((booking.checkout_date - booking.checkin_date).days, 0)
+            if los > 0:
+                lengths_of_stay.append(los)
+
+    revpar = revenue_total / nights_total
+    avg_los = sum(lengths_of_stay) / len(lengths_of_stay) if lengths_of_stay else None
+    direct_share = (direct_revenue / revenue_total * 100) if revenue_total > 0 else 0.0
+    paid_percent = (paid_count / len(bookings) * 100) if bookings else 0.0
+
+    today = date.today()
+    next_30 = today + timedelta(days=30)
+    next_7 = today + timedelta(days=7)
+
+    upcoming_bookings = (
+        db.query(Booking)
+        .filter(Booking.checkin_date >= today, Booking.checkin_date <= next_30)
+        .all()
+    )
+    pipeline_revenue = sum(float(b.total_price or 0) for b in upcoming_bookings)
+    upcoming_arrivals_7 = sum(1 for b in upcoming_bookings if b.checkin_date <= next_7)
+
+    return AdvancedKpiSummary(
+        year=year,
+        month=month,
+        revpar=round(revpar, 2),
+        avg_length_of_stay=round(avg_los, 2) if avg_los is not None else None,
+        direct_share_percent=round(direct_share, 2),
+        paid_booking_percent=round(paid_percent, 2),
+        pipeline_revenue_next_30_days=round(pipeline_revenue, 2),
+        upcoming_arrivals_next_7_days=upcoming_arrivals_7,
+    )
+
+
+class AlertItem(BaseModel):
+    severity: str
+    code: str
+    title: str
+    count: int
+    details: str
+
+
+@app.get("/alerts/today", response_model=List[AlertItem])
+def alerts_today(db: Session = Depends(get_db)):
+    today = date.today()
+    alerts: list[AlertItem] = []
+
+    unpaid_checkouts = (
+        db.query(Booking)
+        .filter(Booking.checkout_date < today, Booking.is_paid.is_(False))
+        .count()
+    )
+    if unpaid_checkouts > 0:
+        alerts.append(
+            AlertItem(
+                severity="high",
+                code="unpaid_checkout",
+                title="Prenotazioni non saldate dopo il check-out",
+                count=unpaid_checkouts,
+                details="Verificare pagamenti e riconciliazione contabile.",
+            )
+        )
+
+    overdue_tasks = (
+        db.query(StaffTask)
+        .filter(
+            StaffTask.date < today,
+            StaffTask.status.notin_(["done", "cancelled"]),
+        )
+        .count()
+    )
+    if overdue_tasks > 0:
+        alerts.append(
+            AlertItem(
+                severity="medium",
+                code="overdue_staff_tasks",
+                title="Task staff scaduti non completati",
+                count=overdue_tasks,
+                details="Prioritizzare i task in ritardo nel planner staff.",
+            )
+        )
+
+    open_tickets = (
+        db.query(MaintenanceTicket)
+        .filter(MaintenanceTicket.status.in_(["todo", "in_progress"]))
+        .count()
+    )
+    if open_tickets > 0:
+        alerts.append(
+            AlertItem(
+                severity="medium",
+                code="open_maintenance",
+                title="Ticket manutenzione aperti",
+                count=open_tickets,
+                details="Verificare ticket urgenti e stato avanzamento.",
+            )
+        )
+
+    return alerts
+
+
+@app.get("/analytics/month-cost-lines.csv")
+def month_cost_lines_csv(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, _ = _get_month_range(year, month)
+    _, _, cost_lines = _collect_costs_for_month(db, month_start, next_month_start)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "date",
+            "category",
+            "description",
+            "amount",
+            "currency",
+            "unit_id",
+            "booking_id",
+            "staff_task_id",
+            "origin",
+        ]
+    )
+    for line in cost_lines:
+        writer.writerow(
+            [
+                line.get("date"),
+                line.get("category"),
+                line.get("description"),
+                line.get("amount"),
+                line.get("currency"),
+                line.get("unit_id"),
+                line.get("booking_id"),
+                line.get("staff_task_id"),
+                line.get("origin"),
+            ]
+        )
+
+    filename = f"month_cost_lines_{year}_{month:02d}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
+    )
+
+
 # ---------- STAFF TASKS ----------
 
 
@@ -1840,3 +1992,4 @@ def delete_maintenance_ticket(ticket_id: int, db: Session = Depends(get_db)):
     db.delete(ticket)
     db.commit()
     return
+
