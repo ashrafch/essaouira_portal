@@ -92,7 +92,7 @@ function Units() {
     gap: 8,
   };
 
-  const avatar = (label) => ({
+  const avatar = () => ({
     width: 30,
     height: 30,
     borderRadius: "999px",

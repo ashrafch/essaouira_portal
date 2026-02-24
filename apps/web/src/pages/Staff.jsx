@@ -4,6 +4,7 @@ import {
   getUnits,
   updateStaffTask,
   createStaffTask,
+  deleteStaffTask,
   getStaffDefaults,
   updateStaffDefaults,
   getStaffMembers,

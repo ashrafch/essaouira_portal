@@ -1,3 +1,4 @@
+import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
 
@@ -31,6 +32,8 @@ const contentWrapper = {
 };
 
 function Layout({ children }) {
+  const content = children ?? <Outlet />;
+
   return (
     <div style={layoutStyle}>
       <aside style={sidebarWrapper}>
@@ -39,7 +42,7 @@ function Layout({ children }) {
       <header style={topbarWrapper}>
         <Topbar />
       </header>
-      <main style={contentWrapper}>{children}</main>
+      <main style={contentWrapper}>{content}</main>
     </div>
   );
 }

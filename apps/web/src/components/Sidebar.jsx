@@ -219,7 +219,7 @@ function Sidebar() {
             if (Array.isArray(tickets)) {
               maintenanceCount = tickets.filter(t => t.status !== 'done').length;
             }
-        } catch (e) {
+        } catch {
             // Ignora errori se la tabella non esiste ancora
             console.log("Tabella maintenance forse non pronta");
         }

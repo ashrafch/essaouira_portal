@@ -1,11 +1,11 @@
-const BASE_URL = "http://localhost:8000";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 
 async function handleResponse(res) {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
-  // Gestione risposta 204 No Content (es. dopo una delete o update senza ritorno)
   if (res.status === 204) {
     return null;
   }

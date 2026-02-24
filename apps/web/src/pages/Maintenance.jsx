@@ -180,6 +180,12 @@ function Maintenance() {
         </button>
       </div>
 
+      {loading && (
+        <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
+          Caricamento ticket manutenzione...
+        </p>
+      )}
+
       {/* BOARD COLUMNS */}
       <div style={{ display: "flex", gap: 20, overflowX: "auto", paddingBottom: 20, flex: 1 }}>
         {Object.entries(columns).map(([status, items]) => (

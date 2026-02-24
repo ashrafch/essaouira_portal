@@ -182,6 +182,9 @@ function Expenses() {
         </div>
       </div>
 
+      {error && <p style={{ color: "#b91c1c", fontSize: 12 }}>{error}</p>}
+      {loading && <p style={{ fontSize: 13, color: "#6b7280" }}>Caricamento spese...</p>}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
         <div style={card}>
           <div style={{ fontSize: 11, color: "#6b7280" }}>Totale Spese ({new Date(year, month-1, 1).toLocaleDateString("it-IT", { month: 'long' })})</div>

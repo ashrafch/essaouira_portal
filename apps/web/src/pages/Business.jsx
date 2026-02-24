@@ -59,11 +59,6 @@ function Business() {
 
   const monthInputValue = `${year}-${pad2(month)}`;
 
-  const costCategories = useMemo(() => {
-    if (!pnl) return [];
-    return pnl.costs_by_category?.map((c) => c.category) || [];
-  }, [pnl]);
-
   const visibleCostLines = useMemo(() => {
     return costLines.filter((c) =>
       selectedCostCategory === "all"
@@ -549,3 +544,4 @@ function Business() {
 }
 
 export default Business;
+

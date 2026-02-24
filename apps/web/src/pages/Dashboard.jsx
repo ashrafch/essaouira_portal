@@ -16,13 +16,6 @@ import { getMonthPnL, getStaffTasks, getBookings } from "../services/api";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
-function formatDate(d) {
-  return new Date(d).toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "short",
-  });
-}
-
 function Dashboard() {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);

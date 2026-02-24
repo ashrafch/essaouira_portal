@@ -84,8 +84,8 @@ function Bookings() {
         const [bks, uns] = await Promise.all([getBookings(), getUnits()]);
         setBookings(bks);
         setUnits(uns);
-        if (!unitId && uns[0]?.id) {
-          setUnitId(String(uns[0].id));
+        if (uns[0]?.id) {
+          setUnitId((prev) => prev || String(uns[0].id));
         }
       } catch (err) {
         setError(err.message);

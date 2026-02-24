@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const overlayStyle = {
   position: "fixed",
@@ -67,29 +67,28 @@ const btnCancel = {
 
 const btnSend = {
   ...btnBase,
-  backgroundColor: "#25d366", // WhatsApp green
+  backgroundColor: "#25d366",
   color: "white",
   display: "flex",
   alignItems: "center",
   gap: 6,
 };
 
-// Definiamo i template predefiniti
 const TEMPLATES = [
   {
     id: "welcome",
     label: "Benvenuto & Posizione",
-    text: `Ciao {guest_name}! 👋\nSiamo felici di accoglierti a Essaouira.\n\nEcco la posizione esatta della struttura:\n📍 https://goo.gl/maps/ESEMPIO_POSIZIONE\n\nIl tuo appartamento è: {unit_name}.\nTi aspettiamo per il check-in dalle 15:00.\nA presto!`,
+    text: `Ciao {guest_name}!\nSiamo felici di accoglierti a Essaouira.\n\nEcco la posizione esatta della struttura:\nhttps://goo.gl/maps/ESEMPIO_POSIZIONE\n\nIl tuo appartamento e: {unit_name}.\nTi aspettiamo per il check-in dalle 15:00.\nA presto!`,
   },
   {
     id: "wifi",
     label: "Info WiFi",
-    text: `Ciao {guest_name},\necco i dati per il WiFi 📶:\n\nRete: Essaouira_Guest\nPassword: guest2025\n\nSe hai bisogno di altro, siamo a disposizione!`,
+    text: `Ciao {guest_name},\necco i dati per il WiFi:\n\nRete: Essaouira_Guest\nPassword: guest2025\n\nSe hai bisogno di altro, siamo a disposizione!`,
   },
   {
     id: "checkout",
     label: "Istruzioni Check-out",
-    text: `Buongiorno {guest_name},\nsperiamo tu abbia passato un ottimo soggiorno! ☀️\n\nTi ricordiamo che il check-out è previsto entro le 10:00.\nPer favore lascia le chiavi sul tavolo o alla reception.\n\nGrazie e buon viaggio!`,
+    text: `Buongiorno {guest_name},\nsperiamo tu abbia passato un ottimo soggiorno.\n\nTi ricordiamo che il check-out e previsto entro le 10:00.\nPer favore lascia le chiavi sul tavolo o alla reception.\n\nGrazie e buon viaggio!`,
   },
   {
     id: "custom",
@@ -100,9 +99,8 @@ const TEMPLATES = [
 
 function MessageModal({ isOpen, onClose, booking, unitName }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState("welcome");
-  const [message, setMessage] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
 
-  // Funzione che sostituisce i placeholder con i dati reali
   function compileTemplate(text) {
     if (!text) return "";
     let compiled = text;
@@ -111,15 +109,12 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
     return compiled;
   }
 
-  // Quando cambia il booking o il template selezionato, aggiorna il testo
-  useEffect(() => {
-    if (isOpen && booking) {
-      const tmpl = TEMPLATES.find((t) => t.id === selectedTemplateId);
-      if (tmpl) {
-        setMessage(compileTemplate(tmpl.text));
-      }
-    }
-  }, [isOpen, booking, selectedTemplateId, unitName]);
+  const templateMessage = (() => {
+    const tmpl = TEMPLATES.find((t) => t.id === selectedTemplateId);
+    return compileTemplate(tmpl?.text || "");
+  })();
+
+  const message = customMessage === "" ? templateMessage : customMessage;
 
   if (!isOpen || !booking) return null;
 
@@ -128,12 +123,11 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
       alert("Nessun numero di telefono per questo ospite.");
       return;
     }
-    
-    // Pulisci il numero e crea il link
+
     const cleanPhone = booking.guest_phone.replace(/[^0-9+]/g, "");
     const encodedText = encodeURIComponent(message);
     const url = `https://wa.me/${cleanPhone}?text=${encodedText}`;
-    
+
     window.open(url, "_blank");
     onClose();
   }
@@ -155,7 +149,10 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
           <select
             style={selectStyle}
             value={selectedTemplateId}
-            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            onChange={(e) => {
+              setSelectedTemplateId(e.target.value);
+              setCustomMessage("");
+            }}
           >
             {TEMPLATES.map((t) => (
               <option key={t.id} value={t.id}>
@@ -170,7 +167,7 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
           <textarea
             style={textareaStyle}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => setCustomMessage(e.target.value)}
           />
         </div>
 
@@ -179,7 +176,7 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
             Annulla
           </button>
           <button style={btnSend} onClick={handleSend} disabled={!booking.guest_phone}>
-            <span>💬</span> Invia su WhatsApp
+            <span>WA</span> Invia su WhatsApp
           </button>
         </div>
       </div>

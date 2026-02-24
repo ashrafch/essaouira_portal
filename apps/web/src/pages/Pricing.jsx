@@ -6,6 +6,13 @@ import {
   updatePricingDefaults,
 } from "../services/api";
 
+const EMPTY_PRICING = {
+  default_cleaning_fee: "",
+  default_city_tax_per_night: "",
+  default_channel_fee_percent: "",
+  default_currency: "EUR",
+};
+
 function Pricing() {
   const [units, setUnits] = useState([]);
   const [pricing, setPricing] = useState(null);
@@ -14,14 +21,6 @@ function Pricing() {
   const [savingPricing, setSavingPricing] = useState(false);
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState("");
-
-  // oggetto "vuoto" per permettere al form di funzionare anche se il backend non ha ancora record
-  const emptyPricing = {
-    default_cleaning_fee: "",
-    default_city_tax_per_night: "",
-    default_channel_commission_percent: "",
-    currency: "EUR",
-  };
 
   useEffect(() => {
     async function load() {
@@ -33,14 +32,12 @@ function Pricing() {
           getPricingDefaults(),
         ]);
         setUnits(uns || []);
-        // se il backend ritorna null/undefined, usiamo un modello vuoto
-        setPricing(pd || emptyPricing);
+        setPricing(pd || EMPTY_PRICING);
       } catch (err) {
         console.error("Errore caricando tariffe/pricing:", err);
         setError(err.message || "Errore caricando le tariffe.");
-        // permetti comunque di usare il form
         setUnits([]);
-        setPricing(emptyPricing);
+        setPricing(EMPTY_PRICING);
       } finally {
         setLoading(false);
       }
@@ -77,7 +74,7 @@ function Pricing() {
 
   function handleChangePricing(field, value) {
     setPricing((prev) => ({
-      ...(prev || emptyPricing),
+      ...(prev || EMPTY_PRICING),
       [field]: value,
     }));
   }
@@ -99,15 +96,15 @@ function Pricing() {
           pricing.default_city_tax_per_night == null
             ? null
             : Number(pricing.default_city_tax_per_night),
-        default_channel_commission_percent:
-          pricing.default_channel_commission_percent === "" ||
-          pricing.default_channel_commission_percent == null
+        default_channel_fee_percent:
+          pricing.default_channel_fee_percent === "" ||
+          pricing.default_channel_fee_percent == null
             ? null
-            : Number(pricing.default_channel_commission_percent),
-        currency: pricing.currency || "EUR",
+            : Number(pricing.default_channel_fee_percent),
+        default_currency: pricing.default_currency || "EUR",
       };
       const updated = await updatePricingDefaults(payload);
-      setPricing(updated || emptyPricing);
+      setPricing(updated || EMPTY_PRICING);
       setMsg("Impostazioni tariffe salvate.");
     } catch (err) {
       alert("Errore salvando tariffe: " + err.message);
@@ -159,16 +156,6 @@ function Pricing() {
     backgroundColor: "#0f766e",
     color: "white",
     cursor: "pointer",
-  };
-
-  const buttonSecondary = {
-    borderRadius: 999,
-    border: "1px solid #d1d5db",
-    padding: "6px 10px",
-    fontSize: 11,
-    fontWeight: 500,
-    backgroundColor: "white",
-    color: "#374151",
   };
 
   const table = {
@@ -385,13 +372,13 @@ function Pricing() {
                     step="0.1"
                     style={input}
                     value={
-                      pricing.default_channel_commission_percent == null
+                      pricing.default_channel_fee_percent == null
                         ? ""
-                        : pricing.default_channel_commission_percent
+                        : pricing.default_channel_fee_percent
                     }
                     onChange={(e) =>
                       handleChangePricing(
-                        "default_channel_commission_percent",
+                        "default_channel_fee_percent",
                         e.target.value
                       )
                     }
@@ -411,9 +398,9 @@ function Pricing() {
                   <label style={label}>Valuta di default</label>
                   <input
                     style={input}
-                    value={pricing.currency || "EUR"}
+                    value={pricing.default_currency || "EUR"}
                     onChange={(e) =>
-                      handleChangePricing("currency", e.target.value)
+                      handleChangePricing("default_currency", e.target.value)
                     }
                     maxLength={3}
                   />

@@ -1,3 +1,4 @@
+import os
 from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
@@ -20,10 +21,11 @@ from app.models.maintenance import MaintenanceTicket
 
 app = FastAPI(title="Portale Essaouira API")
 
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+cors_origins_raw = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+)
+origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,

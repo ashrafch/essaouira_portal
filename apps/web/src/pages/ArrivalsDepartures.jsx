@@ -196,7 +196,7 @@ function ArrivalsDepartures() {
     navigate("/bookings", { state: { editBookingId: b.id } });
   }
 
-  function openStaffForBooking(b) {
+  function _openStaffForBooking(b) {
     navigate(STAFF_ROUTE, {
       state: { bookingId: b.id, date: selectedDate },
     });
@@ -206,7 +206,7 @@ function ArrivalsDepartures() {
     navigate(STAFF_ROUTE, { state: { date: selectedDate } });
   }
 
-  function getTaskLabel(t) {
+  function _getTaskLabel(t) {
     if (t.task_type === "checkin") return "Check-in";
     if (t.task_type === "checkout") return "Check-out";
     if (t.task_type === "cleaning") return "Pulizia";
@@ -322,7 +322,7 @@ function ArrivalsDepartures() {
 
   const pillWarning = badge("#fee2e2", "#b91c1c", "#fecaca");
 
-  const filtersRow = {
+  const _filtersRow = {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",

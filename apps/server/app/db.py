@@ -1,8 +1,12 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import os
 
-# 🔗 Connessione a Postgres (Docker)
-DATABASE_URL = "postgresql+psycopg2://essa:essa@localhost:5432/essa"
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg2://essa:essa@localhost:5432/essa",
+)
 
 engine = create_engine(
     DATABASE_URL,

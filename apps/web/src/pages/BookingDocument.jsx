@@ -165,7 +165,7 @@ function BookingDocument() {
       
       const fileName = `${docType}_${booking.guest_name.replace(/\s+/g, "_")}.pdf`;
       pdf.save(fileName);
-    } catch (err) {
+    } catch {
       alert("Errore durante la creazione del PDF.");
     }
   };
