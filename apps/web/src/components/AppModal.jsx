@@ -49,6 +49,7 @@ function AppModal({ open, title, onClose, children, maxWidth = 760 }) {
               border: "1px solid #d1d5db",
               borderRadius: 999,
               background: "#fff",
+              color: "#111827",
               padding: "4px 10px",
               cursor: "pointer",
             }}
@@ -63,4 +64,3 @@ function AppModal({ open, title, onClose, children, maxWidth = 760 }) {
 }
 
 export default AppModal;
-

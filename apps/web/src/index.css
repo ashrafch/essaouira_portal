@@ -102,6 +102,16 @@ button:disabled {
   transform: none;
 }
 
+/* Fallback contrast for inline white buttons that omit text color */
+button[style*="background: white"]:not([style*="color:"]),
+button[style*="background:#fff"]:not([style*="color:"]),
+button[style*="background: #fff"]:not([style*="color:"]),
+button[style*="background-color: white"]:not([style*="color:"]),
+button[style*="background-color:#fff"]:not([style*="color:"]),
+button[style*="background-color: #fff"]:not([style*="color:"]) {
+  color: var(--text-primary) !important;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

@@ -71,6 +71,7 @@ function Business() {
   });
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -357,6 +358,30 @@ function Business() {
     color: "#111827",
   };
 
+  const sectionTitleRow = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 6,
+  };
+
+  const infoButton = {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: 700,
+    padding: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+  };
+
   const sectionRow = {
     display: "grid",
     gridTemplateColumns: "1.2fr 1fr",
@@ -393,7 +418,7 @@ function Business() {
     border: "1px solid #d1d5db",
     padding: "4px 10px",
     fontSize: 11,
-    color: "gray",
+    color: "#334155",
     background: "#f9fafb",
     cursor: "pointer",
   };
@@ -790,7 +815,17 @@ function Business() {
 
             <div style={sectionRow}>
               <div style={card}>
-                <div style={sectionTitle}>Channel Connections</div>
+                <div style={sectionTitleRow}>
+                  <div style={sectionTitle}>Channel Connections</div>
+                  <button
+                    type="button"
+                    style={infoButton}
+                    aria-label="Info Channel Connections"
+                    onClick={() => setInfoModal("channels")}
+                  >
+                    i
+                  </button>
+                </div>
                 <button
                   type="button"
                   style={{ ...smallButton, marginBottom: 8 }}
@@ -918,6 +953,7 @@ function Business() {
                         borderRadius: 8,
                         padding: "6px 8px",
                         background: "white",
+                        color: "#111827",
                         cursor: "pointer",
                       }}
                       onClick={() =>
@@ -943,7 +979,17 @@ function Business() {
               </div>
 
               <div style={card}>
-                <div style={sectionTitle}>Revenue Rules & Rate Suggestions</div>
+                <div style={sectionTitleRow}>
+                  <div style={sectionTitle}>Revenue Rules & Rate Suggestions</div>
+                  <button
+                    type="button"
+                    style={infoButton}
+                    aria-label="Info Revenue Rules"
+                    onClick={() => setInfoModal("rules")}
+                  >
+                    i
+                  </button>
+                </div>
                 <button
                   type="button"
                   style={{ ...smallButton, marginBottom: 8 }}
@@ -1042,6 +1088,7 @@ function Business() {
                         borderRadius: 8,
                         padding: "6px 8px",
                         background: "white",
+                        color: "#111827",
                         cursor: "pointer",
                       }}
                       onClick={() =>
@@ -1123,6 +1170,62 @@ function Business() {
                 </div>
               </div>
             </div>
+            <AppModal
+              open={infoModal != null}
+              onClose={() => setInfoModal(null)}
+              title={
+                infoModal === "channels"
+                  ? "Come usare Channel Connections"
+                  : "Come usare Revenue Rules"
+              }
+              maxWidth={720}
+            >
+              {infoModal === "channels" ? (
+                <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                  <p>
+                    Le Channel Connections collegano ogni canale OTA (Airbnb, Booking, Direct)
+                    alla logica economica del portale.
+                  </p>
+                  <p>
+                    Servono per calcolare fee reali, ritardi payout e performance netta per canale
+                    dentro KPI e report.
+                  </p>
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 10,
+                      background: "#f8fafc",
+                      padding: 10,
+                    }}
+                  >
+                    Esempio: canale `airbnb`, commissione `15`, payout delay `3`. Il sistema
+                    sottrae la fee da ogni booking Airbnb e mostra il netto nella Business.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                  <p>
+                    Le Revenue Rules regolano in automatico il prezzo suggerito in base a
+                    occupazione, anticipo prenotazione e priorita della regola.
+                  </p>
+                  <p>
+                    Rate Suggestions applica queste regole su un periodo e ti propone una tariffa
+                    consigliata per ogni data.
+                  </p>
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 10,
+                      background: "#f8fafc",
+                      padding: 10,
+                    }}
+                  >
+                    Esempio: se occupazione e alta e lead days e basso, regola `+12%` con priorita
+                    alta. Il motore suggerisce un prezzo piu alto rispetto alla base.
+                  </div>
+                </div>
+              )}
+            </AppModal>
             {rulesError ? <p style={{ color: "#b91c1c", fontSize: 12 }}>{rulesError}</p> : null}
           </div>
         </>
