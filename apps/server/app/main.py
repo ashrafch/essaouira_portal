@@ -37,6 +37,7 @@ from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
 from app.models.maintenance import MaintenanceTicket
+from app.models.tenant import Tenant
 from app.models.user import User
 
 
@@ -112,6 +113,10 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     tenant_id = normalize_tenant_id(payload.tenant_id or settings.admin_tenant_id)
     role = None
 
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id, Tenant.is_active.is_(True)).first()
+    if tenant is None:
+        raise HTTPException(status_code=401, detail="Tenant non valido")
+
     tenant_token = set_current_tenant_id(tenant_id)
     try:
         db_user = (
@@ -156,6 +161,18 @@ def _require_role(request: Request, allowed_roles: set[str]) -> None:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
+def _require_platform_owner(request: Request) -> None:
+    username = getattr(request.state, "user", None)
+    role = getattr(request.state, "role", None)
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    if (
+        role != "owner"
+        or username != settings.admin_username
+        or tenant_id != normalize_tenant_id(settings.admin_tenant_id)
+    ):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 class UserCreateRequest(BaseModel):
     username: str
     password: str
@@ -189,6 +206,22 @@ class AuditLogOut(BaseModel):
     status_code: int
     client_ip: str | None = None
     details: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TenantCreateRequest(BaseModel):
+    tenant_id: str
+    name: str
+    owner_username: str
+    owner_password: str
+
+
+class TenantOut(BaseModel):
+    tenant_id: str
+    name: str
+    is_active: bool
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -275,6 +308,54 @@ def list_audit_logs(
     if username:
         q = q.filter(AuditLog.username == username)
     return q.limit(limit).all()
+
+
+@app.get("/platform/tenants", response_model=list[TenantOut])
+def list_platform_tenants(request: Request, db: Session = Depends(get_db)):
+    _require_platform_owner(request)
+    return db.query(Tenant).order_by(Tenant.created_at.desc()).all()
+
+
+@app.post("/platform/tenants", response_model=TenantOut)
+def create_platform_tenant(
+    payload: TenantCreateRequest, request: Request, db: Session = Depends(get_db)
+):
+    _require_platform_owner(request)
+    tenant_id = normalize_tenant_id(payload.tenant_id)
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="tenant_id obbligatorio")
+    if len(payload.owner_password) < 8:
+        raise HTTPException(status_code=400, detail="Password owner troppo corta (min 8)")
+    owner_username = payload.owner_username.strip()
+    if not owner_username:
+        raise HTTPException(status_code=400, detail="owner_username obbligatorio")
+
+    existing_tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
+    if existing_tenant:
+        raise HTTPException(status_code=409, detail="Tenant gia esistente")
+
+    tenant = Tenant(tenant_id=tenant_id, name=payload.name.strip() or tenant_id, is_active=True)
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+
+    token = set_current_tenant_id(tenant_id)
+    try:
+        existing_owner = db.query(User).filter(User.username == owner_username).first()
+        if existing_owner:
+            raise HTTPException(status_code=409, detail="Owner username gia esistente nel tenant")
+        owner = User(
+            username=owner_username,
+            password_hash=hash_password(payload.owner_password),
+            role="owner",
+            is_active=True,
+        )
+        db.add(owner)
+        db.commit()
+    finally:
+        reset_current_tenant_id(token)
+
+    return tenant
 
 
 # ---------- UNITS ----------

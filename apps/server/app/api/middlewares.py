@@ -34,6 +34,7 @@ WRITE_PROTECTED_PREFIXES = (
     "/maintenance",
     "/users",
     "/audit-logs",
+    "/platform/tenants",
 )
 
 

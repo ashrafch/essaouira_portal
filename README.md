@@ -83,6 +83,10 @@ Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
 - registrazione automatica write operations su risorse core
 
+Tenant onboarding (piattaforma):
+- endpoint `GET/POST /platform/tenants` (solo platform owner `owner@default`)
+- crea tenant + owner iniziale per nuovo cliente
+
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
 

@@ -6,6 +6,7 @@
 - Tenant context su token/header: completato
 - Isolamento dati tenant a livello ORM (`tenant_id` + filtri automatici): completato
 - Audit trail backend (`audit_logs` + endpoint consultazione owner): completato
+- Tenant onboarding piattaforma (`/platform/tenants` + owner seed): completato
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

@@ -4,6 +4,7 @@ from app.core.config import settings
 from app.core.auth import hash_password
 from app.db import Base, engine, get_db
 from app.models.pricing_defaults import PricingDefaults
+from app.models.tenant import Tenant
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.user import User
@@ -26,6 +27,12 @@ def initialize_schema_and_seed() -> None:
 
     db = next(get_db())
     try:
+        default_tenant_id = settings.admin_tenant_id
+        default_tenant = db.query(Tenant).filter(Tenant.tenant_id == default_tenant_id).first()
+        if default_tenant is None:
+            db.add(Tenant(tenant_id=default_tenant_id, name="Default Tenant", is_active=True))
+            db.commit()
+
         if db.query(Unit).count() == 0:
             units_seed = [
                 Unit(name="Unit A", size_m2=64, capacity=6, base_nightly_rate=80),

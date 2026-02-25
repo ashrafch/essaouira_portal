@@ -4,8 +4,9 @@ from app.core.auth import create_access_token
 from app.main import app
 
 
-def _headers(role: str, tenant_id: str = "default"):
-    token = create_access_token(f"{role}_{tenant_id}", role=role, tenant_id=tenant_id)
+def _headers(role: str, tenant_id: str = "default", username: str | None = None):
+    subject = username or f"{role}_{tenant_id}"
+    token = create_access_token(subject, role=role, tenant_id=tenant_id)
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -51,6 +52,19 @@ def test_non_owner_cannot_manage_users():
 
 def test_user_auth_is_tenant_scoped():
     with TestClient(app) as client:
+        platform_headers = _headers("owner", "default", username="owner")
+        tenant_resp = client.post(
+            "/platform/tenants",
+            headers=platform_headers,
+            json={
+                "tenant_id": "tenant-b",
+                "name": "Tenant B",
+                "owner_username": "tenantb_owner_seed",
+                "owner_password": "StrongPass123!",
+            },
+        )
+        assert tenant_resp.status_code in (200, 409)
+
         owner_other_tenant = _headers("owner", "tenant-b")
         create_resp = client.post(
             "/users",
