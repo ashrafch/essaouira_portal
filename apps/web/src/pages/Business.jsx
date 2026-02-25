@@ -247,6 +247,22 @@ function Business() {
   async function handleSaveRevenueRule(e) {
     e.preventDefault();
     try {
+      if (Number(ruleForm.min_occupancy_percent) > Number(ruleForm.max_occupancy_percent)) {
+        setRulesError("Occupazione minima non puo essere maggiore della massima.");
+        return;
+      }
+      if (Number(ruleForm.min_lead_days) > Number(ruleForm.max_lead_days)) {
+        setRulesError("Lead days minimo non puo essere maggiore del massimo.");
+        return;
+      }
+      if (
+        ruleForm.min_price !== "" &&
+        ruleForm.max_price !== "" &&
+        Number(ruleForm.min_price) > Number(ruleForm.max_price)
+      ) {
+        setRulesError("Prezzo minimo non puo essere maggiore del prezzo massimo.");
+        return;
+      }
       const payload = {
         name: ruleForm.name,
         priority: Number(ruleForm.priority || 100),
@@ -284,6 +300,50 @@ function Business() {
     } catch (err) {
       setRulesError(err.message || "Errore salvataggio regola");
     }
+  }
+
+  function applyRulePreset(preset) {
+    if (preset === "last_minute") {
+      setRuleForm((s) => ({
+        ...s,
+        name: s.name || "Last minute boost",
+        priority: "30",
+        min_occupancy_percent: "70",
+        max_occupancy_percent: "100",
+        min_lead_days: "0",
+        max_lead_days: "3",
+        adjustment_percent: "12",
+        min_price: "",
+        max_price: "",
+      }));
+      return;
+    }
+    if (preset === "early_bird") {
+      setRuleForm((s) => ({
+        ...s,
+        name: s.name || "Early bird promo",
+        priority: "60",
+        min_occupancy_percent: "0",
+        max_occupancy_percent: "45",
+        min_lead_days: "21",
+        max_lead_days: "365",
+        adjustment_percent: "-8",
+        min_price: "",
+        max_price: "",
+      }));
+      return;
+    }
+    setRuleForm((s) => ({
+      ...s,
+      priority: "100",
+      min_occupancy_percent: "0",
+      max_occupancy_percent: "100",
+      min_lead_days: "0",
+      max_lead_days: "365",
+      adjustment_percent: "0",
+      min_price: "",
+      max_price: "",
+    }));
   }
 
   async function handleLoadRecommendations(e) {
@@ -421,6 +481,29 @@ function Business() {
     color: "#334155",
     background: "#f9fafb",
     cursor: "pointer",
+  };
+
+  const fieldLabel = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#334155",
+    marginBottom: 4,
+    display: "block",
+  };
+
+  const fieldHelp = {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 4,
+  };
+
+  const helpCard = {
+    border: "1px solid #e2e8f0",
+    borderRadius: 10,
+    background: "#f8fafc",
+    padding: 10,
+    fontSize: 12,
+    color: "#334155",
   };
 
   return (
@@ -1004,71 +1087,168 @@ function Business() {
                   maxWidth={640}
                 >
                 <form onSubmit={handleSaveRevenueRule} style={{ display: "grid", gap: 8 }}>
-                  <input
-                    style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                    value={ruleForm.name}
-                    onChange={(e) => setRuleForm((s) => ({ ...s, name: e.target.value }))}
-                    placeholder="Nome regola"
-                    required
-                  />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={helpCard}>
+                    Il motore valuta le regole in ordine di priorita crescente (10 prima di 50).
+                    Appena trova la prima regola compatibile, applica quella e si ferma.
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button type="button" style={smallButton} onClick={() => applyRulePreset("last_minute")}>
+                      Preset Last minute
+                    </button>
+                    <button type="button" style={smallButton} onClick={() => applyRulePreset("early_bird")}>
+                      Preset Early bird
+                    </button>
+                    <button type="button" style={smallButton} onClick={() => applyRulePreset("neutral")}>
+                      Reset valori
+                    </button>
+                  </div>
+
+                  <div>
+                    <label style={fieldLabel}>Nome regola</label>
                     <input
-                      type="number"
                       style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.adjustment_percent}
-                      onChange={(e) =>
-                        setRuleForm((s) => ({ ...s, adjustment_percent: e.target.value }))
-                      }
-                      placeholder="Adjustment %"
-                    />
-                    <input
-                      type="number"
-                      style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.priority}
-                      onChange={(e) => setRuleForm((s) => ({ ...s, priority: e.target.value }))}
-                      placeholder="Priority"
+                      value={ruleForm.name}
+                      onChange={(e) => setRuleForm((s) => ({ ...s, name: e.target.value }))}
+                      placeholder="Es. Last minute boost"
+                      required
                     />
                   </div>
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <label style={fieldLabel}>Adjustment %</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.adjustment_percent}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, adjustment_percent: e.target.value }))
+                        }
+                        placeholder="+12 o -8"
+                      />
+                      <div style={fieldHelp}>Aumento o riduzione percentuale sul prezzo base.</div>
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>Priority</label>
+                      <input
+                        type="number"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.priority}
+                        onChange={(e) => setRuleForm((s) => ({ ...s, priority: e.target.value }))}
+                        placeholder="10, 50, 100"
+                      />
+                      <div style={fieldHelp}>Numero piu basso = regola valutata prima.</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <label style={fieldLabel}>Occupazione minima %</label>
+                      <input
+                        type="number"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.min_occupancy_percent}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, min_occupancy_percent: e.target.value }))
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>Occupazione massima %</label>
+                      <input
+                        type="number"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.max_occupancy_percent}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, max_occupancy_percent: e.target.value }))
+                        }
+                        placeholder="100"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <label style={fieldLabel}>Lead days minimi</label>
+                      <input
+                        type="number"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.min_lead_days}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, min_lead_days: e.target.value }))
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>Lead days massimi</label>
+                      <input
+                        type="number"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.max_lead_days}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, max_lead_days: e.target.value }))
+                        }
+                        placeholder="365"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <label style={fieldLabel}>Prezzo minimo (opzionale)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.min_price}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, min_price: e.target.value }))
+                        }
+                        placeholder="Es. 60"
+                      />
+                    </div>
+                    <div>
+                      <label style={fieldLabel}>Prezzo massimo (opzionale)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
+                        value={ruleForm.max_price}
+                        onChange={(e) =>
+                          setRuleForm((s) => ({ ...s, max_price: e.target.value }))
+                        }
+                        placeholder="Es. 180"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={fieldLabel}>Note interne</label>
                     <input
-                      type="number"
                       style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.min_occupancy_percent}
-                      onChange={(e) =>
-                        setRuleForm((s) => ({ ...s, min_occupancy_percent: e.target.value }))
-                      }
-                      placeholder="Min occupancy %"
-                    />
-                    <input
-                      type="number"
-                      style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.max_occupancy_percent}
-                      onChange={(e) =>
-                        setRuleForm((s) => ({ ...s, max_occupancy_percent: e.target.value }))
-                      }
-                      placeholder="Max occupancy %"
+                      value={ruleForm.notes}
+                      onChange={(e) => setRuleForm((s) => ({ ...s, notes: e.target.value }))}
+                      placeholder="Quando usare questa regola"
                     />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+
+                  <label style={{ fontSize: 12, color: "#334155" }}>
                     <input
-                      type="number"
-                      style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.min_lead_days}
-                      onChange={(e) =>
-                        setRuleForm((s) => ({ ...s, min_lead_days: e.target.value }))
-                      }
-                      placeholder="Min lead days"
-                    />
-                    <input
-                      type="number"
-                      style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
-                      value={ruleForm.max_lead_days}
-                      onChange={(e) =>
-                        setRuleForm((s) => ({ ...s, max_lead_days: e.target.value }))
-                      }
-                      placeholder="Max lead days"
-                    />
+                      type="checkbox"
+                      checked={ruleForm.is_active}
+                      onChange={(e) => setRuleForm((s) => ({ ...s, is_active: e.target.checked }))}
+                    />{" "}
+                    Regola attiva
+                  </label>
+
+                  <div style={helpCard}>
+                    Formula: suggerita = prezzo base x (1 + adjustment/100). Poi applica eventuale
+                    limite minimo o massimo prezzo.
                   </div>
+
                   <button type="submit" style={smallButton} disabled={rulesLoading}>
                     {ruleForm.id ? "Aggiorna regola" : "Aggiungi regola"}
                   </button>
@@ -1111,7 +1291,14 @@ function Business() {
                         }
                       }
                     >
-                      {r.name} · {Number(r.adjustment_percent || 0).toFixed(2)}%
+                      <div style={{ fontWeight: 600 }}>
+                        {r.name} - {Number(r.adjustment_percent || 0).toFixed(2)}%
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                        prio {r.priority} - occ {Number(r.min_occupancy_percent || 0)}-
+                        {Number(r.max_occupancy_percent || 100)}% - lead {r.min_lead_days}-
+                        {r.max_lead_days}g
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -1121,6 +1308,10 @@ function Business() {
                   style={{ marginTop: 12, display: "grid", gap: 8 }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 600 }}>Suggerimenti tariffari</div>
+                  <div style={{ ...fieldHelp, marginTop: -2 }}>
+                    Il motore prende il prezzo base da Pricing, applica la prima regola valida per
+                    quella data e restituisce la tariffa suggerita.
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                     <input
                       type="date"
@@ -1161,8 +1352,9 @@ function Business() {
                   ) : (
                     rateRecommendations.map((it) => (
                       <div key={it.date} style={{ marginBottom: 6 }}>
-                        {it.date} · base {Number(it.base_rate).toFixed(2)}€ · suggerita{" "}
-                        {Number(it.suggested_rate).toFixed(2)}€ ·{" "}
+                        {it.date} - occ {Number(it.occupancy_percent).toFixed(1)}% - lead{" "}
+                        {it.lead_days}g - base {Number(it.base_rate).toFixed(2)}EUR - suggerita{" "}
+                        {Number(it.suggested_rate).toFixed(2)}EUR -{" "}
                         {it.applied_rule_name || "no-rule"}
                       </div>
                     ))
@@ -1190,38 +1382,56 @@ function Business() {
                     Servono per calcolare fee reali, ritardi payout e performance netta per canale
                     dentro KPI e report.
                   </p>
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 10,
-                      background: "#f8fafc",
-                      padding: 10,
-                    }}
-                  >
-                    Esempio: canale `airbnb`, commissione `15`, payout delay `3`. Il sistema
-                    sottrae la fee da ogni booking Airbnb e mostra il netto nella Business.
+                  <div>
+                    <strong>Significato campi</strong>
+                    <ul style={{ margin: "6px 0 0 16px", display: "grid", gap: 4 }}>
+                      <li>`channel`: OTA o canale diretto (airbnb, booking, direct, ecc.).</li>
+                      <li>`listing external id`: id annuncio sul canale (facoltativo).</li>
+                      <li>`commission %`: commissione applicata sui ricavi lordi.</li>
+                      <li>`payout delay days`: giorni medi di ritardo incasso.</li>
+                      <li>`sync attiva`: pronto per integrazione/sincronizzazione automatica.</li>
+                    </ul>
+                  </div>
+                  <div style={helpCard}>
+                    Esempio: canale airbnb, commissione 15, payout delay 3. Su una prenotazione da
+                    100 EUR il sistema stima fee 15 EUR e ricavo netto 85 EUR.
                   </div>
                 </div>
               ) : (
                 <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
-                  <p>
-                    Le Revenue Rules regolano in automatico il prezzo suggerito in base a
-                    occupazione, anticipo prenotazione e priorita della regola.
-                  </p>
-                  <p>
-                    Rate Suggestions applica queste regole su un periodo e ti propone una tariffa
-                    consigliata per ogni data.
-                  </p>
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 10,
-                      background: "#f8fafc",
-                      padding: 10,
-                    }}
-                  >
-                    Esempio: se occupazione e alta e lead days e basso, regola `+12%` con priorita
-                    alta. Il motore suggerisce un prezzo piu alto rispetto alla base.
+                  <div style={helpCard}>
+                    Obiettivo: automatizzare i suggerimenti prezzo senza aggiornare ogni data a
+                    mano.
+                  </div>
+                  <div>
+                    <strong>Workflow rapido</strong>
+                    <ol style={{ margin: "6px 0 0 16px", display: "grid", gap: 4 }}>
+                      <li>Crea regole con range occupazione e lead days.</li>
+                      <li>Imposta la priorita (numero piu basso = applicata prima).</li>
+                      <li>Definisci adjustment positivo/negativo e limiti prezzo opzionali.</li>
+                      <li>Usa "Suggerimenti tariffari" per vedere l'output giorno per giorno.</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <strong>Significato campi</strong>
+                    <ul style={{ margin: "6px 0 0 16px", display: "grid", gap: 4 }}>
+                      <li>`priority`: ordine con cui le regole vengono provate.</li>
+                      <li>`min/max occupancy`: percentuale occupazione per attivare la regola.</li>
+                      <li>`min/max lead days`: giorni mancanti al check-in per attivarla.</li>
+                      <li>`adjustment %`: variazione sul prezzo base (es. +12 o -8).</li>
+                      <li>`min/max price`: blocco finale minimo/massimo opzionale.</li>
+                    </ul>
+                  </div>
+                  <div style={helpCard}>
+                    Esempio completo:
+                    <br />
+                    Regola A "Last minute boost": priority 30, occupancy 70-100, lead 0-3,
+                    adjustment +12.
+                    <br />
+                    Regola B "Early bird promo": priority 60, occupancy 0-45, lead 21-365,
+                    adjustment -8.
+                    <br />
+                    Se oggi mancano 2 giorni al check-in e occupazione e 85%, passa la regola A.
                   </div>
                 </div>
               )}

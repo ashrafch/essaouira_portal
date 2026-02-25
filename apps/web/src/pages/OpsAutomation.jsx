@@ -30,6 +30,7 @@ function OpsAutomation() {
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistTitle, setChecklistTitle] = useState("");
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isTemplateInfoOpen, setIsTemplateInfoOpen] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -155,6 +156,14 @@ function OpsAutomation() {
     fontWeight: 600,
   };
 
+  const infoButton = {
+    ...button,
+    width: 24,
+    height: 24,
+    padding: 0,
+    color: "#0f172a",
+  };
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div>
@@ -169,7 +178,17 @@ function OpsAutomation() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <section style={card}>
-          <h2 style={{ marginTop: 0, fontSize: 14 }}>Template messaggi</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h2 style={{ marginTop: 0, marginBottom: 0, fontSize: 14 }}>Template messaggi</h2>
+            <button
+              type="button"
+              style={infoButton}
+              aria-label="Info template messaggi"
+              onClick={() => setIsTemplateInfoOpen(true)}
+            >
+              i
+            </button>
+          </div>
           <button
             type="button"
             style={button}
@@ -184,6 +203,10 @@ function OpsAutomation() {
             maxWidth={620}
           >
           <form onSubmit={handleSaveTemplate} style={{ display: "grid", gap: 8 }}>
+            <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10, fontSize: 12, color: "#334155" }}>
+              Trigger + offset decidono quando il messaggio viene schedulato rispetto al check-in o check-out.
+              Esempio: offset -24 invia 24 ore prima.
+            </div>
             <input
               style={input}
               value={templateForm.name}
@@ -229,6 +252,28 @@ function OpsAutomation() {
               {templateForm.id ? "Aggiorna template" : "Crea template"}
             </button>
           </form>
+          </AppModal>
+          <AppModal
+            open={isTemplateInfoOpen}
+            onClose={() => setIsTemplateInfoOpen(false)}
+            title="Come usare i template messaggi"
+            maxWidth={640}
+          >
+            <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+              <div>
+                <strong>Campi principali</strong>
+                <ul style={{ margin: "6px 0 0 16px", display: "grid", gap: 4 }}>
+                  <li>`trigger_type`: evento di riferimento (checkin o checkout).</li>
+                  <li>`offset_hours`: ore rispetto al trigger (negativo = prima, positivo = dopo).</li>
+                  <li>`subject`: usato per canale email.</li>
+                  <li>`body`: contenuto del messaggio inviato al cliente.</li>
+                </ul>
+              </div>
+              <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+                Esempio: trigger `checkin`, offset `-24`, body "Domani ti aspettiamo dalle 15:00..."
+                ; invio automatico il giorno prima del check-in.
+              </div>
+            </div>
           </AppModal>
 
           <div style={{ marginTop: 10, fontSize: 12 }}>
