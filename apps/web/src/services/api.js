@@ -130,6 +130,38 @@ export function createBookingInvoice(bookingId, payload = {}) {
   return apiPost(`/bookings/${bookingId}/invoice`, payload);
 }
 
+export function getMessageTemplates() {
+  return apiGet("/message-templates");
+}
+
+export function createMessageTemplate(payload) {
+  return apiPost("/message-templates", payload);
+}
+
+export function updateMessageTemplate(id, payload) {
+  return apiPut(`/message-templates/${id}`, payload);
+}
+
+export function getMessageJobs(params = {}) {
+  return apiGet("/message-jobs", params);
+}
+
+export function updateMessageJobStatus(id, payload) {
+  return apiPut(`/message-jobs/${id}/status`, payload);
+}
+
+export function getTaskChecklist(taskId) {
+  return apiGet(`/staff-tasks/${taskId}/checklist`);
+}
+
+export function createTaskChecklistItem(taskId, payload) {
+  return apiPost(`/staff-tasks/${taskId}/checklist`, payload);
+}
+
+export function updateTaskChecklistItem(taskId, itemId, payload) {
+  return apiPut(`/staff-tasks/${taskId}/checklist/${itemId}`, payload);
+}
+
 /**
  * Calendario/schedule per singola unità
  * params può contenere: { from_date: "2025-11-01", to_date: "2025-11-30" }

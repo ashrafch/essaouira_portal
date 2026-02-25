@@ -91,6 +91,11 @@ Sales core (Fase 1):
 - pagamenti prenotazione: `GET/POST /bookings/{id}/payments`
 - fatture: `GET /invoices`, `POST /bookings/{id}/invoice`
 
+Ops automation (Fase 2):
+- template messaggi: `GET/POST/PUT /message-templates`
+- coda invii: `GET /message-jobs`, `PUT /message-jobs/{id}/status`
+- checklist housekeeping per task: `GET/POST/PUT /staff-tasks/{id}/checklist...`
+
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
 - registrazione automatica write operations su risorse core

@@ -35,7 +35,10 @@ from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
 from app.models.audit_log import AuditLog
 from app.models.guest_profile import GuestProfile
+from app.models.housekeeping_checklist_item import HousekeepingChecklistItem
 from app.models.invoice_document import InvoiceDocument
+from app.models.message_job import MessageJob
+from app.models.message_template import MessageTemplate
 from app.models.payment_transaction import PaymentTransaction
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
@@ -670,6 +673,77 @@ class InvoiceOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MessageTemplateBase(BaseModel):
+    name: str
+    trigger_type: str
+    offset_hours: int = -24
+    channel: str = "email"
+    subject: str | None = None
+    body: str
+    is_active: bool = True
+
+
+class MessageTemplateCreate(MessageTemplateBase):
+    pass
+
+
+class MessageTemplateUpdate(MessageTemplateBase):
+    pass
+
+
+class MessageTemplateOut(MessageTemplateBase):
+    id: int
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MessageJobOut(BaseModel):
+    id: int
+    booking_id: int
+    template_id: int
+    channel: str
+    recipient: str | None = None
+    scheduled_at: datetime
+    status: str
+    payload: str | None = None
+    error_message: str | None = None
+    sent_at: datetime | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MessageJobStatusUpdate(BaseModel):
+    status: str
+    error_message: str | None = None
+
+
+class ChecklistItemCreate(BaseModel):
+    title: str
+    notes: str | None = None
+    photo_url: str | None = None
+
+
+class ChecklistItemUpdate(BaseModel):
+    is_done: bool | None = None
+    notes: str | None = None
+    photo_url: str | None = None
+
+
+class ChecklistItemOut(BaseModel):
+    id: int
+    staff_task_id: int
+    title: str
+    is_done: bool
+    done_at: datetime | None = None
+    notes: str | None = None
+    photo_url: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ---------- HELPERS: TIME, DEFAULTS & LOGIC ----------
 
 def _parse_time_str(value: str | None) -> Optional[time]:
@@ -756,6 +830,42 @@ def _next_invoice_number(db: Session) -> str:
         .count()
     )
     return f"{year_prefix}{count + 1:05d}"
+
+
+def _schedule_message_jobs_for_booking(db: Session, booking: Booking):
+    db.query(MessageJob).filter(
+        MessageJob.booking_id == booking.id,
+        MessageJob.status == "scheduled",
+    ).delete(synchronize_session=False)
+
+    templates = db.query(MessageTemplate).filter(MessageTemplate.is_active.is_(True)).all()
+    for tmpl in templates:
+        if tmpl.trigger_type == "checkin":
+            base_dt = datetime.combine(booking.checkin_date, time(15, 0), tzinfo=timezone.utc)
+        elif tmpl.trigger_type == "checkout":
+            base_dt = datetime.combine(booking.checkout_date, time(10, 0), tzinfo=timezone.utc)
+        else:
+            continue
+
+        scheduled_at = base_dt + timedelta(hours=int(tmpl.offset_hours or 0))
+        recipient = booking.guest_email or booking.guest_phone
+        payload = {
+            "guest_name": booking.guest_name,
+            "checkin_date": str(booking.checkin_date),
+            "checkout_date": str(booking.checkout_date),
+            "unit_id": booking.unit_id,
+        }
+        job = MessageJob(
+            booking_id=booking.id,
+            template_id=tmpl.id,
+            channel=tmpl.channel,
+            recipient=recipient,
+            scheduled_at=scheduled_at,
+            status="scheduled",
+            payload=str(payload),
+        )
+        db.add(job)
+    db.commit()
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -1036,6 +1146,7 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
 
     _upsert_guest_profile_from_booking(db, booking)
     _create_auto_staff_tasks_for_booking(db, booking)
+    _schedule_message_jobs_for_booking(db, booking)
 
     return booking
 
@@ -1135,6 +1246,7 @@ def update_booking(
 
     _upsert_guest_profile_from_booking(db, booking)
     _create_auto_staff_tasks_for_booking(db, booking)
+    _schedule_message_jobs_for_booking(db, booking)
 
     return booking
 
@@ -1259,6 +1371,144 @@ def create_booking_invoice(
     db.commit()
     db.refresh(invoice)
     return invoice
+
+
+@app.get("/message-templates", response_model=list[MessageTemplateOut])
+def list_message_templates(db: Session = Depends(get_db)):
+    return db.query(MessageTemplate).order_by(MessageTemplate.created_at.desc()).all()
+
+
+@app.post("/message-templates", response_model=MessageTemplateOut)
+def create_message_template(payload: MessageTemplateCreate, db: Session = Depends(get_db)):
+    tmpl = MessageTemplate(
+        name=payload.name,
+        trigger_type=payload.trigger_type,
+        offset_hours=payload.offset_hours,
+        channel=payload.channel,
+        subject=payload.subject,
+        body=payload.body,
+        is_active=payload.is_active,
+    )
+    db.add(tmpl)
+    db.commit()
+    db.refresh(tmpl)
+    return tmpl
+
+
+@app.put("/message-templates/{template_id}", response_model=MessageTemplateOut)
+def update_message_template(
+    template_id: int,
+    payload: MessageTemplateUpdate,
+    db: Session = Depends(get_db),
+):
+    tmpl = db.query(MessageTemplate).filter(MessageTemplate.id == template_id).first()
+    if not tmpl:
+        raise HTTPException(status_code=404, detail="Template non trovato")
+    tmpl.name = payload.name
+    tmpl.trigger_type = payload.trigger_type
+    tmpl.offset_hours = payload.offset_hours
+    tmpl.channel = payload.channel
+    tmpl.subject = payload.subject
+    tmpl.body = payload.body
+    tmpl.is_active = payload.is_active
+    db.commit()
+    db.refresh(tmpl)
+    return tmpl
+
+
+@app.get("/message-jobs", response_model=list[MessageJobOut])
+def list_message_jobs(
+    db: Session = Depends(get_db),
+    status: str | None = None,
+    limit: int = Query(default=200, ge=1, le=2000),
+):
+    q = db.query(MessageJob).order_by(MessageJob.scheduled_at.desc())
+    if status:
+        q = q.filter(MessageJob.status == status)
+    return q.limit(limit).all()
+
+
+@app.put("/message-jobs/{job_id}/status", response_model=MessageJobOut)
+def update_message_job_status(
+    job_id: int,
+    payload: MessageJobStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    job = db.query(MessageJob).filter(MessageJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Message job non trovato")
+    job.status = payload.status
+    job.error_message = payload.error_message
+    if payload.status == "sent":
+        job.sent_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+@app.get("/staff-tasks/{task_id}/checklist", response_model=list[ChecklistItemOut])
+def list_task_checklist(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task non trovato")
+    return (
+        db.query(HousekeepingChecklistItem)
+        .filter(HousekeepingChecklistItem.staff_task_id == task_id)
+        .order_by(HousekeepingChecklistItem.created_at)
+        .all()
+    )
+
+
+@app.post("/staff-tasks/{task_id}/checklist", response_model=ChecklistItemOut)
+def create_task_checklist_item(
+    task_id: int, payload: ChecklistItemCreate, db: Session = Depends(get_db)
+):
+    task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task non trovato")
+    item = HousekeepingChecklistItem(
+        staff_task_id=task_id,
+        title=payload.title,
+        notes=payload.notes,
+        photo_url=payload.photo_url,
+        is_done=False,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.put("/staff-tasks/{task_id}/checklist/{item_id}", response_model=ChecklistItemOut)
+def update_task_checklist_item(
+    task_id: int,
+    item_id: int,
+    payload: ChecklistItemUpdate,
+    db: Session = Depends(get_db),
+):
+    task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task non trovato")
+    item = (
+        db.query(HousekeepingChecklistItem)
+        .filter(
+            HousekeepingChecklistItem.id == item_id,
+            HousekeepingChecklistItem.staff_task_id == task_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item non trovato")
+    if payload.is_done is not None:
+        item.is_done = payload.is_done
+        item.done_at = datetime.now(timezone.utc) if payload.is_done else None
+    if payload.notes is not None:
+        item.notes = payload.notes
+    if payload.photo_url is not None:
+        item.photo_url = payload.photo_url
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 # ---------- UNIT SCHEDULE (TIMELINE SINGOLA UNITÀ) ----------

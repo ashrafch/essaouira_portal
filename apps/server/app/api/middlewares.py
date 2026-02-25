@@ -36,6 +36,8 @@ WRITE_PROTECTED_PREFIXES = (
     "/users",
     "/audit-logs",
     "/platform/tenants",
+    "/message-templates",
+    "/message-jobs",
 )
 
 
