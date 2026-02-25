@@ -1,6 +1,9 @@
 import os
 import csv
 import io
+import json
+import re
+from urllib.parse import quote
 from contextlib import asynccontextmanager
 from datetime import date, timedelta, time, datetime, timezone
 from typing import Optional, Dict, List
@@ -721,6 +724,25 @@ class MessageJobStatusUpdate(BaseModel):
     error_message: str | None = None
 
 
+class MessageRenderRequest(BaseModel):
+    booking_id: int
+    template_id: int
+    channel: str | None = None
+    subject_override: str | None = None
+    body_override: str | None = None
+
+
+class MessageRenderOut(BaseModel):
+    booking_id: int
+    template_id: int
+    channel: str
+    recipient: str | None = None
+    subject: str | None = None
+    body: str
+    whatsapp_url: str | None = None
+    context: dict[str, str]
+
+
 class ChecklistItemCreate(BaseModel):
     title: str
     notes: str | None = None
@@ -927,24 +949,121 @@ def _schedule_message_jobs_for_booking(db: Session, booking: Booking):
             continue
 
         scheduled_at = base_dt + timedelta(hours=int(tmpl.offset_hours or 0))
-        recipient = booking.guest_email or booking.guest_phone
-        payload = {
-            "guest_name": booking.guest_name,
-            "checkin_date": str(booking.checkin_date),
-            "checkout_date": str(booking.checkout_date),
-            "unit_id": booking.unit_id,
-        }
+        render_data = _render_message_data(db, booking, tmpl)
         job = MessageJob(
             booking_id=booking.id,
             template_id=tmpl.id,
-            channel=tmpl.channel,
-            recipient=recipient,
+            channel=render_data["channel"],
+            recipient=render_data["recipient"],
             scheduled_at=scheduled_at,
             status="scheduled",
-            payload=str(payload),
+            payload=json.dumps(
+                {
+                    "subject": render_data["subject"],
+                    "body": render_data["body"],
+                    "context": render_data["context"],
+                },
+                ensure_ascii=False,
+            ),
         )
         db.add(job)
     db.commit()
+
+
+_PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\{([a-zA-Z0-9_]+)\}")
+
+
+def _format_iso_to_it(value: date | None) -> str:
+    if not value:
+        return ""
+    return value.strftime("%d/%m/%Y")
+
+
+def _sanitize_phone_for_whatsapp(value: str | None) -> str | None:
+    if not value:
+        return None
+    digits = "".join(ch for ch in value if ch.isdigit())
+    return digits or None
+
+
+def _build_message_context(db: Session, booking: Booking) -> dict[str, str]:
+    unit_name = ""
+    if booking.unit_id:
+        unit = db.query(Unit).filter(Unit.id == booking.unit_id).first()
+        unit_name = unit.name if unit else f"Unit #{booking.unit_id}"
+
+    nights = max((booking.checkout_date - booking.checkin_date).days, 0)
+    return {
+        "booking_id": str(booking.id),
+        "guest_name": booking.guest_name or "Ospite",
+        "guest_email": booking.guest_email or "",
+        "guest_phone": booking.guest_phone or "",
+        "unit_id": str(booking.unit_id or ""),
+        "unit_name": unit_name,
+        "source": booking.source or "",
+        "checkin_date": str(booking.checkin_date),
+        "checkout_date": str(booking.checkout_date),
+        "checkin_date_it": _format_iso_to_it(booking.checkin_date),
+        "checkout_date_it": _format_iso_to_it(booking.checkout_date),
+        "nights": str(nights),
+        "currency": booking.currency or "EUR",
+        "total_price": str(booking.total_price or ""),
+    }
+
+
+def _render_text_with_context(text: str | None, context: dict[str, str]) -> str:
+    source = text or ""
+
+    def replace(match):
+        key = match.group(1) or match.group(2)
+        return context.get(key, "")
+
+    return _PLACEHOLDER_PATTERN.sub(replace, source)
+
+
+def _build_whatsapp_url(recipient: str | None, body: str) -> str | None:
+    phone = _sanitize_phone_for_whatsapp(recipient)
+    if not phone:
+        return None
+    return f"https://wa.me/{phone}?text={quote(body)}"
+
+
+def _resolve_recipient_for_channel(booking: Booking, channel: str) -> str | None:
+    if channel in {"whatsapp", "sms"}:
+        return booking.guest_phone or booking.guest_email
+    return booking.guest_email or booking.guest_phone
+
+
+def _render_message_data(
+    db: Session,
+    booking: Booking,
+    tmpl: MessageTemplate,
+    channel_override: str | None = None,
+    subject_override: str | None = None,
+    body_override: str | None = None,
+) -> dict[str, str | None | dict[str, str]]:
+    channel = channel_override or tmpl.channel or "email"
+    context = _build_message_context(db, booking)
+    rendered_subject = _render_text_with_context(
+        subject_override if subject_override is not None else tmpl.subject,
+        context,
+    )
+    rendered_body = _render_text_with_context(
+        body_override if body_override is not None else tmpl.body,
+        context,
+    )
+    recipient = _resolve_recipient_for_channel(booking, channel)
+    whatsapp_url = _build_whatsapp_url(recipient, rendered_body) if channel == "whatsapp" else None
+    return {
+        "booking_id": booking.id,
+        "template_id": tmpl.id,
+        "channel": channel,
+        "recipient": recipient,
+        "subject": rendered_subject or None,
+        "body": rendered_body,
+        "whatsapp_url": whatsapp_url,
+        "context": context,
+    }
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -1543,6 +1662,25 @@ def update_message_template(
     return tmpl
 
 
+@app.post("/message-templates/render", response_model=MessageRenderOut)
+def render_message_template(payload: MessageRenderRequest, db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.id == payload.booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+    tmpl = db.query(MessageTemplate).filter(MessageTemplate.id == payload.template_id).first()
+    if not tmpl:
+        raise HTTPException(status_code=404, detail="Template non trovato")
+    rendered = _render_message_data(
+        db,
+        booking,
+        tmpl,
+        channel_override=payload.channel,
+        subject_override=payload.subject_override,
+        body_override=payload.body_override,
+    )
+    return MessageRenderOut(**rendered)
+
+
 @app.get("/message-jobs", response_model=list[MessageJobOut])
 def list_message_jobs(
     db: Session = Depends(get_db),
@@ -1571,6 +1709,94 @@ def update_message_job_status(
     db.commit()
     db.refresh(job)
     return job
+
+
+@app.post("/message-jobs/{job_id}/dispatch", response_model=MessageRenderOut)
+def dispatch_message_job(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(MessageJob).filter(MessageJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Message job non trovato")
+
+    booking = db.query(Booking).filter(Booking.id == job.booking_id).first()
+    if not booking:
+        job.status = "failed"
+        job.error_message = "Prenotazione non trovata"
+        db.commit()
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+
+    tmpl = db.query(MessageTemplate).filter(MessageTemplate.id == job.template_id).first()
+    if not tmpl:
+        job.status = "failed"
+        job.error_message = "Template non trovato"
+        db.commit()
+        raise HTTPException(status_code=404, detail="Template non trovato")
+
+    rendered = _render_message_data(db, booking, tmpl, channel_override=job.channel)
+    if not rendered["recipient"]:
+        job.status = "failed"
+        job.error_message = "Destinatario mancante"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Destinatario mancante")
+
+    job.status = "sent"
+    job.error_message = None
+    job.sent_at = datetime.now(timezone.utc)
+    job.payload = json.dumps(
+        {
+            "subject": rendered["subject"],
+            "body": rendered["body"],
+            "context": rendered["context"],
+            "whatsapp_url": rendered["whatsapp_url"],
+        },
+        ensure_ascii=False,
+    )
+    db.commit()
+    return MessageRenderOut(**rendered)
+
+
+@app.post("/messages/send-now", response_model=MessageRenderOut)
+def send_message_now(payload: MessageRenderRequest, db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.id == payload.booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+    tmpl = db.query(MessageTemplate).filter(MessageTemplate.id == payload.template_id).first()
+    if not tmpl:
+        raise HTTPException(status_code=404, detail="Template non trovato")
+
+    rendered = _render_message_data(
+        db,
+        booking,
+        tmpl,
+        channel_override=payload.channel,
+        subject_override=payload.subject_override,
+        body_override=payload.body_override,
+    )
+    if not rendered["recipient"]:
+        raise HTTPException(status_code=400, detail="Destinatario mancante")
+
+    now = datetime.now(timezone.utc)
+    job = MessageJob(
+        booking_id=booking.id,
+        template_id=tmpl.id,
+        channel=rendered["channel"],
+        recipient=rendered["recipient"],
+        scheduled_at=now,
+        status="sent",
+        sent_at=now,
+        payload=json.dumps(
+            {
+                "subject": rendered["subject"],
+                "body": rendered["body"],
+                "context": rendered["context"],
+                "whatsapp_url": rendered["whatsapp_url"],
+                "origin": "manual_send_now",
+            },
+            ensure_ascii=False,
+        ),
+    )
+    db.add(job)
+    db.commit()
+    return MessageRenderOut(**rendered)
 
 
 @app.get("/staff-tasks/{task_id}/checklist", response_model=list[ChecklistItemOut])

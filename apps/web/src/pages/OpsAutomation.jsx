@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+ï»¿import { useEffect, useMemo, useState } from "react";
 import AppModal from "../components/AppModal";
 import PageInfoHelp from "../components/PageInfoHelp";
 import {
   createMessageTemplate,
   createTaskChecklistItem,
+  dispatchMessageJob,
   getMessageJobs,
   getMessageTemplates,
   getStaffTasks,
@@ -214,6 +215,15 @@ function OpsAutomation() {
     }
   }
 
+  async function handleDispatchJob(jobId) {
+    try {
+      await dispatchMessageJob(jobId);
+      await loadAll();
+    } catch (err) {
+      setError(err.message || "Errore invio job");
+    }
+  }
+
   async function handleLoadChecklist(taskId = checklistTaskId) {
     if (!taskId) return;
     try {
@@ -332,6 +342,7 @@ function OpsAutomation() {
         <button type="button" style={panelButton(activePanel === "templates")} onClick={() => setActivePanel("templates")}>Template</button>
         <button type="button" style={panelButton(activePanel === "jobs")} onClick={() => setActivePanel("jobs")}>Message Jobs</button>
         <button type="button" style={panelButton(activePanel === "checklist")} onClick={() => setActivePanel("checklist")}>Checklist</button>
+        <button type="button" style={button} onClick={() => setIsTemplateInfoOpen(true)}>Info template</button>
         <PageInfoHelp title="Cos e Ops Automation" maxWidth={700}>
           <p>Ops Automation coordina comunicazioni e procedure operative post-prenotazione.</p>
           <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
@@ -400,7 +411,7 @@ function OpsAutomation() {
                 >
                   <div style={{ fontWeight: 600 }}>{t.name}</div>
                   <div style={{ color: "#64748b", fontSize: 11 }}>
-                    {t.trigger_type} · {t.offset_hours}h · {t.is_active ? "attivo" : "disattivo"}
+                    {t.trigger_type} Â· {t.offset_hours}h Â· {t.is_active ? "attivo" : "disattivo"}
                   </div>
                 </button>
               ))
@@ -447,8 +458,16 @@ function OpsAutomation() {
                     background: "#fff",
                   }}
                 >
-                  <div>#{j.id} · booking #{j.booking_id} · {j.channel} · <strong>{j.status}</strong></div>
+                  <div>#{j.id} Â· booking #{j.booking_id} Â· {j.channel} Â· <strong>{j.status}</strong></div>
                   <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      style={button}
+                      onClick={() => handleDispatchJob(j.id)}
+                      disabled={j.status !== "scheduled"}
+                    >
+                      Esegui adesso
+                    </button>
                     <button type="button" style={button} onClick={() => handleUpdateJobStatus(j.id, "scheduled")}>scheduled</button>
                     <button type="button" style={button} onClick={() => handleUpdateJobStatus(j.id, "sent")}>sent</button>
                     <button type="button" style={button} onClick={() => handleUpdateJobStatus(j.id, "failed")}>failed</button>
@@ -578,19 +597,33 @@ function OpsAutomation() {
               onChange={(e) => setTemplateForm((s) => ({ ...s, offset_hours: e.target.value }))}
               placeholder="Offset ore"
             />
-            <input
+            <select
               style={input}
-              value={templateForm.subject}
-              onChange={(e) => setTemplateForm((s) => ({ ...s, subject: e.target.value }))}
-              placeholder="Subject"
-            />
+              value={templateForm.channel}
+              onChange={(e) => setTemplateForm((s) => ({ ...s, channel: e.target.value }))}
+            >
+              <option value="whatsapp">whatsapp</option>
+              <option value="email">email</option>
+              <option value="sms">sms</option>
+            </select>
+          </div>
+
+          <input
+            style={input}
+            value={templateForm.subject}
+            onChange={(e) => setTemplateForm((s) => ({ ...s, subject: e.target.value }))}
+            placeholder="Subject (opzionale)"
+          />
+
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10, fontSize: 12, color: "#334155" }}>
+            Placeholder utili: {`{{guest_name}}`}, {`{{unit_name}}`}, {`{{checkin_date_it}}`}, {`{{checkout_date_it}}`}, {`{{nights}}`}, {`{{total_price}}`}, {`{{currency}}`}.
           </div>
 
           <textarea
             style={{ ...input, minHeight: 90, resize: "vertical" }}
             value={templateForm.body}
             onChange={(e) => setTemplateForm((s) => ({ ...s, body: e.target.value }))}
-            placeholder="Body messaggio"
+            placeholder="Body messaggio (supporta placeholder)"
             required
           />
 
@@ -616,13 +649,20 @@ function OpsAutomation() {
         maxWidth={660}
       >
         <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+          <p style={{ margin: 0 }}>
+            I template creati qui vengono usati in 3 modi: 1) schedulazione automatica sui booking, 2) invio manuale da Arrivi/Partenze, 3) dispatch dalla coda Message Jobs.
+          </p>
           <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
             <li>`trigger_type`: evento di riferimento (checkin/checkout).</li>
             <li>`offset_hours`: ore rispetto al trigger (negativo prima, positivo dopo).</li>
+            <li>`channel`: canale usato per il job (es. whatsapp).</li>
             <li>`subject` e `body`: contenuto effettivo da inviare.</li>
+            <li>
+              Placeholder supportati: <code>{"{{guest_name}}"}</code>, <code>{"{{unit_name}}"}</code>, <code>{"{{checkin_date_it}}"}</code>, <code>{"{{checkout_date_it}}"}</code>, <code>{"{{nights}}"}</code>, <code>{"{{total_price}}"}</code>, <code>{"{{currency}}"}</code>.
+            </li>
           </ul>
           <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
-            Esempio: checkin con offset -24 invia il promemoria un giorno prima del check-in.
+            Esempio pratico body: "Ciao {"{{guest_name}}"}, arrivi il {"{{checkin_date_it}}"} in {"{{unit_name}}"}. Soggiorno di {"{{nights}}"} notti."
           </div>
         </div>
       </AppModal>
@@ -631,3 +671,4 @@ function OpsAutomation() {
 }
 
 export default OpsAutomation;
+

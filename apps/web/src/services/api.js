@@ -150,6 +150,18 @@ export function updateMessageJobStatus(id, payload) {
   return apiPut(`/message-jobs/${id}/status`, payload);
 }
 
+export function renderMessageTemplate(payload) {
+  return apiPost("/message-templates/render", payload);
+}
+
+export function dispatchMessageJob(id) {
+  return apiPost(`/message-jobs/${id}/dispatch`, {});
+}
+
+export function sendMessageNow(payload) {
+  return apiPost("/messages/send-now", payload);
+}
+
 export function getTaskChecklist(taskId) {
   return apiGet(`/staff-tasks/${taskId}/checklist`);
 }

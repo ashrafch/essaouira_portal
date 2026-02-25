@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  getMessageTemplates,
+  renderMessageTemplate,
+  sendMessageNow,
+} from "../services/api";
 
 const overlayStyle = {
   position: "fixed",
@@ -15,18 +20,18 @@ const modalStyle = {
   borderRadius: 16,
   padding: 24,
   width: "100%",
-  maxWidth: 480,
+  maxWidth: 560,
   boxShadow: "0 20px 40px rgba(15,23,42,0.2)",
   display: "flex",
   flexDirection: "column",
-  gap: 16,
+  gap: 14,
 };
 
 const textareaStyle = {
   width: "100%",
-  minHeight: 120,
+  minHeight: 130,
   padding: 12,
-  borderRadius: 8,
+  borderRadius: 10,
   border: "1px solid #d1d5db",
   fontSize: 14,
   fontFamily: "inherit",
@@ -40,12 +45,12 @@ const selectStyle = {
   borderRadius: 8,
   border: "1px solid #d1d5db",
   fontSize: 14,
-  marginBottom: 12,
 };
 
 const footerStyle = {
   display: "flex",
-  justifyContent: "flex-end",
+  justifyContent: "space-between",
+  alignItems: "center",
   gap: 8,
   marginTop: 8,
 };
@@ -74,100 +79,148 @@ const btnSend = {
   gap: 6,
 };
 
-const TEMPLATES = [
-  {
-    id: "welcome",
-    label: "Benvenuto & Posizione",
-    text: `Ciao {guest_name}!\nSiamo felici di accoglierti a Essaouira.\n\nEcco la posizione esatta della struttura:\nhttps://goo.gl/maps/ESEMPIO_POSIZIONE\n\nIl tuo appartamento e: {unit_name}.\nTi aspettiamo per il check-in dalle 15:00.\nA presto!`,
-  },
-  {
-    id: "wifi",
-    label: "Info WiFi",
-    text: `Ciao {guest_name},\necco i dati per il WiFi:\n\nRete: Essaouira_Guest\nPassword: guest2025\n\nSe hai bisogno di altro, siamo a disposizione!`,
-  },
-  {
-    id: "checkout",
-    label: "Istruzioni Check-out",
-    text: `Buongiorno {guest_name},\nsperiamo tu abbia passato un ottimo soggiorno.\n\nTi ricordiamo che il check-out e previsto entro le 10:00.\nPer favore lascia le chiavi sul tavolo o alla reception.\n\nGrazie e buon viaggio!`,
-  },
-  {
-    id: "custom",
-    label: "Messaggio Vuoto",
-    text: "",
-  },
-];
-
-function MessageModal({ isOpen, onClose, booking, unitName }) {
-  const [selectedTemplateId, setSelectedTemplateId] = useState("welcome");
+function MessageModal({ isOpen, onClose, booking, contextTrigger = null }) {
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [compiledMessage, setCompiledMessage] = useState("");
   const [customMessage, setCustomMessage] = useState("");
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [loadingRender, setLoadingRender] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
-  function compileTemplate(text) {
-    if (!text) return "";
-    let compiled = text;
-    compiled = compiled.replace(/{guest_name}/g, booking?.guest_name || "Ospite");
-    compiled = compiled.replace(/{unit_name}/g, unitName || "il tuo appartamento");
-    return compiled;
-  }
+  const visibleTemplates = useMemo(() => {
+    const active = templates.filter((t) => Boolean(t.is_active));
+    if (!contextTrigger) return active;
+    const byTrigger = active.filter((t) => t.trigger_type === contextTrigger);
+    return byTrigger.length > 0 ? byTrigger : active;
+  }, [templates, contextTrigger]);
 
-  const templateMessage = (() => {
-    const tmpl = TEMPLATES.find((t) => t.id === selectedTemplateId);
-    return compileTemplate(tmpl?.text || "");
-  })();
+  const message = customMessage === "" ? compiledMessage : customMessage;
 
-  const message = customMessage === "" ? templateMessage : customMessage;
+  const loadTemplates = useCallback(async () => {
+    if (!isOpen || !booking) return;
+    setLoadingTemplates(true);
+    setError("");
+    try {
+      const data = await getMessageTemplates();
+      const rows = data || [];
+      setTemplates(rows);
+      const activeRows = rows.filter((t) => Boolean(t.is_active));
+      const target = contextTrigger
+        ? activeRows.find((t) => t.trigger_type === contextTrigger) || activeRows[0]
+        : activeRows[0];
+      setSelectedTemplateId(target ? String(target.id) : "");
+    } catch (err) {
+      setError(err.message || "Errore caricando template");
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, [booking, contextTrigger, isOpen]);
 
-  if (!isOpen || !booking) return null;
+  useEffect(() => {
+    if (isOpen && booking) {
+      loadTemplates();
+    }
+  }, [isOpen, booking, loadTemplates]);
 
-  function handleSend() {
-    if (!booking.guest_phone) {
-      alert("Nessun numero di telefono per questo ospite.");
-      return;
+  useEffect(() => {
+    async function loadRenderedBody() {
+      if (!booking || !selectedTemplateId) {
+        setCompiledMessage("");
+        setCustomMessage("");
+        return;
+      }
+      setLoadingRender(true);
+      setError("");
+      try {
+        const rendered = await renderMessageTemplate({
+          booking_id: booking.id,
+          template_id: Number(selectedTemplateId),
+          channel: "whatsapp",
+        });
+        setCompiledMessage(rendered.body || "");
+        setCustomMessage("");
+      } catch (err) {
+        setError(err.message || "Errore rendering template");
+      } finally {
+        setLoadingRender(false);
+      }
     }
 
-    const cleanPhone = booking.guest_phone.replace(/[^0-9+]/g, "");
-    const encodedText = encodeURIComponent(message);
-    const url = `https://wa.me/${cleanPhone}?text=${encodedText}`;
+    if (isOpen) {
+      loadRenderedBody();
+    }
+  }, [selectedTemplateId, booking, isOpen]);
 
-    window.open(url, "_blank");
-    onClose();
+  async function handleSend() {
+    if (!booking || !selectedTemplateId) return;
+    setSending(true);
+    setError("");
+    try {
+      const result = await sendMessageNow({
+        booking_id: booking.id,
+        template_id: Number(selectedTemplateId),
+        channel: "whatsapp",
+        body_override: message,
+      });
+      if (!result.whatsapp_url) {
+        throw new Error("Numero WhatsApp mancante o non valido");
+      }
+      window.open(result.whatsapp_url, "_blank");
+      onClose();
+    } catch (err) {
+      setError(err.message || "Errore invio messaggio");
+    } finally {
+      setSending(false);
+    }
   }
+
+  if (!isOpen || !booking) return null;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div>
           <h2 style={{ fontSize: 18, marginBottom: 4 }}>Invia Messaggio WhatsApp</h2>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
             A: <strong>{booking.guest_name}</strong> ({booking.guest_phone || "Nessun numero"})
           </p>
         </div>
 
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-            Scegli Template
+        {error ? <p style={{ fontSize: 12, color: "#b91c1c", margin: 0 }}>{error}</p> : null}
+
+        <div style={{ display: "grid", gap: 8 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
+            Template Ops Automation
           </label>
           <select
             style={selectStyle}
             value={selectedTemplateId}
-            onChange={(e) => {
-              setSelectedTemplateId(e.target.value);
-              setCustomMessage("");
-            }}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            disabled={loadingTemplates || visibleTemplates.length === 0}
           >
-            {TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
+            {visibleTemplates.length === 0 ? (
+              <option value="">Nessun template disponibile</option>
+            ) : (
+              visibleTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.trigger_type})
+                </option>
+              ))
+            )}
           </select>
+        </div>
 
+        <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-            Anteprima Messaggio (modificabile)
+            Messaggio (puoi modificarlo prima dell invio)
           </label>
           <textarea
             style={textareaStyle}
             value={message}
             onChange={(e) => setCustomMessage(e.target.value)}
+            disabled={loadingRender || !selectedTemplateId}
           />
         </div>
 
@@ -175,8 +228,12 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
           <button style={btnCancel} onClick={onClose}>
             Annulla
           </button>
-          <button style={btnSend} onClick={handleSend} disabled={!booking.guest_phone}>
-            <span>WA</span> Invia su WhatsApp
+          <button
+            style={btnSend}
+            onClick={handleSend}
+            disabled={sending || loadingTemplates || loadingRender || !selectedTemplateId}
+          >
+            {sending ? "Invio..." : "Invia su WhatsApp"}
           </button>
         </div>
       </div>

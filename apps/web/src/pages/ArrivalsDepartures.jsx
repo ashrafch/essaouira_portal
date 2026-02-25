@@ -42,6 +42,7 @@ function ArrivalsDepartures() {
 
   const [messageModalOpen, setMessageModalOpen] = useState(false);
   const [selectedBookingForMessage, setSelectedBookingForMessage] = useState(null);
+  const [messageTriggerType, setMessageTriggerType] = useState(null);
 
   const unitMap = useMemo(
     () =>
@@ -117,8 +118,9 @@ function ArrivalsDepartures() {
     return map;
   }, [staffTasks]);
 
-  function openMessageModal(b) {
+  function openMessageModal(b, triggerType) {
     setSelectedBookingForMessage(b);
+    setMessageTriggerType(triggerType || null);
     setMessageModalOpen(true);
   }
 
@@ -517,7 +519,7 @@ function ArrivalsDepartures() {
                                         border: "1px solid #86efac",
                                         fontSize: 12,
                                     }}
-                                    onClick={() => openMessageModal(b)}
+                                    onClick={() => openMessageModal(b, "checkin")}
                                   >
                                     💬
                                   </button>
@@ -797,7 +799,7 @@ function ArrivalsDepartures() {
                                     border: "1px solid #86efac",
                                     width: 26, height: 26, fontSize: 14
                                   }}
-                                  onClick={() => openMessageModal(b)}
+                                  onClick={() => openMessageModal(b, "checkout")}
                                 >
                                   💬
                                 </button>
@@ -833,9 +835,11 @@ function ArrivalsDepartures() {
               onClose={() => {
                 setMessageModalOpen(false);
                 setSelectedBookingForMessage(null);
+                setMessageTriggerType(null);
               }}
               booking={selectedBookingForMessage}
               unitName={unitMap[selectedBookingForMessage.unit_id]?.name}
+              contextTrigger={messageTriggerType}
             />
           )}
         </>
