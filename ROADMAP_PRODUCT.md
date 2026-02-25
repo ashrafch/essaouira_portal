@@ -9,6 +9,8 @@
 - Tenant onboarding piattaforma (`/platform/tenants` + owner seed): completato
 - Admin UI (`/admin-control`) per audit/compliance/onboarding: completato
 - Compliance policy endpoint pubblico (`/compliance/policy`): completato
+- Release readiness pipeline (quality + migration + backup/restore drill): completato
+- Script operativi restore (`db-restore.sh`) e drill (`backup-restore-drill.sh`): completato
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

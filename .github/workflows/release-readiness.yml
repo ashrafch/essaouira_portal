@@ -1,0 +1,75 @@
+name: Release Readiness
+
+on:
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Backend tests
+        working-directory: apps/server
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+          pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Frontend quality
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+  migration-and-drill:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: essa
+          POSTGRES_USER: essa
+          POSTGRES_PASSWORD: essa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U essa -d essa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg2://essa:essa@localhost:5432/essa
+      PGPASSWORD: essa
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Alembic upgrade
+        working-directory: apps/server
+        run: |
+          pip install -r requirements.txt
+          alembic -c alembic.ini upgrade head
+
+      - name: Install postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Backup/restore drill
+        run: |
+          pg_dump -h localhost -U essa essa | gzip > drill_backup.sql.gz
+          psql -h localhost -U essa -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS essa_restore_drill;"
+          psql -h localhost -U essa -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE essa_restore_drill;"
+          gunzip -c drill_backup.sql.gz | psql -h localhost -U essa -d essa_restore_drill -v ON_ERROR_STOP=1
+          psql -h localhost -U essa -d essa_restore_drill -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"

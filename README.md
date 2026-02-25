@@ -155,6 +155,16 @@ Backup automatico DB:
 - retention default 7 giorni
 - volume: `db_backups`
 
+Restore manuale da backup:
+```bash
+POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_USER=essa POSTGRES_PASSWORD=essa POSTGRES_DB=essa sh scripts/db-restore.sh <file.sql.gz>
+```
+
+Backup/restore drill locale:
+```bash
+sh scripts/backup-restore-drill.sh
+```
+
 Staging compose:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
@@ -163,6 +173,7 @@ docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
 CI/CD:
 - pipeline CI: `.github/workflows/ci.yml`
 - pipeline staging (manual trigger): `.github/workflows/staging.yml`
+- pipeline release readiness (manual trigger): `.github/workflows/release-readiness.yml`
 
 ## Workflow branch
 
