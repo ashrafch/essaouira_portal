@@ -78,7 +78,8 @@ function Staff() {
   const [editingId, setEditingId] = useState(null);
   const [date, setDate] = useState("");
   const [taskType, setTaskType] = useState("cleaning");
-  const [assigneeName, setAssigneeName] = useState("");
+  const [assigneeSelectName, setAssigneeSelectName] = useState("");
+  const [assigneeManualName, setAssigneeManualName] = useState("");
   const [unitId, setUnitId] = useState("");
   const [bookingId, setBookingId] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("");
@@ -99,6 +100,7 @@ function Staff() {
 
   const [quickRole, setQuickRole] = useState("");
   const [quickAssignee, setQuickAssignee] = useState("");
+  const [quickAssigneeManual, setQuickAssigneeManual] = useState("");
 
   // mappa unità
   const unitMap = useMemo(
@@ -409,6 +411,7 @@ function Staff() {
     setQuickNotes("");
     setQuickRole("");
     setQuickAssignee(assignee === "Non assegnato" ? "" : assignee);
+    setQuickAssigneeManual("");
   }
 
   function closeQuickCreate() {
@@ -420,6 +423,7 @@ function Staff() {
     setQuickNotes("");
     setQuickRole("");
     setQuickAssignee("");
+    setQuickAssigneeManual("");
   }
 
   const quickAvailableAssignees = useMemo(() => {
@@ -435,7 +439,9 @@ function Staff() {
     if (!quickCreateTarget) return;
     const { date, assignee } = quickCreateTarget;
     let chosenAssignee = null;
-    if (quickAssignee && quickAssignee !== "Non assegnato") {
+    if (quickAssigneeManual.trim()) {
+      chosenAssignee = quickAssigneeManual.trim();
+    } else if (quickAssignee && quickAssignee !== "Non assegnato") {
       chosenAssignee = quickAssignee;
     } else if (assignee && assignee !== "Non assegnato") {
       chosenAssignee = assignee;
@@ -471,7 +477,8 @@ function Staff() {
     setEditingId(null);
     setDate("");
     setTaskType("cleaning");
-    setAssigneeName("");
+    setAssigneeSelectName("");
+    setAssigneeManualName("");
     setUnitId("");
     setBookingId("");
     setEstimatedHours("");
@@ -486,7 +493,10 @@ function Staff() {
     setEditingId(t.id);
     setDate(t.date || "");
     setTaskType(t.task_type || "cleaning");
-    setAssigneeName(t.assignee_name || "");
+    const existingName = t.assignee_name || "";
+    const isKnownStaff = staffMembers.some((m) => m.name === existingName);
+    setAssigneeSelectName(isKnownStaff ? existingName : "");
+    setAssigneeManualName(isKnownStaff ? "" : existingName);
     setUnitId(t.unit_id ? String(t.unit_id) : "");
     setBookingId(t.booking_id ? String(t.booking_id) : "");
     setEstimatedHours(
@@ -505,10 +515,11 @@ function Staff() {
       return;
     }
 
+    const chosenAssignee = assigneeManualName.trim() || assigneeSelectName || null;
     const payload = {
       date,
       task_type: taskType,
-      assignee_name: assigneeName || null,
+      assignee_name: chosenAssignee,
       estimated_hours: estimatedHours !== "" ? Number(estimatedHours) : null,
       status,
       notes: notes || null,
@@ -1453,6 +1464,7 @@ function Staff() {
                                   onChange={(e) => {
                                     setQuickRole(e.target.value);
                                     setQuickAssignee("");
+                                    setQuickAssigneeManual("");
                                   }}
                                 >
                                   <option value="">
@@ -1486,6 +1498,14 @@ function Staff() {
                                   ))}
                                 </select>
                               </div>
+                              <input
+                                style={inputInline}
+                                value={quickAssigneeManual}
+                                onChange={(e) =>
+                                  setQuickAssigneeManual(e.target.value)
+                                }
+                                placeholder="Oppure inserisci nome manuale"
+                              />
 
                               {/* costi + ore */}
                               <div
@@ -1615,11 +1635,27 @@ function Staff() {
 
               <div style={field}>
                 <label style={label}>Assegnato a</label>
+                <select
+                  style={select}
+                  value={assigneeSelectName}
+                  onChange={(e) => setAssigneeSelectName(e.target.value)}
+                >
+                  <option value="">Seleziona membro staff...</option>
+                  {staffMembers
+                    .filter((m) => m.is_active)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name}
+                        {m.role ? ` (${getRoleLabel(m.role)})` : ""}
+                      </option>
+                    ))}
+                </select>
                 <input
-                  style={input}
-                  value={assigneeName}
-                  onChange={(e) => setAssigneeName(e.target.value)}
-                  placeholder="Nome dello staff"
+                  style={{ ...input, marginTop: 6 }}
+                  value={assigneeManualName}
+                  onChange={(e) => setAssigneeManualName(e.target.value)}
+                  placeholder="Oppure inserisci nome manuale"
                 />
               </div>
 

@@ -6,6 +6,12 @@ import {
   createBooking,
   updateBooking,
   deleteBooking,
+  getBookingPayments,
+  createBookingPayment,
+  createBookingInvoice,
+  getInvoices,
+  getGuests,
+  getGuestBookings,
 } from "../services/api";
 
 function formatDate(d) {
@@ -45,6 +51,23 @@ function Bookings() {
 
   const [formMode, setFormMode] = useState("create"); // "create" | "edit"
   const [editingId, setEditingId] = useState(null);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
+  const [paymentsByBooking, setPaymentsByBooking] = useState({});
+  const [invoiceByBooking, setInvoiceByBooking] = useState({});
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    method: "cash",
+    status: "captured",
+    external_ref: "",
+    notes: "",
+  });
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [invoiceSaving, setInvoiceSaving] = useState(false);
+  const [guestQuery, setGuestQuery] = useState("");
+  const [guestResults, setGuestResults] = useState([]);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [selectedGuest, setSelectedGuest] = useState(null);
+  const [selectedGuestBookings, setSelectedGuestBookings] = useState([]);
 
   // form state
   const [unitId, setUnitId] = useState("");
@@ -84,6 +107,7 @@ function Bookings() {
         const [bks, uns] = await Promise.all([getBookings(), getUnits()]);
         setBookings(bks);
         setUnits(uns);
+        if (bks?.length) setSelectedBookingId(bks[0].id);
         if (uns[0]?.id) {
           setUnitId((prev) => prev || String(uns[0].id));
         }
@@ -203,6 +227,111 @@ function Bookings() {
 
   const shownCount = filteredBookings.length;
   const totalCount = bookings.length;
+  const selectedBooking =
+    bookings.find((b) => b.id === selectedBookingId) || null;
+
+  useEffect(() => {
+    if (filteredBookings.length === 0) {
+      setSelectedBookingId(null);
+      return;
+    }
+    if (!filteredBookings.some((b) => b.id === selectedBookingId)) {
+      setSelectedBookingId(filteredBookings[0].id);
+    }
+  }, [filteredBookings, selectedBookingId]);
+
+  useEffect(() => {
+    async function loadFinancialForSelection() {
+      if (!selectedBookingId) return;
+      try {
+        const [payments, invoices] = await Promise.all([
+          getBookingPayments(selectedBookingId),
+          getInvoices(),
+        ]);
+        setPaymentsByBooking((prev) => ({ ...prev, [selectedBookingId]: payments || [] }));
+        const currentInvoice =
+          (invoices || []).find((i) => i.booking_id === selectedBookingId) || null;
+        setInvoiceByBooking((prev) => ({ ...prev, [selectedBookingId]: currentInvoice }));
+      } catch (err) {
+        setError(err.message || "Errore caricando pagamenti/fatture");
+      }
+    }
+    loadFinancialForSelection();
+  }, [selectedBookingId]);
+
+  async function handleCreatePayment() {
+    if (!selectedBooking) return;
+    if (!paymentForm.amount || Number(paymentForm.amount) <= 0) {
+      alert("Importo pagamento non valido.");
+      return;
+    }
+    setPaymentSaving(true);
+    try {
+      await createBookingPayment(selectedBooking.id, {
+        amount: Number(paymentForm.amount),
+        currency: selectedBooking.currency || "EUR",
+        method: paymentForm.method,
+        status: paymentForm.status,
+        external_ref: paymentForm.external_ref || null,
+        notes: paymentForm.notes || null,
+      });
+      const [updatedPayments, updatedBookings] = await Promise.all([
+        getBookingPayments(selectedBooking.id),
+        getBookings(),
+      ]);
+      setPaymentsByBooking((prev) => ({ ...prev, [selectedBooking.id]: updatedPayments || [] }));
+      setBookings(updatedBookings || []);
+      setPaymentForm({
+        amount: "",
+        method: "cash",
+        status: "captured",
+        external_ref: "",
+        notes: "",
+      });
+    } catch (err) {
+      alert(`Errore registrazione pagamento: ${err.message}`);
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
+
+  async function handleCreateInvoice() {
+    if (!selectedBooking) return;
+    setInvoiceSaving(true);
+    try {
+      const invoice = await createBookingInvoice(selectedBooking.id, {});
+      setInvoiceByBooking((prev) => ({ ...prev, [selectedBooking.id]: invoice }));
+    } catch (err) {
+      alert(`Errore emissione fattura: ${err.message}`);
+    } finally {
+      setInvoiceSaving(false);
+    }
+  }
+
+  async function handleGuestSearch(e) {
+    e.preventDefault();
+    setGuestLoading(true);
+    setSelectedGuest(null);
+    setSelectedGuestBookings([]);
+    try {
+      const guests = await getGuests({ q: guestQuery });
+      setGuestResults(guests || []);
+    } catch (err) {
+      alert(`Errore ricerca ospiti: ${err.message}`);
+    } finally {
+      setGuestLoading(false);
+    }
+  }
+
+  async function handleSelectGuest(guest) {
+    setSelectedGuest(guest);
+    try {
+      const history = await getGuestBookings(guest.id);
+      setSelectedGuestBookings(history || []);
+    } catch (err) {
+      alert(`Errore storico ospite: ${err.message}`);
+    }
+  }
 
   function resetForm() {
     setFormMode("create");
@@ -1108,7 +1237,14 @@ function Bookings() {
                           : null;
 
                       return (
-                        <tr key={b.id}>
+                        <tr
+                          key={b.id}
+                          style={
+                            selectedBookingId === b.id
+                              ? { backgroundColor: "#f0fdfa" }
+                              : undefined
+                          }
+                        >
                           <td style={td}>
                             <div
                               style={{
@@ -1187,6 +1323,19 @@ function Bookings() {
                                 ...buttonSecondary,
                                 padding: "4px 10px",
                                 fontSize: 12,
+                                borderColor: selectedBookingId === b.id ? "#0f766e" : "#d1d5db",
+                                color: selectedBookingId === b.id ? "#0f766e" : "#374151",
+                              }}
+                              onClick={() => setSelectedBookingId(b.id)}
+                            >
+                              Gestione
+                            </button>{" "}
+                            <button
+                              type="button"
+                              style={{
+                                ...buttonSecondary,
+                                padding: "4px 10px",
+                                fontSize: 12,
                               }}
                               onClick={() => loadBookingIntoForm(b)}
                             >
@@ -1227,6 +1376,211 @@ function Bookings() {
                 </table>
               </div>
             )}
+
+            <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  padding: 12,
+                  backgroundColor: "#f9fafb",
+                }}
+              >
+                <h3 style={{ margin: "0 0 8px 0", fontSize: 13 }}>
+                  Gestione pagamenti e fattura
+                </h3>
+                {!selectedBooking ? (
+                  <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
+                    Seleziona una prenotazione dalla lista per vedere pagamenti e fatture.
+                  </p>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: "#374151", margin: "0 0 8px 0" }}>
+                      Booking #{selectedBooking.id} · {selectedBooking.guest_name}
+                    </p>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <input
+                        style={input}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentForm.amount}
+                        onChange={(e) =>
+                          setPaymentForm((s) => ({ ...s, amount: e.target.value }))
+                        }
+                        placeholder="Importo"
+                      />
+                      <select
+                        style={select}
+                        value={paymentForm.method}
+                        onChange={(e) =>
+                          setPaymentForm((s) => ({ ...s, method: e.target.value }))
+                        }
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="bank_transfer">Bonifico</option>
+                        <option value="card">Carta</option>
+                        <option value="stripe">Stripe</option>
+                      </select>
+                      <select
+                        style={select}
+                        value={paymentForm.status}
+                        onChange={(e) =>
+                          setPaymentForm((s) => ({ ...s, status: e.target.value }))
+                        }
+                      >
+                        <option value="captured">Captured</option>
+                        <option value="pending">Pending</option>
+                        <option value="failed">Failed</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                      <input
+                        style={input}
+                        value={paymentForm.external_ref}
+                        onChange={(e) =>
+                          setPaymentForm((s) => ({ ...s, external_ref: e.target.value }))
+                        }
+                        placeholder="Riferimento esterno (opz.)"
+                      />
+                      <input
+                        style={input}
+                        value={paymentForm.notes}
+                        onChange={(e) =>
+                          setPaymentForm((s) => ({ ...s, notes: e.target.value }))
+                        }
+                        placeholder="Note pagamento (opz.)"
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        style={buttonSecondary}
+                        onClick={handleCreatePayment}
+                        disabled={paymentSaving}
+                      >
+                        {paymentSaving ? "Salvataggio..." : "Registra pagamento"}
+                      </button>
+                      <button
+                        type="button"
+                        style={buttonSecondary}
+                        onClick={handleCreateInvoice}
+                        disabled={invoiceSaving}
+                      >
+                        {invoiceSaving ? "Emissione..." : "Emetti fattura"}
+                      </button>
+                    </div>
+
+                    <div style={{ marginTop: 10, fontSize: 12 }}>
+                      <strong>Pagamenti:</strong>
+                      <ul style={{ margin: "6px 0 0 16px", padding: 0 }}>
+                        {(paymentsByBooking[selectedBooking.id] || []).length === 0 ? (
+                          <li style={{ color: "#6b7280" }}>Nessun pagamento registrato</li>
+                        ) : (
+                          (paymentsByBooking[selectedBooking.id] || []).map((p) => (
+                            <li key={p.id}>
+                              {p.currency} {Number(p.amount).toFixed(2)} · {p.method} · {p.status}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </div>
+
+                    <div style={{ marginTop: 8, fontSize: 12 }}>
+                      <strong>Fattura:</strong>{" "}
+                      {invoiceByBooking[selectedBooking.id] ? (
+                        <>
+                          {invoiceByBooking[selectedBooking.id].invoice_number} ·{" "}
+                          {invoiceByBooking[selectedBooking.id].currency}{" "}
+                          {Number(invoiceByBooking[selectedBooking.id].amount).toFixed(2)}
+                        </>
+                      ) : (
+                        <span style={{ color: "#6b7280" }}>non emessa</span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  padding: 12,
+                  backgroundColor: "#f9fafb",
+                }}
+              >
+                <h3 style={{ margin: "0 0 8px 0", fontSize: 13 }}>CRM ospiti</h3>
+                <form
+                  onSubmit={handleGuestSearch}
+                  style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}
+                >
+                  <input
+                    style={input}
+                    value={guestQuery}
+                    onChange={(e) => setGuestQuery(e.target.value)}
+                    placeholder="Cerca per nome o email ospite"
+                  />
+                  <button type="submit" style={buttonSecondary} disabled={guestLoading}>
+                    {guestLoading ? "Ricerca..." : "Cerca"}
+                  </button>
+                </form>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Risultati</div>
+                    <div style={{ maxHeight: 150, overflowY: "auto", fontSize: 12 }}>
+                      {guestResults.length === 0 ? (
+                        <div style={{ color: "#6b7280" }}>Nessun risultato</div>
+                      ) : (
+                        guestResults.map((g) => (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => handleSelectGuest(g)}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              textAlign: "left",
+                              marginBottom: 6,
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              padding: "6px 8px",
+                              background:
+                                selectedGuest?.id === g.id ? "#ecfdf5" : "#ffffff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{ fontWeight: 600 }}>{g.full_name}</div>
+                            <div style={{ color: "#6b7280" }}>{g.email}</div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                      Storico prenotazioni ospite
+                    </div>
+                    <div style={{ maxHeight: 150, overflowY: "auto", fontSize: 12 }}>
+                      {!selectedGuest ? (
+                        <div style={{ color: "#6b7280" }}>Seleziona un ospite</div>
+                      ) : selectedGuestBookings.length === 0 ? (
+                        <div style={{ color: "#6b7280" }}>Nessuna prenotazione trovata</div>
+                      ) : (
+                        selectedGuestBookings.map((b) => (
+                          <div key={b.id} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: "1px solid #e5e7eb" }}>
+                            #{b.id} · {b.checkin_date} → {b.checkout_date} ·{" "}
+                            {b.currency || "EUR"} {Number(b.total_price || 0).toFixed(2)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

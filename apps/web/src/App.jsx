@@ -10,6 +10,7 @@ const Bookings = lazy(() => import("./pages/Bookings.jsx"));
 const Calendar = lazy(() => import("./pages/Calendar.jsx"));
 const Staff = lazy(() => import("./pages/Staff.jsx"));
 const StaffPlanner = lazy(() => import("./pages/StaffPlanner.jsx"));
+const OpsAutomation = lazy(() => import("./pages/OpsAutomation.jsx"));
 const UnitTimeline = lazy(() => import("./pages/UnitTimeline.jsx"));
 const NotFound = lazy(() => import("./pages/NotFound.jsx"));
 const Business = lazy(() => import("./pages/Business.jsx"));
@@ -35,6 +36,7 @@ const ROUTE_COMPONENTS = {
   calendar: Calendar,
   staff: Staff,
   staffPlanner: StaffPlanner,
+  opsAutomation: OpsAutomation,
   business: Business,
   staffDirectory: StaffDirectory,
   pricing: Pricing,

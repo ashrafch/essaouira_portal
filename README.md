@@ -95,12 +95,14 @@ Ops automation (Fase 2):
 - template messaggi: `GET/POST/PUT /message-templates`
 - coda invii: `GET /message-jobs`, `PUT /message-jobs/{id}/status`
 - checklist housekeeping per task: `GET/POST/PUT /staff-tasks/{id}/checklist...`
+- frontend dedicato: pagina `/ops-automation`
 
 Distribution & Revenue (Fase 3):
 - connessioni canali OTA/direct: `GET/POST/PUT /channel-connections`
 - regole revenue management: `GET/POST/PUT /revenue-rules`
 - suggerimenti tariffari: `GET /revenue/rate-recommendations`
 - performance canali: `GET /analytics/channel-performance`
+- frontend: esteso su `/business` (performance canali, channel manager, revenue rules, suggerimenti tariffari)
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)

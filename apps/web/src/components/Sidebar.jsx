@@ -187,6 +187,11 @@ function Sidebar() {
           badge: "staffTasksToday",
         },
         {
+          to: "/ops-automation",
+          label: "Ops automation",
+          badge: null,
+        },
+        {
           to: "/staff-anagrafica",
           label: "Anagrafica staff",
           badge: null,

@@ -7,6 +7,7 @@ export const APP_ROUTES = [
   { path: "/calendar", key: "calendar" },
   { path: "/staff", key: "staff" },
   { path: "/staff-planner", key: "staffPlanner" },
+  { path: "/ops-automation", key: "opsAutomation" },
   { path: "/business", key: "business" },
   { path: "/staff-anagrafica", key: "staffDirectory" },
   { path: "/tariffe-canali", key: "pricing" },
