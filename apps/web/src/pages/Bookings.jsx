@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import AppModal from "../components/AppModal";
 import {
   getBookings,
   getUnits,
@@ -68,6 +69,8 @@ function Bookings() {
   const [guestLoading, setGuestLoading] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState(null);
   const [selectedGuestBookings, setSelectedGuestBookings] = useState([]);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
 
   // form state
   const [unitId, setUnitId] = useState("");
@@ -131,12 +134,14 @@ function Bookings() {
       setEditingId(null);
       setCheckinDate(d);
       setCheckoutDate(d);
+      setIsBookingModalOpen(true);
     }
 
     if (state.editBookingId && bookings.length > 0) {
       const b = bookings.find((bk) => bk.id === state.editBookingId);
       if (b) {
         loadBookingIntoForm(b);
+        setIsBookingModalOpen(true);
       }
     }
   }, [location.state, bookings]);
@@ -364,6 +369,22 @@ function Bookings() {
     }
   }
 
+  function openCreateModal() {
+    resetForm();
+    setFormMode("create");
+    setIsBookingModalOpen(true);
+  }
+
+  function openEditModal(booking) {
+    loadBookingIntoForm(booking);
+    setIsBookingModalOpen(true);
+  }
+
+  function openManagementModal(booking) {
+    setSelectedBookingId(booking.id);
+    setIsManagementModalOpen(true);
+  }
+
   function loadBookingIntoForm(b) {
     setFormMode("edit");
     setEditingId(b.id);
@@ -459,6 +480,7 @@ function Bookings() {
         setBookings((prev) => [...prev, saved]);
       }
       resetForm();
+      setIsBookingModalOpen(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -693,6 +715,9 @@ function Bookings() {
             controlli immediati di disponibilità.
           </p>
         </div>
+        <button type="button" style={buttonPrimary} onClick={openCreateModal}>
+          Nuova prenotazione
+        </button>
       </div>
 
       {error && (
@@ -703,8 +728,18 @@ function Bookings() {
         <p>Caricamento prenotazioni...</p>
       ) : (
         <div style={container}>
-          {/* FORM */}
-          <div style={card}>
+          {/* FORM MODALE */}
+          <AppModal
+            open={isBookingModalOpen}
+            onClose={() => setIsBookingModalOpen(false)}
+            title={
+              formMode === "create"
+                ? "Nuova prenotazione"
+                : `Modifica prenotazione #${editingId}`
+            }
+            maxWidth={920}
+          >
+            <div style={card}>
             <h2 style={{ fontSize: 14, marginBottom: 10 }}>
               {formMode === "create"
                 ? "Nuova prenotazione"
@@ -1142,7 +1177,8 @@ function Bookings() {
                 )}
               </div>
             </form>
-          </div>
+            </div>
+          </AppModal>
 
           {/* LISTA PRENOTAZIONI */}
           <div style={card}>
@@ -1326,7 +1362,7 @@ function Bookings() {
                                 borderColor: selectedBookingId === b.id ? "#0f766e" : "#d1d5db",
                                 color: selectedBookingId === b.id ? "#0f766e" : "#374151",
                               }}
-                              onClick={() => setSelectedBookingId(b.id)}
+                              onClick={() => openManagementModal(b)}
                             >
                               Gestione
                             </button>{" "}
@@ -1337,7 +1373,7 @@ function Bookings() {
                                 padding: "4px 10px",
                                 fontSize: 12,
                               }}
-                              onClick={() => loadBookingIntoForm(b)}
+                              onClick={() => openEditModal(b)}
                             >
                               Modifica
                             </button>{" "}
@@ -1377,7 +1413,17 @@ function Bookings() {
               </div>
             )}
 
-            <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+            <AppModal
+              open={isManagementModalOpen}
+              onClose={() => setIsManagementModalOpen(false)}
+              title={
+                selectedBooking
+                  ? `Gestione booking #${selectedBooking.id}`
+                  : "Gestione prenotazione"
+              }
+              maxWidth={980}
+            >
+            <div style={{ display: "grid", gap: 12 }}>
               <div
                 style={{
                   border: "1px solid #e5e7eb",
@@ -1581,6 +1627,7 @@ function Bookings() {
                 </div>
               </div>
             </div>
+            </AppModal>
           </div>
         </div>
       )}

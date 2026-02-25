@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   getCostItems,
   createCostItem,
@@ -29,6 +30,7 @@ function Expenses() {
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [error, setError] = useState(null);
 
   // Form state
@@ -92,6 +94,11 @@ function Expenses() {
     setUnitId("");
   }
 
+  function openCreateModal() {
+    resetForm();
+    setIsExpenseModalOpen(true);
+  }
+
   function editItem(item) {
     // Permetti modifica solo se è una spesa manuale (non generata da booking/staff)
     // Se il backend non salva 'origin' su CostItem manuali, assumiamo che possiamo modificarli tutti 
@@ -103,6 +110,7 @@ function Expenses() {
     setAmount(item.amount);
     setCurrency(item.currency);
     setUnitId(item.unit_id ? String(item.unit_id) : "");
+    setIsExpenseModalOpen(true);
   }
 
   async function handleSubmit(e) {
@@ -130,6 +138,7 @@ function Expenses() {
         setItems((prev) => [...prev, created]);
       }
       resetForm();
+      setIsExpenseModalOpen(false);
     } catch (err) {
       alert("Errore salvataggio: " + err.message);
     } finally {
@@ -179,6 +188,9 @@ function Expenses() {
           <select style={{...inputStyle, width: "auto"}} value={year} onChange={(e) => setYear(Number(e.target.value))}>
              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <button type="button" style={btnPrimary} onClick={openCreateModal}>
+            Nuova spesa
+          </button>
         </div>
       </div>
 
@@ -200,7 +212,13 @@ function Expenses() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 1fr) 2fr", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, alignItems: "flex-start" }}>
+        <AppModal
+          open={isExpenseModalOpen}
+          onClose={() => setIsExpenseModalOpen(false)}
+          title={editingId ? "Modifica Spesa" : "Nuova Spesa"}
+          maxWidth={620}
+        >
         {/* FORM */}
         <div style={card}>
           <h2 style={{ ...title, marginBottom: 12 }}>{editingId ? "Modifica Spesa" : "Nuova Spesa"}</h2>
@@ -252,6 +270,7 @@ function Expenses() {
             </div>
           </form>
         </div>
+        </AppModal>
 
         {/* LISTA */}
         <div style={card}>

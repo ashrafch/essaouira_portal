@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   createMessageTemplate,
   createTaskChecklistItem,
@@ -28,6 +29,7 @@ function OpsAutomation() {
   const [checklistTaskId, setChecklistTaskId] = useState("");
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistTitle, setChecklistTitle] = useState("");
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -74,6 +76,7 @@ function OpsAutomation() {
         body: "",
         is_active: true,
       });
+      setIsTemplateModalOpen(false);
       await loadAll();
     } catch (err) {
       setError(err.message || "Errore salvataggio template");
@@ -164,6 +167,19 @@ function OpsAutomation() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <section style={card}>
           <h2 style={{ marginTop: 0, fontSize: 14 }}>Template messaggi</h2>
+          <button
+            type="button"
+            style={button}
+            onClick={() => setIsTemplateModalOpen(true)}
+          >
+            {templateForm.id ? "Modifica template" : "Nuovo template"}
+          </button>
+          <AppModal
+            open={isTemplateModalOpen}
+            onClose={() => setIsTemplateModalOpen(false)}
+            title={templateForm.id ? "Modifica template" : "Nuovo template"}
+            maxWidth={620}
+          >
           <form onSubmit={handleSaveTemplate} style={{ display: "grid", gap: 8 }}>
             <input
               style={input}
@@ -210,6 +226,7 @@ function OpsAutomation() {
               {templateForm.id ? "Aggiorna template" : "Crea template"}
             </button>
           </form>
+          </AppModal>
 
           <div style={{ marginTop: 10, fontSize: 12 }}>
             {templates.map((t) => (
@@ -217,16 +234,19 @@ function OpsAutomation() {
                 key={t.id}
                 type="button"
                 onClick={() =>
-                  setTemplateForm({
-                    id: t.id,
-                    name: t.name,
-                    trigger_type: t.trigger_type,
-                    offset_hours: String(t.offset_hours ?? 0),
-                    channel: t.channel || "email",
-                    subject: t.subject || "",
-                    body: t.body || "",
-                    is_active: Boolean(t.is_active),
-                  })
+                  {
+                    setTemplateForm({
+                      id: t.id,
+                      name: t.name,
+                      trigger_type: t.trigger_type,
+                      offset_hours: String(t.offset_hours ?? 0),
+                      channel: t.channel || "email",
+                      subject: t.subject || "",
+                      body: t.body || "",
+                      is_active: Boolean(t.is_active),
+                    });
+                    setIsTemplateModalOpen(true);
+                  }
                 }
                 style={{
                   display: "block",
@@ -352,4 +372,3 @@ function OpsAutomation() {
 }
 
 export default OpsAutomation;
-

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   getStaffMembers,
   createStaffMember,
@@ -46,6 +47,7 @@ function StaffDirectory() {
   const [colorHex, setColorHex] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -86,6 +88,11 @@ function StaffDirectory() {
     setIsActive(true);
   }
 
+  function openCreateModal() {
+    resetForm();
+    setIsFormModalOpen(true);
+  }
+
   function startEdit(m) {
     setEditingId(m.id);
     setName(m.name || "");
@@ -97,6 +104,7 @@ function StaffDirectory() {
     );
     setColorHex(m.color_hex || "");
     setIsActive(m.is_active);
+    setIsFormModalOpen(true);
   }
 
   async function handleSubmit(e) {
@@ -142,6 +150,7 @@ function StaffDirectory() {
         );
       }
       resetForm();
+      setIsFormModalOpen(false);
     } catch (err) {
       alert("Errore salvando membro staff: " + err.message);
     } finally {
@@ -343,11 +352,17 @@ function StaffDirectory() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(260px, 320px) 1fr",
+          gridTemplateColumns: "1fr",
           gap: 12,
           alignItems: "flex-start",
         }}
       >
+        <AppModal
+          open={isFormModalOpen}
+          onClose={() => setIsFormModalOpen(false)}
+          title={editingId ? "Modifica membro" : "Nuovo membro"}
+          maxWidth={720}
+        >
         {/* FORM */}
         <div style={card}>
           <h2 style={{ fontSize: 14, marginBottom: 8 }}>
@@ -476,6 +491,7 @@ function StaffDirectory() {
             </div>
           </form>
         </div>
+        </AppModal>
 
         {/* LISTA */}
         <div style={card}>
@@ -493,6 +509,9 @@ function StaffDirectory() {
                 I membri disattivi non compariranno nel planner staff.
               </p>
             </div>
+            <button type="button" style={buttonPrimary} onClick={openCreateModal}>
+              Nuovo membro
+            </button>
             <label
               style={{
                 fontSize: 11,

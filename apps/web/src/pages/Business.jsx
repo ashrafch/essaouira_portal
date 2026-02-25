@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   downloadMonthCostLinesCsv,
   getMonthPnL,
@@ -68,6 +69,8 @@ function Business() {
     )}`,
     unit_id: "",
   });
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -233,6 +236,7 @@ function Business() {
         sync_enabled: false,
         notes: "",
       });
+      setIsChannelModalOpen(false);
       await reloadRevenueBlocks();
     } catch (err) {
       setRulesError(err.message || "Errore salvataggio canale");
@@ -274,6 +278,7 @@ function Business() {
         is_active: true,
         notes: "",
       });
+      setIsRuleModalOpen(false);
       await reloadRevenueBlocks();
     } catch (err) {
       setRulesError(err.message || "Errore salvataggio regola");
@@ -786,6 +791,19 @@ function Business() {
             <div style={sectionRow}>
               <div style={card}>
                 <div style={sectionTitle}>Channel Connections</div>
+                <button
+                  type="button"
+                  style={{ ...smallButton, marginBottom: 8 }}
+                  onClick={() => setIsChannelModalOpen(true)}
+                >
+                  {channelForm.id ? "Modifica canale" : "Nuovo canale"}
+                </button>
+                <AppModal
+                  open={isChannelModalOpen}
+                  onClose={() => setIsChannelModalOpen(false)}
+                  title={channelForm.id ? "Modifica channel connection" : "Nuova channel connection"}
+                  maxWidth={640}
+                >
                 <form onSubmit={handleSaveChannelConnection} style={{ display: "grid", gap: 8 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     <select
@@ -885,6 +903,7 @@ function Business() {
                     ) : null}
                   </div>
                 </form>
+                </AppModal>
                 <div style={{ marginTop: 10, fontSize: 12 }}>
                   {channelConnections.map((c) => (
                     <button
@@ -902,16 +921,19 @@ function Business() {
                         cursor: "pointer",
                       }}
                       onClick={() =>
-                        setChannelForm({
-                          id: c.id,
-                          channel: c.channel,
-                          listing_external_id: c.listing_external_id || "",
-                          commission_percent: String(c.commission_percent ?? "0"),
-                          payout_delay_days: String(c.payout_delay_days ?? "0"),
-                          is_active: Boolean(c.is_active),
-                          sync_enabled: Boolean(c.sync_enabled),
-                          notes: c.notes || "",
-                        })
+                        {
+                          setChannelForm({
+                            id: c.id,
+                            channel: c.channel,
+                            listing_external_id: c.listing_external_id || "",
+                            commission_percent: String(c.commission_percent ?? "0"),
+                            payout_delay_days: String(c.payout_delay_days ?? "0"),
+                            is_active: Boolean(c.is_active),
+                            sync_enabled: Boolean(c.sync_enabled),
+                            notes: c.notes || "",
+                          });
+                          setIsChannelModalOpen(true);
+                        }
                       }
                     >
                       {c.channel} · {Number(c.commission_percent || 0).toFixed(2)}%
@@ -922,6 +944,19 @@ function Business() {
 
               <div style={card}>
                 <div style={sectionTitle}>Revenue Rules & Rate Suggestions</div>
+                <button
+                  type="button"
+                  style={{ ...smallButton, marginBottom: 8 }}
+                  onClick={() => setIsRuleModalOpen(true)}
+                >
+                  {ruleForm.id ? "Modifica regola" : "Nuova regola"}
+                </button>
+                <AppModal
+                  open={isRuleModalOpen}
+                  onClose={() => setIsRuleModalOpen(false)}
+                  title={ruleForm.id ? "Modifica revenue rule" : "Nuova revenue rule"}
+                  maxWidth={640}
+                >
                 <form onSubmit={handleSaveRevenueRule} style={{ display: "grid", gap: 8 }}>
                   <input
                     style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
@@ -992,6 +1027,7 @@ function Business() {
                     {ruleForm.id ? "Aggiorna regola" : "Aggiungi regola"}
                   </button>
                 </form>
+                </AppModal>
                 <div style={{ marginTop: 10, fontSize: 12 }}>
                   {revenueRules.map((r) => (
                     <button
@@ -1009,20 +1045,23 @@ function Business() {
                         cursor: "pointer",
                       }}
                       onClick={() =>
-                        setRuleForm({
-                          id: r.id,
-                          name: r.name,
-                          priority: String(r.priority ?? 100),
-                          min_occupancy_percent: String(r.min_occupancy_percent ?? 0),
-                          max_occupancy_percent: String(r.max_occupancy_percent ?? 100),
-                          min_lead_days: String(r.min_lead_days ?? 0),
-                          max_lead_days: String(r.max_lead_days ?? 365),
-                          adjustment_percent: String(r.adjustment_percent ?? 0),
-                          min_price: r.min_price == null ? "" : String(r.min_price),
-                          max_price: r.max_price == null ? "" : String(r.max_price),
-                          is_active: Boolean(r.is_active),
-                          notes: r.notes || "",
-                        })
+                        {
+                          setRuleForm({
+                            id: r.id,
+                            name: r.name,
+                            priority: String(r.priority ?? 100),
+                            min_occupancy_percent: String(r.min_occupancy_percent ?? 0),
+                            max_occupancy_percent: String(r.max_occupancy_percent ?? 100),
+                            min_lead_days: String(r.min_lead_days ?? 0),
+                            max_lead_days: String(r.max_lead_days ?? 365),
+                            adjustment_percent: String(r.adjustment_percent ?? 0),
+                            min_price: r.min_price == null ? "" : String(r.min_price),
+                            max_price: r.max_price == null ? "" : String(r.max_price),
+                            is_active: Boolean(r.is_active),
+                            notes: r.notes || "",
+                          });
+                          setIsRuleModalOpen(true);
+                        }
                       }
                     >
                       {r.name} · {Number(r.adjustment_percent || 0).toFixed(2)}%

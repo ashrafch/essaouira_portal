@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   createPlatformTenant,
   downloadAuditLogsCsv,
@@ -29,6 +30,7 @@ function AdminControl() {
     owner_username: "",
     owner_password: "",
   });
+  const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
 
   const canManageTenants = useMemo(() => isOwner, [isOwner]);
 
@@ -61,6 +63,7 @@ function AdminControl() {
     try {
       await createPlatformTenant(form);
       setForm({ tenant_id: "", name: "", owner_username: "", owner_password: "" });
+      setIsTenantModalOpen(false);
       await loadAll();
     } catch (e) {
       setError(e?.message || "Errore creazione tenant");
@@ -138,6 +141,15 @@ function AdminControl() {
       {canManageTenants ? (
         <section style={card}>
           <h2 style={{ marginTop: 0 }}>Tenant Onboarding</h2>
+          <button type="button" onClick={() => setIsTenantModalOpen(true)}>
+            Nuovo tenant
+          </button>
+          <AppModal
+            open={isTenantModalOpen}
+            onClose={() => setIsTenantModalOpen(false)}
+            title="Crea tenant"
+            maxWidth={640}
+          >
           <form onSubmit={onCreateTenant} style={{ display: "grid", gap: 8, maxWidth: 520 }}>
             <input
               placeholder="tenant_id (es. client-a)"
@@ -166,6 +178,7 @@ function AdminControl() {
             />
             <button type="submit">Crea Tenant</button>
           </form>
+          </AppModal>
 
           <div style={{ marginTop: 12, fontSize: 13 }}>
             <strong>Tenant registrati:</strong>
