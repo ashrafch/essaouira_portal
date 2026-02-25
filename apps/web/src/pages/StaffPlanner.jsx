@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   getStaffMembers,
   getStaffTasks,
@@ -259,6 +260,7 @@ function StaffPlanner() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   // carica unità
   useEffect(() => {
@@ -396,6 +398,25 @@ function StaffPlanner() {
         </div>
 
         <div style={dateWrapper}>
+          <button
+            type="button"
+            style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: 999,
+              width: 24,
+              height: 24,
+              padding: 0,
+              backgroundColor: "#ffffff",
+              color: "#0f172a",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+            aria-label="Info planner staff"
+            onClick={() => setIsInfoOpen(true)}
+          >
+            i
+          </button>
           <span style={dateLabel}>Seleziona giorno</span>
           <input
             type="date"
@@ -405,6 +426,30 @@ function StaffPlanner() {
           />
         </div>
       </div>
+
+      <AppModal
+        open={isInfoOpen}
+        onClose={() => setIsInfoOpen(false)}
+        title="Come usare Planner Staff"
+        maxWidth={720}
+      >
+        <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+          <p>
+            Planner Staff mostra tutte le task del giorno, divise per categoria operativa
+            (pulizie, check-in/out, colazioni, altro).
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Clicca una task per aprire la modale e aggiornarla.</li>
+            <li>Puoi assegnare un membro staff esistente o inserire un nome manuale.</li>
+            <li>Stato consigliato: `planned` a `in_progress` a `done`.</li>
+            <li>`estimated_hours` e `cost` alimentano il monitoraggio costi operativo/business.</li>
+          </ul>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+            Esempio: task cleaning assegnata a Fatima, 1.5h, costo 90 MAD, stato done. Il costo
+            viene conteggiato nei report del mese.
+          </div>
+        </div>
+      </AppModal>
 
       <div style={boardWrapper}>
         <div style={boardInner}>

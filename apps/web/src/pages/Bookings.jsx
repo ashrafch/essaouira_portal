@@ -71,6 +71,7 @@ function Bookings() {
   const [selectedGuestBookings, setSelectedGuestBookings] = useState([]);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isManagementModalOpen, setIsManagementModalOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState(null);
 
   // form state
   const [unitId, setUnitId] = useState("");
@@ -577,6 +578,19 @@ function Bookings() {
     cursor: "pointer",
   };
 
+  const infoButton = {
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    width: 24,
+    height: 24,
+    padding: 0,
+    fontSize: 12,
+    fontWeight: 700,
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
+    cursor: "pointer",
+  };
+
   const table = {
     width: "100%",
     borderCollapse: "collapse",
@@ -738,9 +752,19 @@ function Bookings() {
             controlli immediati di disponibilità.
           </p>
         </div>
-        <button type="button" style={buttonPrimary} onClick={openCreateModal}>
-          Nuova prenotazione
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            style={infoButton}
+            aria-label="Info prenotazioni"
+            onClick={() => setInfoModal("overview")}
+          >
+            i
+          </button>
+          <button type="button" style={buttonPrimary} onClick={openCreateModal}>
+            Nuova prenotazione
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -1480,9 +1504,19 @@ function Bookings() {
                   backgroundColor: "#f9fafb",
                 }}
               >
-                <h3 style={{ margin: "0 0 8px 0", fontSize: 13 }}>
-                  Gestione pagamenti e fattura
-                </h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 13 }}>
+                    Gestione pagamenti e fattura
+                  </h3>
+                  <button
+                    type="button"
+                    style={infoButton}
+                    aria-label="Info gestione pagamenti"
+                    onClick={() => setInfoModal("management")}
+                  >
+                    i
+                  </button>
+                </div>
                 {!selectedBooking ? (
                   <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
                     Seleziona una prenotazione dalla lista per vedere pagamenti e fatture.
@@ -1675,6 +1709,52 @@ function Bookings() {
                 </div>
               </div>
             </div>
+            </AppModal>
+            <AppModal
+              open={infoModal != null}
+              onClose={() => setInfoModal(null)}
+              title={
+                infoModal === "management"
+                  ? "Come usare gestione pagamenti e fatture"
+                  : "Come usare la pagina Prenotazioni"
+              }
+              maxWidth={760}
+            >
+              {infoModal === "management" ? (
+                <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                  <p>
+                    La sezione gestione serve per registrare incassi reali, emettere fattura e vedere
+                    rapidamente storico pagamenti per booking.
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                    <li>`amount`: importo incassato (puoi registrare piu pagamenti parziali).</li>
+                    <li>`method`: modalita di pagamento (cash, bonifico, carta, stripe).</li>
+                    <li>`status`: stato movimento (captured/pending/failed).</li>
+                    <li>`Emetti fattura`: crea documento fiscale per il booking selezionato.</li>
+                  </ul>
+                  <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+                    Esempio: booking da 600 EUR con caparra 200 (pending) + saldo 400 (captured).
+                    Nel riepilogo vedi entrambi i movimenti e poi puoi emettere fattura finale.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                  <p>
+                    Prenotazioni e il centro operativo: disponibilita, dati ospite, prezzi e stato
+                    pagamento in un unico flusso.
+                  </p>
+                  <ol style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                    <li>Crea o modifica una prenotazione dalla modale.</li>
+                    <li>Controlla conflitti date/unita direttamente nel form.</li>
+                    <li>Compila prezzo, fee e tasse per avere totale coerente.</li>
+                    <li>Usa il bottone Gestione per pagamenti, fattura e CRM ospite.</li>
+                  </ol>
+                  <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+                    Nota: i valori pricing di default arrivano dalla pagina Tariffe e possono essere
+                    sempre sovrascritti nel singolo booking.
+                  </div>
+                </div>
+              )}
             </AppModal>
           </div>
         </div>

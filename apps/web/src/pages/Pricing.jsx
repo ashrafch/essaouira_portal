@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AppModal from "../components/AppModal";
 import {
   getUnits,
   updateUnit,
@@ -21,6 +22,7 @@ function Pricing() {
   const [savingPricing, setSavingPricing] = useState(false);
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState("");
+  const [infoModal, setInfoModal] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -158,6 +160,19 @@ function Pricing() {
     cursor: "pointer",
   };
 
+  const infoButton = {
+    borderRadius: 999,
+    border: "1px solid #cbd5e1",
+    width: 24,
+    height: 24,
+    padding: 0,
+    backgroundColor: "#ffffff",
+    color: "#0f172a",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 700,
+  };
+
   const table = {
     width: "100%",
     borderCollapse: "collapse",
@@ -198,9 +213,26 @@ function Pricing() {
       ) : (
         <>
           <div style={card}>
-            <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-              Tariffe base per unità (ADR di riferimento)
-            </h2>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <h2 style={{ fontSize: 14, margin: 0 }}>
+                Tariffe base per unità (ADR di riferimento)
+              </h2>
+              <button
+                type="button"
+                style={infoButton}
+                aria-label="Info tariffe base"
+                onClick={() => setInfoModal("base_rates")}
+              >
+                i
+              </button>
+            </div>
             <p
               style={{
                 fontSize: 11,
@@ -296,9 +328,19 @@ function Pricing() {
 
           {pricing && (
             <div style={card}>
-              <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-                Extra & Commissioni (valori di default)
-              </h2>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <h2 style={{ fontSize: 14, margin: 0 }}>
+                  Extra & Commissioni (valori di default)
+                </h2>
+                <button
+                  type="button"
+                  style={infoButton}
+                  aria-label="Info extra e commissioni"
+                  onClick={() => setInfoModal("extras")}
+                >
+                  i
+                </button>
+              </div>
               <p
                 style={{
                   fontSize: 11,
@@ -438,6 +480,44 @@ function Pricing() {
               </form>
             </div>
           )}
+          <AppModal
+            open={infoModal != null}
+            onClose={() => setInfoModal(null)}
+            title={infoModal === "base_rates" ? "Come impostare le tariffe base" : "Come usare extra e commissioni"}
+            maxWidth={700}
+          >
+            {infoModal === "base_rates" ? (
+              <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                <p>
+                  La tariffa base unità è il prezzo di partenza per notte usato dal portale quando
+                  crei prenotazioni o calcoli suggerimenti in Business.
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                  <li>Inserisci il prezzo medio reale che vuoi ottenere.</li>
+                  <li>Usa la stessa valuta su tutte le unità.</li>
+                  <li>In prenotazione puoi sempre sovrascrivere manualmente il valore.</li>
+                </ul>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+                  Esempio: unità Atlas con base 95 EUR, 3 notti = 285 EUR base, poi sommi extra e tasse.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+                <p>
+                  Questi valori sono default che precompilano nuove prenotazioni e semplificano la
+                  gestione operativa.
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                  <li>`cleaning fee`: costo fisso pulizia per soggiorno.</li>
+                  <li>`city tax per night`: tassa soggiorno moltiplicata per notte.</li>
+                  <li>`channel fee %`: commissione canale sul totale prenotazione.</li>
+                </ul>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 10 }}>
+                  Esempio: totale 400 EUR con channel fee 15% = commissione stimata 60 EUR.
+                </div>
+              </div>
+            )}
+          </AppModal>
         </>
       )}
     </div>
@@ -445,4 +525,3 @@ function Pricing() {
 }
 
 export default Pricing;
-
