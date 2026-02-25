@@ -45,6 +45,21 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(computed, expected_digest)
 
 
+def validate_password_policy(password: str, min_length: int = 10) -> list[str]:
+    errors: list[str] = []
+    if len(password) < min_length:
+        errors.append(f"Password troppo corta (min {min_length})")
+    if not any(ch.islower() for ch in password):
+        errors.append("Password deve contenere almeno una lettera minuscola")
+    if not any(ch.isupper() for ch in password):
+        errors.append("Password deve contenere almeno una lettera maiuscola")
+    if not any(ch.isdigit() for ch in password):
+        errors.append("Password deve contenere almeno un numero")
+    if not any(not ch.isalnum() for ch in password):
+        errors.append("Password deve contenere almeno un simbolo")
+    return errors
+
+
 def validate_auth_configuration() -> None:
     if not settings.auth_enabled:
         return

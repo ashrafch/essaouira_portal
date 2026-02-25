@@ -276,3 +276,11 @@ export function getPlatformTenants() {
 export function createPlatformTenant(payload) {
   return apiPost("/platform/tenants", payload);
 }
+
+export function resetUserPassword(userId, payload) {
+  return apiPost(`/users/${userId}/reset-password`, payload);
+}
+
+export function changeMyPassword(payload) {
+  return apiPost("/auth/change-password", payload);
+}

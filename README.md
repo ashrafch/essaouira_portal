@@ -76,12 +76,15 @@ Backend (`apps/server/.env`):
 - `COMPLIANCE_PRIVACY_EMAIL`
 - `COMPLIANCE_TERMS_URL`
 - `COMPLIANCE_PRIVACY_URL`
+- `PASSWORD_MIN_LENGTH`
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
 
 Gestione utenti:
 - endpoint `GET/POST/PUT /users` (owner del tenant)
+- endpoint `POST /users/{id}/reset-password` (owner del tenant)
 - login supporta `tenant_id` nel payload
+- endpoint `POST /auth/change-password` (utente autenticato)
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.core.auth import hash_password
@@ -122,6 +123,8 @@ def initialize_schema_and_seed() -> None:
                 password_hash=password_hash,
                 role=settings.admin_role,
                 is_active=True,
+                must_change_password=False,
+                last_password_change_at=datetime.now(timezone.utc),
             )
             db.add(owner_user)
             db.commit()

@@ -11,6 +11,7 @@
 - Compliance policy endpoint pubblico (`/compliance/policy`): completato
 - Release readiness pipeline (quality + migration + backup/restore drill): completato
 - Script operativi restore (`db-restore.sh`) e drill (`backup-restore-drill.sh`): completato
+- User lifecycle enterprise (policy password + reset owner + change password self-service): completato
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

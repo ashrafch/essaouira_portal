@@ -24,6 +24,7 @@ class Settings:
     compliance_privacy_email: str = os.getenv("COMPLIANCE_PRIVACY_EMAIL", "privacy@example.com")
     compliance_terms_url: str = os.getenv("COMPLIANCE_TERMS_URL", "https://example.com/terms")
     compliance_privacy_url: str = os.getenv("COMPLIANCE_PRIVACY_URL", "https://example.com/privacy")
+    password_min_length: int = int(os.getenv("PASSWORD_MIN_LENGTH", "10"))
     auto_create_schema: bool = _as_bool(os.getenv("AUTO_CREATE_SCHEMA"), True)
     auto_seed_data: bool = _as_bool(os.getenv("AUTO_SEED_DATA"), True)
 

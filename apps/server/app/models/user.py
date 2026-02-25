@@ -13,4 +13,6 @@ class User(TenantScopedMixin, Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(32), nullable=False, default="viewer")
     is_active = Column(Boolean, nullable=False, default=True)
+    must_change_password = Column(Boolean, nullable=False, default=False)
+    last_password_change_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())

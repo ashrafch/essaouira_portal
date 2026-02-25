@@ -2,7 +2,7 @@ import os
 import csv
 import io
 from contextlib import asynccontextmanager
-from datetime import date, timedelta, time, datetime
+from datetime import date, timedelta, time, datetime, timezone
 from typing import Optional, Dict, List
 from enum import Enum
 
@@ -21,6 +21,7 @@ from app.core.auth import (
     authenticate_user,
     create_access_token,
     hash_password,
+    validate_password_policy,
     validate_auth_configuration,
     verify_password,
 )
@@ -91,12 +92,19 @@ class AuthLoginResponse(BaseModel):
     username: str
     role: str
     tenant_id: str
+    must_change_password: bool = False
 
 
 class AuthMeResponse(BaseModel):
     username: str
     role: str
     tenant_id: str
+    must_change_password: bool = False
+
+
+class AuthChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 @app.post("/auth/login", response_model=AuthLoginResponse)
@@ -112,6 +120,7 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 
     tenant_id = normalize_tenant_id(payload.tenant_id or settings.admin_tenant_id)
     role = None
+    must_change_password = False
 
     tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id, Tenant.is_active.is_(True)).first()
     if tenant is None:
@@ -129,6 +138,7 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 
     if db_user and verify_password(payload.password, db_user.password_hash):
         role = db_user.role
+        must_change_password = bool(db_user.must_change_password)
     elif authenticate_user(payload.username, payload.password):
         if tenant_id != normalize_tenant_id(settings.admin_tenant_id):
             raise HTTPException(status_code=401, detail="Credenziali non valide")
@@ -142,17 +152,54 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
         username=payload.username,
         role=role,
         tenant_id=tenant_id,
+        must_change_password=must_change_password,
     )
 
 
 @app.get("/auth/me", response_model=AuthMeResponse)
-def auth_me(request: Request):
+def auth_me(request: Request, db: Session = Depends(get_db)):
     username = getattr(request.state, "user", None)
     role = getattr(request.state, "role", None)
     tenant_id = getattr(request.state, "tenant_id", None)
     if not username:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return AuthMeResponse(username=username, role=role, tenant_id=tenant_id)
+
+    user = db.query(User).filter(User.username == username).first()
+    must_change_password = bool(user.must_change_password) if user else False
+    return AuthMeResponse(
+        username=username,
+        role=role,
+        tenant_id=tenant_id,
+        must_change_password=must_change_password,
+    )
+
+
+def _enforce_password_policy(password: str) -> None:
+    errors = validate_password_policy(password, min_length=settings.password_min_length)
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+
+
+@app.post("/auth/change-password")
+def auth_change_password(
+    payload: AuthChangePasswordRequest, request: Request, db: Session = Depends(get_db)
+):
+    username = getattr(request.state, "user", None)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    user = db.query(User).filter(User.username == username, User.is_active.is_(True)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Password attuale non valida")
+
+    _enforce_password_policy(payload.new_password)
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.last_password_change_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "ok"}
 
 
 def _require_role(request: Request, allowed_roles: set[str]) -> None:
@@ -186,11 +233,18 @@ class UserUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+class UserResetPasswordRequest(BaseModel):
+    new_password: str
+    must_change_on_login: bool = True
+
+
 class UserOut(BaseModel):
     id: int
     username: str
     role: str
     is_active: bool
+    must_change_password: bool
+    last_password_change_at: datetime | None = None
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -250,8 +304,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
     username = payload.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="Username obbligatorio")
-    if len(payload.password) < 8:
-        raise HTTPException(status_code=400, detail="Password troppo corta (min 8)")
+    _enforce_password_policy(payload.password)
 
     existing = db.query(User).filter(User.username == username).first()
     if existing:
@@ -285,13 +338,35 @@ def update_user(
         user.role = role
 
     if payload.password is not None:
-        if len(payload.password) < 8:
-            raise HTTPException(status_code=400, detail="Password troppo corta (min 8)")
+        _enforce_password_policy(payload.password)
         user.password_hash = hash_password(payload.password)
+        user.must_change_password = False
+        user.last_password_change_at = datetime.now(timezone.utc)
 
     if payload.is_active is not None:
         user.is_active = payload.is_active
 
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.post("/users/{user_id}/reset-password", response_model=UserOut)
+def reset_user_password(
+    user_id: int,
+    payload: UserResetPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_role(request, {"owner"})
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    _enforce_password_policy(payload.new_password)
+    user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = payload.must_change_on_login
+    user.last_password_change_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     return user
@@ -331,8 +406,7 @@ def create_platform_tenant(
     tenant_id = normalize_tenant_id(payload.tenant_id)
     if not tenant_id:
         raise HTTPException(status_code=400, detail="tenant_id obbligatorio")
-    if len(payload.owner_password) < 8:
-        raise HTTPException(status_code=400, detail="Password owner troppo corta (min 8)")
+    _enforce_password_policy(payload.owner_password)
     owner_username = payload.owner_username.strip()
     if not owner_username:
         raise HTTPException(status_code=400, detail="owner_username obbligatorio")
@@ -356,6 +430,8 @@ def create_platform_tenant(
             password_hash=hash_password(payload.owner_password),
             role="owner",
             is_active=True,
+            must_change_password=False,
+            last_password_change_at=datetime.now(timezone.utc),
         )
         db.add(owner)
         db.commit()

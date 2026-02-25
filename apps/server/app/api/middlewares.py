@@ -46,6 +46,8 @@ def _is_write_protected(path: str, method: str) -> bool:
 
 
 def _should_audit(path: str, method: str) -> bool:
+    if path == "/auth/change-password" and method == "POST":
+        return True
     return _is_write_protected(path, method)
 
 
