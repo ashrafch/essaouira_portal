@@ -162,7 +162,7 @@ function Bookings() {
   const parsedCheckout = parseDate(checkoutDate);
   const nights = diffNights(parsedCheckin, parsedCheckout);
 
-  // ---- disponibilitÃ  / conflitti per intervallo selezionato ----
+  // ---- disponibilita / conflitti per intervallo selezionato ----
   const availability = useMemo(() => {
     if (!parsedCheckin || !parsedCheckout || units.length === 0) {
       return {
@@ -448,7 +448,7 @@ function Bookings() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!unitId || !guestName || !checkinDate || !checkoutDate) {
-      alert("UnitÃ , ospite, check-in e check-out sono obbligatori.");
+      alert("Unita, ospite, check-in e check-out sono obbligatori.");
       return;
     }
 
@@ -751,7 +751,7 @@ function Bookings() {
           <h1 style={{ marginBottom: 4 }}>Prenotazioni</h1>
           <p style={{ fontSize: 13, color: "#6b7280" }}>
             Gestisci le prenotazioni con informazioni economiche complete e
-            controlli immediati di disponibilitÃ .
+            controlli immediati di disponibilita.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -792,7 +792,7 @@ function Bookings() {
           <div style={statCard}>
             <div style={{ fontSize: 11, color: "#64748b" }}>Valore Portafoglio</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>
-              â‚¬ {bookingStats.totalValue.toFixed(0)}
+              EUR {bookingStats.totalValue.toFixed(0)}
             </div>
           </div>
         </div>
@@ -838,7 +838,7 @@ function Bookings() {
                 </select>
               </div>
 
-              {/* disponibilitÃ  e conflitti */}
+              {/* disponibilita e conflitti */}
               {parsedCheckin && parsedCheckout && (
                 <div style={{ fontSize: 12, marginBottom: 10 }}>
                   <div style={{ marginBottom: 4 }}>
@@ -890,7 +890,7 @@ function Bookings() {
                             marginBottom: 2,
                           }}
                         >
-                          Attenzione: questa unitÃ  Ã¨ giÃ  occupata nelle date
+                          Attenzione: questa unita e gia occupata nelle date
                           selezionate.
                         </div>
                         {availability.conflictBookings.length > 0 && (
@@ -903,11 +903,11 @@ function Bookings() {
                           >
                             {availability.conflictBookings.map((b) => (
                               <li key={b.id}>
-                                {b.guest_name || "Ospite"} Â·{" "}
+                                {b.guest_name || "Ospite"} -{" "}
                                 {parseDate(
                                   b.checkin_date
                                 )?.toLocaleDateString("it-IT")}{" "}
-                                â†’{" "}
+                                {"->"}{" "}
                                 {parseDate(
                                   b.checkout_date
                                 )?.toLocaleDateString("it-IT")}
@@ -916,7 +916,7 @@ function Bookings() {
                           </ul>
                         )}
                         <div style={{ marginTop: 4, color: "#7f1d1d" }}>
-                          Puoi cambiare unitÃ  oppure modificare il periodo.
+                          Puoi cambiare unita oppure modificare il periodo.
                         </div>
                       </div>
                     </div>
@@ -1164,7 +1164,7 @@ function Bookings() {
                   <strong>
                     {currency} {suggestedTotal.toFixed(2)}
                   </strong>{" "}
-                  (notti Ã— tariffa + extra). Puoi lasciare vuoto il campo totale
+                  (notti x tariffa + extra). Puoi lasciare vuoto il campo totale
                   per usare questo valore calcolato automaticamente.
                 </div>
               )}
@@ -1191,7 +1191,7 @@ function Bookings() {
                       Pagata
                     </label>
                     <div style={checkboxLabelSub}>
-                      Segna la prenotazione come giÃ  incassata.
+                      Segna la prenotazione come gia incassata.
                     </div>
                   </div>
                 </div>
@@ -1275,7 +1275,7 @@ function Bookings() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: "#6b7280" }}>UnitÃ </span>
+                  <span style={{ fontSize: 11, color: "#6b7280" }}>Unita</span>
                   <select
                     style={{
                       ...input,
@@ -1327,7 +1327,7 @@ function Bookings() {
                     <tr>
                       <th style={th}>Ospite / Canale</th>
                       <th style={th}>Periodo</th>
-                      <th style={th}>UnitÃ </th>
+                      <th style={th}>Unita</th>
                       <th style={th}>Totale</th>
                       <th style={th}>Stato</th>
                       <th style={th}>Azioni</th>
@@ -1388,7 +1388,7 @@ function Bookings() {
                               }}
                             >
                               <span>
-                                {cIn?.toLocaleDateString("it-IT")} â†’{" "}
+                                {cIn?.toLocaleDateString("it-IT")} {"->"}{" "}
                                 {cOut?.toLocaleDateString("it-IT")}
                               </span>
                               <span
@@ -1418,7 +1418,7 @@ function Bookings() {
                                 {b.currency || "EUR"} {total.toFixed(2)}
                               </>
                             ) : (
-                              "â€”"
+                              "-"
                             )}
                           </td>
                           <td style={td}>
@@ -1526,7 +1526,7 @@ function Bookings() {
                 ) : (
                   <>
                     <p style={{ fontSize: 12, color: "#374151", margin: "0 0 8px 0" }}>
-                      Booking #{selectedBooking.id} Â· {selectedBooking.guest_name}
+                      Booking #{selectedBooking.id} - {selectedBooking.guest_name}
                     </p>
 
                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 8 }}>
@@ -1610,7 +1610,7 @@ function Bookings() {
                         ) : (
                           (paymentsByBooking[selectedBooking.id] || []).map((p) => (
                             <li key={p.id}>
-                              {p.currency} {Number(p.amount).toFixed(2)} Â· {p.method} Â· {p.status}
+                              {p.currency} {Number(p.amount).toFixed(2)} - {p.method} - {p.status}
                             </li>
                           ))
                         )}
@@ -1621,7 +1621,7 @@ function Bookings() {
                       <strong>Fattura:</strong>{" "}
                       {invoiceByBooking[selectedBooking.id] ? (
                         <>
-                          {invoiceByBooking[selectedBooking.id].invoice_number} Â·{" "}
+                          {invoiceByBooking[selectedBooking.id].invoice_number} -{" "}
                           {invoiceByBooking[selectedBooking.id].currency}{" "}
                           {Number(invoiceByBooking[selectedBooking.id].amount).toFixed(2)}
                         </>
@@ -1701,7 +1701,7 @@ function Bookings() {
                       ) : (
                         selectedGuestBookings.map((b) => (
                           <div key={b.id} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: "1px solid #e5e7eb" }}>
-                            #{b.id} Â· {b.checkin_date} â†’ {b.checkout_date} Â·{" "}
+                            #{b.id} - {b.checkin_date} {"->"} {b.checkout_date} -{" "}
                             {b.currency || "EUR"} {Number(b.total_price || 0).toFixed(2)}
                           </div>
                         ))

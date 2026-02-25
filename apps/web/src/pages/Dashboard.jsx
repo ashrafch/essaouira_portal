@@ -135,7 +135,7 @@ function Dashboard() {
   const chartCard = {
     background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)", borderRadius: 16, padding: 18,
     boxShadow: "0 8px 20px rgba(15,23,42,0.05)", border: "1px solid #e2e8f0",
-    minHeight: "350px", display: "flex", flexDirection: "column"
+    minHeight: "350px", minWidth: 0, display: "flex", flexDirection: "column"
   };
 
   const operationCard = {
@@ -191,19 +191,19 @@ function Dashboard() {
         <div style={kpiCard("#1d4ed8")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>RevPAR</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            EUR {advancedKpis?.revpar?.toLocaleString?.() ?? 0}
+            EUR {advancedKpis?.revpar?.toLocaleString?.()  -  0}
           </div>
         </div>
         <div style={kpiCard("#0ea5e9")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Share Direct</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            {advancedKpis?.direct_share_percent ?? 0}%
+            {advancedKpis?.direct_share_percent  -  0}%
           </div>
         </div>
         <div style={kpiCard("#7c3aed")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Pipeline 30g</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.() ?? 0}
+            EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.()  -  0}
           </div>
         </div>
         <div style={kpiCard("#f97316")}>
@@ -237,19 +237,19 @@ function Dashboard() {
         <div style={kpiCard("#0f766e")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Ricavi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            â‚¬ {pnl?.revenue_total.toLocaleString()}
+            EUR {pnl?.revenue_total.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard("#dc2626")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Costi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            â‚¬ {pnl?.costs_total.toLocaleString()}
+            EUR {pnl?.costs_total.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard(pnl?.profit >= 0 ? "#16a34a" : "#dc2626")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Profitto Netto</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "#16a34a" : "#dc2626", marginTop: "8px" }}>
-            â‚¬ {pnl?.profit.toLocaleString()}
+            EUR {pnl?.profit.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard("#f59e0b")}>
@@ -257,7 +257,7 @@ function Dashboard() {
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
              <span style={{ fontSize: "28px", fontWeight: "700", color: "#111827" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
              <span style={{ fontSize: "14px", color: "#6b7280" }}>
-               (â‚¬ {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
+               (EUR {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
              </span>
           </div>
         </div>
@@ -270,7 +270,7 @@ function Dashboard() {
           <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
             Provenienza Ricavi
           </h3>
-          <div style={{ flex: 1, minHeight: "250px" }}>
+          <div style={{ flex: 1, minHeight: "250px", minWidth: 0 }}>
             {sourceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -285,7 +285,7 @@ function Dashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `â‚¬ ${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value) => `EUR ${value.toLocaleString()}`} />
                   <Legend verticalAlign="bottom" height={36}/>
                 </PieChart>
               </ResponsiveContainer>
@@ -300,14 +300,14 @@ function Dashboard() {
           <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
             Top 5 Categorie di Spesa
           </h3>
-          <div style={{ flex: 1, minHeight: "250px" }}>
+          <div style={{ flex: 1, minHeight: "250px", minWidth: 0 }}>
             {costData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={costData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => `â‚¬ ${value.toLocaleString()}`} />
+                  <Tooltip cursor={{ fill: "transparent" }} formatter={(value) => `EUR ${value.toLocaleString()}`} />
                   <Bar dataKey="Importo" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -341,7 +341,7 @@ function Dashboard() {
                   </div>
                   <div>
                     <div style={{ fontWeight: "600", fontSize: "14px", color: "#111827" }}>{booking.guest_name}</div>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Unit #{booking.unit_id} Â· {booking.num_adults} pax</div>
+                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Unit #{booking.unit_id} - {booking.num_adults} pax</div>
                   </div>
                   <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "#0f766e" }}>
                     {booking.estimated_arrival_time ? booking.estimated_arrival_time.slice(0,5) : "Orario n/d"}
@@ -368,11 +368,11 @@ function Dashboard() {
 
           {tasksTotal > 0 && tasksCompleted < tasksTotal ? (
             <div style={{ fontSize: "13px", color: "#d97706", backgroundColor: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d" }}>
-              âš ï¸ Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attivitÃ  da completare oggi.
+              Attenzione: ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attivita da completare oggi.
             </div>
           ) : tasksTotal > 0 ? (
             <div style={{ fontSize: "13px", color: "#047857", backgroundColor: "#ecfdf5", padding: "10px", borderRadius: "8px", border: "1px solid #6ee7b7" }}>
-              âœ… Ottimo lavoro! Tutte le attivitÃ  di oggi sono completate.
+              OK. Ottimo lavoro! Tutte le attivita di oggi sono completate.
             </div>
           ) : (
             <div style={{ fontSize: "13px", color: "#6b7280" }}>Nessun task programmato per oggi.</div>
