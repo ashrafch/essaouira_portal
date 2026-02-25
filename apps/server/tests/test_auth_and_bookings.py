@@ -32,6 +32,10 @@ def test_auth_required_for_protected_routes():
 def test_login_and_access_units():
     with TestClient(app) as client:
         headers = _login_headers(client)
+        me_response = client.get("/auth/me", headers=headers)
+        assert me_response.status_code == 200
+        assert me_response.json()["username"] == "owner"
+
         response = client.get("/units", headers=headers)
         assert response.status_code == 200
         assert isinstance(response.json(), list)

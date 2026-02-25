@@ -62,12 +62,14 @@ npm run dev
 Backend (`apps/server/.env`):
 - `DATABASE_URL`
 - `CORS_ORIGINS`
+- `ENVIRONMENT` (`development|staging|production`)
 - `AUTH_ENABLED`
 - `AUTH_SECRET_KEY`
 - `AUTH_ALGORITHM`
 - `AUTH_ACCESS_TOKEN_MINUTES`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
+- `ADMIN_PASSWORD_HASH` (preferito in produzione)
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
 
@@ -89,6 +91,12 @@ Backend:
 cd apps/server
 pip install -r requirements-dev.txt
 pytest -q
+```
+
+Generare password hash admin (consigliato):
+```bash
+cd apps/server
+python -c "from app.core.auth import hash_password; print(hash_password('cambia-questa-password'))"
 ```
 
 Frontend:

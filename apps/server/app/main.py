@@ -6,7 +6,7 @@ from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 from app.db import get_db
 from app.api.middlewares import authentication, request_logging
 from app.bootstrap import initialize_schema_and_seed
-from app.core.auth import authenticate_user, create_access_token
+from app.core.auth import authenticate_user, create_access_token, validate_auth_configuration
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.main_types import StaffRole
@@ -35,6 +35,7 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    validate_auth_configuration()
     initialize_schema_and_seed()
     yield
 
@@ -78,6 +79,10 @@ class AuthLoginResponse(BaseModel):
     username: str
 
 
+class AuthMeResponse(BaseModel):
+    username: str
+
+
 @app.post("/auth/login", response_model=AuthLoginResponse)
 def auth_login(payload: AuthLoginRequest):
     if not settings.auth_enabled:
@@ -89,6 +94,14 @@ def auth_login(payload: AuthLoginRequest):
 
     token = create_access_token(payload.username)
     return AuthLoginResponse(access_token=token, username=payload.username)
+
+
+@app.get("/auth/me", response_model=AuthMeResponse)
+def auth_me(request: Request):
+    username = getattr(request.state, "user", None)
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return AuthMeResponse(username=username)
 
 
 # ---------- UNITS ----------
