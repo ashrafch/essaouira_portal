@@ -32,7 +32,7 @@ function Login() {
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f3f4f6", padding: 20 }}>
-      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 360, background: "white", borderRadius: 14, padding: 20, border: "1px solid #e5e7eb", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 360, background: "white", borderRadius: 16, padding: 20, border: "1px solid #e2e8f0", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
         <h1 style={{ margin: 0, fontSize: 20 }}>Accesso Portale</h1>
         <p style={{ marginTop: 6, marginBottom: 14, fontSize: 13, color: "#6b7280" }}>Inserisci le credenziali di gestione.</p>
 
@@ -56,3 +56,4 @@ function Login() {
 }
 
 export default Login;
+

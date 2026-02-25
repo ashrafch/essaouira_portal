@@ -239,10 +239,10 @@ function ArrivalsDepartures() {
 
   const card = {
     background: "white",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+    border: "1px solid #e2e8f0",
   };
 
   const sectionTitle = {
@@ -836,3 +836,4 @@ function ArrivalsDepartures() {
 }
 
 export default ArrivalsDepartures;
+

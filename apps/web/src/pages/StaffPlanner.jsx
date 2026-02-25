@@ -54,7 +54,7 @@ const boardWrapper = {
   backgroundColor: "#f9fafb",
   borderRadius: 16,
   padding: 16,
-  border: "1px solid #e5e7eb",
+  border: "1px solid #e2e8f0",
 };
 
 const boardInner = {
@@ -65,9 +65,9 @@ const boardInner = {
 
 const columnWrapper = {
   backgroundColor: "#f3f4f6",
-  borderRadius: 14,
+  borderRadius: 16,
   padding: 14,
-  border: "1px solid #e5e7eb",
+  border: "1px solid #e2e8f0",
   display: "flex",
   flexDirection: "column",
   gap: 8,
@@ -101,7 +101,7 @@ const taskCard = {
   backgroundColor: "#ffffff",
   borderRadius: 12,
   padding: 10,
-  border: "1px solid #e5e7eb",
+  border: "1px solid #e2e8f0",
   boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
   display: "flex",
   flexDirection: "column",
@@ -146,7 +146,7 @@ const metaChip = {
   padding: "3px 8px",
   borderRadius: 999,
   backgroundColor: "#f9fafb",
-  border: "1px solid #e5e7eb",
+  border: "1px solid #e2e8f0",
   color: "#6b7280",
 };
 
@@ -609,3 +609,4 @@ function StaffPlanner() {
 }
 
 export default StaffPlanner;
+

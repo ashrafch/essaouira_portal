@@ -10,10 +10,11 @@ import {
 import { getCurrentRole } from "../services/auth";
 
 const card = {
-  background: "white",
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
+  background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+  border: "1px solid #e2e8f0",
+  borderRadius: 16,
   padding: 16,
+  boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
 };
 
 function AdminControl() {
@@ -87,7 +88,7 @@ function AdminControl() {
   if (loading) return <div style={{ padding: 20 }}>Caricamento admin control...</div>;
 
   return (
-    <div style={{ padding: 20, display: "grid", gap: 16 }}>
+    <div style={{ padding: 4, display: "grid", gap: 16 }}>
       <h1 style={{ margin: 0 }}>Admin Control</h1>
       {error ? <div style={{ color: "#b91c1c" }}>{error}</div> : null}
 
@@ -197,3 +198,4 @@ function AdminControl() {
 }
 
 export default AdminControl;
+

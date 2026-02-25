@@ -610,10 +610,10 @@ function Staff() {
 
   const card = {
     background: "white",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+    border: "1px solid #e2e8f0",
   };
 
   const sectionTitle = {
@@ -718,7 +718,7 @@ function Staff() {
     borderRadius: 10,
     padding: 6,
     marginBottom: 4,
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e2e8f0",
     backgroundColor: status === "done" ? "#f0fdf4" : "white",
     boxShadow:
       status === "done"
@@ -732,7 +732,7 @@ function Staff() {
   const inputInline = {
     width: "100%",
     borderRadius: 8,
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e2e8f0",
     padding: "4px 6px",
     fontSize: 11,
   };
@@ -1893,3 +1893,4 @@ function Staff() {
 }
 
 export default Staff;
+

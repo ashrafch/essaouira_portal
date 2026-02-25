@@ -130,26 +130,29 @@ function OpsAutomation() {
   }
 
   const card = {
-    background: "white",
-    border: "1px solid #e5e7eb",
-    borderRadius: 12,
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
     padding: 14,
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
   };
 
   const input = {
-    borderRadius: 8,
-    border: "1px solid #d1d5db",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
     padding: "6px 8px",
     fontSize: 13,
   };
 
   const button = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid #cbd5e1",
     padding: "6px 10px",
     fontSize: 12,
-    background: "#f9fafb",
+    background: "#ffffff",
     cursor: "pointer",
+    color: "#0f766e",
+    fontWeight: 600,
   };
 
   return (
@@ -253,7 +256,7 @@ function OpsAutomation() {
                   width: "100%",
                   textAlign: "left",
                   marginBottom: 6,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e2e8f0",
                   borderRadius: 8,
                   padding: "6px 8px",
                   background: "#fff",
@@ -276,7 +279,7 @@ function OpsAutomation() {
                 <div
                   key={j.id}
                   style={{
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid #e2e8f0",
                     borderRadius: 8,
                     padding: "6px 8px",
                     marginBottom: 6,
@@ -353,7 +356,7 @@ function OpsAutomation() {
                   width: "100%",
                   textAlign: "left",
                   marginBottom: 6,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e2e8f0",
                   borderRadius: 8,
                   padding: "6px 8px",
                   background: it.is_done ? "#ecfdf5" : "#fff",
@@ -372,3 +375,4 @@ function OpsAutomation() {
 }
 
 export default OpsAutomation;
+

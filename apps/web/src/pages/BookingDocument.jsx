@@ -313,7 +313,7 @@ function BookingDocument() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: "10mm", padding: "5mm", border: "1px solid #e5e7eb", borderRadius: "4px" }}>
+              <div style={{ marginBottom: "10mm", padding: "5mm", border: "1px solid #e2e8f0", borderRadius: "4px" }}>
                 <strong style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", display: "block", marginBottom: "2mm" }}>Intestato a:</strong>
                 <div style={{ fontSize: "14pt", fontWeight: "bold" }}>{booking.guest_name}</div>
                 <div style={{ fontSize: "11pt" }}>{booking.guest_email || ""}</div>
@@ -391,3 +391,4 @@ function BookingDocument() {
 }
 
 export default BookingDocument;
+

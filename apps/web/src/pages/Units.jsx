@@ -61,10 +61,10 @@ function Units() {
 
   const card = {
     backgroundColor: "white",
-    borderRadius: "14px",
+    borderRadius: "16px",
     padding: "14px 16px",
     boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e2e8f0",
     display: "flex",
     flexDirection: "column",
     gap: 8,
@@ -214,3 +214,4 @@ function Units() {
 }
 
 export default Units;
+

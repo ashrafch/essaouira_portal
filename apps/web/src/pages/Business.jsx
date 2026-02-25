@@ -324,10 +324,10 @@ function Business() {
 
   const card = {
     background: "white",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+    border: "1px solid #e2e8f0",
   };
 
   const cardTitle = {
@@ -914,7 +914,7 @@ function Business() {
                         width: "100%",
                         textAlign: "left",
                         marginBottom: 6,
-                        border: "1px solid #e5e7eb",
+                        border: "1px solid #e2e8f0",
                         borderRadius: 8,
                         padding: "6px 8px",
                         background: "white",
@@ -1038,7 +1038,7 @@ function Business() {
                         width: "100%",
                         textAlign: "left",
                         marginBottom: 6,
-                        border: "1px solid #e5e7eb",
+                        border: "1px solid #e2e8f0",
                         borderRadius: 8,
                         padding: "6px 8px",
                         background: "white",
@@ -1132,4 +1132,5 @@ function Business() {
 }
 
 export default Business;
+
 

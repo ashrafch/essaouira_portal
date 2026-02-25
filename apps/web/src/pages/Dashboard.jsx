@@ -100,37 +100,48 @@ function Dashboard() {
   const taskProgress = tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
 
   // --- STILI ---
-  const pageStyle = { display: "flex", flexDirection: "column", gap: "24px" };
+  const pageStyle = { display: "flex", flexDirection: "column", gap: 20 };
   
-  const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" };
+  const headerStyle = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 14,
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
+    padding: "14px 16px",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+  };
   
-  const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" };
+  const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 };
   
   const kpiCard = (borderLeftColor) => ({
-    backgroundColor: "white",
-    borderRadius: "12px",
-    padding: "20px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
-    border: "1px solid #e5e7eb",
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+    border: "1px solid #e2e8f0",
     borderLeft: `5px solid ${borderLeftColor}`,
     display: "flex", flexDirection: "column", justifyContent: "space-between"
   });
 
-  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px" };
+  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 };
   
   const chartCard = {
-    backgroundColor: "white", borderRadius: "16px", padding: "24px",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)", border: "1px solid #e5e7eb",
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)", borderRadius: 16, padding: 18,
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)", border: "1px solid #e2e8f0",
     minHeight: "350px", display: "flex", flexDirection: "column"
   };
 
   const operationCard = {
-    backgroundColor: "white", borderRadius: "16px", padding: "24px",
-    border: "1px solid #e5e7eb", flex: 1
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)", borderRadius: 16, padding: 18,
+    border: "1px solid #e2e8f0", flex: 1, boxShadow: "0 8px 20px rgba(15,23,42,0.05)"
   };
 
   const selectStyle = {
-    padding: "8px 12px", borderRadius: "8px", border: "1px solid #d1d5db",
+    padding: "8px 12px", borderRadius: 10, border: "1px solid #cbd5e1",
     fontSize: "14px", cursor: "pointer", backgroundColor: "white"
   };
 
@@ -201,7 +212,7 @@ function Dashboard() {
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {alerts.map((alert) => (
-              <div key={alert.code} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>
+              <div key={alert.code} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10, background: "#fff" }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{alert.title} ({alert.count})</div>
                 <div style={{ fontSize: 12, color: "#6b7280" }}>{alert.details}</div>
               </div>
@@ -363,3 +374,4 @@ function Dashboard() {
 }
 
 export default Dashboard;
+

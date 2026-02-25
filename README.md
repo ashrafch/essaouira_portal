@@ -204,6 +204,13 @@ CI/CD:
 
 Roadmap prodotto: `ROADMAP_PRODUCT.md`
 
+## UX Refresh
+
+- design system UI unificato (palette, superfici, ombre, radius, spacing)
+- layout generale aggiornato (sidebar + topbar + area contenuti)
+- flusso modal-first per azioni operative principali
+- refresh stilistico esteso su tutte le pagine operative
+
 ## Schema Tenant & Ruoli
 
 ### Modello tenant

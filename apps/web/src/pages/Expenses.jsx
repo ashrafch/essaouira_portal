@@ -160,11 +160,17 @@ function Expenses() {
   // Styles
   const page = { display: "flex", flexDirection: "column", gap: 16 };
   const header = { display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 };
-  const card = { backgroundColor: "white", borderRadius: 14, padding: 16, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" };
+  const card = {
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    borderRadius: 16,
+    padding: 16,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+  };
   const title = { fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 4 };
-  const inputStyle = { padding: "6px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, width: "100%" };
+  const inputStyle = { padding: "8px 10px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, width: "100%" };
   const btnPrimary = { padding: "8px 16px", borderRadius: 99, border: "none", backgroundColor: "#0f766e", color: "white", cursor: "pointer", fontWeight: 500 };
-  const btnSecondary = { padding: "6px 10px", borderRadius: 99, border: "1px solid #d1d5db", backgroundColor: "white", color: "#374151", cursor: "pointer", fontSize: 12 };
+  const btnSecondary = { padding: "6px 10px", borderRadius: 99, border: "1px solid #cbd5e1", backgroundColor: "white", color: "#374151", cursor: "pointer", fontSize: 12 };
   const table = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
   const th = { textAlign: "left", padding: "8px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 12 };
   const td = { padding: "8px", borderBottom: "1px solid #f3f4f6" };
@@ -322,3 +328,4 @@ function Expenses() {
 }
 
 export default Expenses;
+

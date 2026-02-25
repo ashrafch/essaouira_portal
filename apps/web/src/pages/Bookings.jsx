@@ -628,7 +628,7 @@ function Bookings() {
   const statCard = {
     background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
     border: "1px solid #e2e8f0",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: "10px 12px",
     boxShadow: "0 4px 14px rgba(15,23,42,0.04)",
   };
@@ -1474,7 +1474,7 @@ function Bookings() {
             <div style={{ display: "grid", gap: 12 }}>
               <div
                 style={{
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e2e8f0",
                   borderRadius: 10,
                   padding: 12,
                   backgroundColor: "#f9fafb",
@@ -1599,7 +1599,7 @@ function Bookings() {
 
               <div
                 style={{
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e2e8f0",
                   borderRadius: 10,
                   padding: 12,
                   backgroundColor: "#f9fafb",
@@ -1684,3 +1684,4 @@ function Bookings() {
 }
 
 export default Bookings;
+

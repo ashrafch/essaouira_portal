@@ -296,10 +296,10 @@ function UnitTimeline() {
 
   const card = {
     backgroundColor: "white",
-    borderRadius: "14px",
+    borderRadius: "16px",
     padding: "16px 18px",
     boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e2e8f0",
   };
 
   const rangeControls = {
@@ -453,7 +453,7 @@ function UnitTimeline() {
     width: "100%",
     maxWidth: 420,
     boxShadow: "0 20px 40px rgba(15,23,42,0.2)",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e2e8f0",
   };
 
   function Modal({ title, onClose, children }) {
@@ -472,7 +472,7 @@ function UnitTimeline() {
             <button
               style={{
                 borderRadius: 999,
-                border: "1px solid #e5e7eb",
+                border: "1px solid #e2e8f0",
                 padding: "4px 8px",
                 background: "#f9fafb",
                 cursor: "pointer",
@@ -762,7 +762,7 @@ function UnitTimeline() {
                     padding: "4px 8px",
                     borderRadius: 999,
                     backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid #e2e8f0",
                   }}
                 >
                   <span
@@ -879,7 +879,7 @@ function UnitTimeline() {
                 maxHeight: 260,
                 overflowY: "auto",
                 borderRadius: 10,
-                border: "1px solid #e5e7eb",
+                border: "1px solid #e2e8f0",
                 padding: "6px 8px",
                 background: "#f9fafb",
               }}
@@ -1011,3 +1011,4 @@ function UnitTimeline() {
 }
 
 export default UnitTimeline;
+

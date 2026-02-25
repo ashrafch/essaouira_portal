@@ -337,9 +337,9 @@ function Calendar() {
 
   const navButton = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid #cbd5e1",
     backgroundColor: "white",
-    padding: "4px 8px",
+    padding: "6px 10px",
     fontSize: 13,
     cursor: "pointer",
   };
@@ -363,11 +363,11 @@ function Calendar() {
   };
 
   const card = {
-    backgroundColor: "white",
-    borderRadius: "14px",
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    borderRadius: "16px",
     padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.05)",
+    border: "1px solid #e2e8f0",
   };
 
   const legend = {
@@ -414,15 +414,15 @@ function Calendar() {
   };
 
   const dayCell = (isCurrentMonth, isToday) => ({
-    borderRadius: 10,
-    border: "1px solid #e5e7eb",
-    backgroundColor: isCurrentMonth ? "#f9fafb" : "#fdfdfd",
+    borderRadius: 12,
+    border: "1px solid #e2e8f0",
+    backgroundColor: isCurrentMonth ? "#f8fafc" : "#fdfdfd",
     position: "relative",
     minHeight: 90,
     padding: "4px 4px 4px 4px",
     fontSize: 11,
     cursor: draggingBooking && !fromCache ? "copy" : "default",
-    boxShadow: isToday ? "0 0 0 2px #0f766e inset" : "none",
+    boxShadow: isToday ? "0 0 0 2px #0f766e inset" : "0 1px 2px rgba(15,23,42,0.03)",
     overflow: "hidden",
   });
 
@@ -849,3 +849,4 @@ function Calendar() {
 }
 
 export default Calendar;
+

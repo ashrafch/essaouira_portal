@@ -203,11 +203,11 @@ function StaffDirectory() {
   };
 
   const card = {
-    background: "white",
-    borderRadius: 14,
+    background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
+    borderRadius: 16,
     padding: 14,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
+    border: "1px solid #e2e8f0",
   };
 
   const field = {
@@ -224,9 +224,9 @@ function StaffDirectory() {
   };
 
   const input = {
-    borderRadius: 8,
-    border: "1px solid #d1d5db",
-    padding: "6px 8px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    padding: "8px 10px",
     fontSize: 13,
   };
 
@@ -243,7 +243,7 @@ function StaffDirectory() {
 
   const buttonSecondary = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid #cbd5e1",
     padding: "6px 10px",
     fontSize: 11,
     fontWeight: 500,
@@ -332,7 +332,7 @@ function StaffDirectory() {
               borderRadius: 999,
               backgroundColor: "#f9fafb",
               color: "#6b7280",
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e2e8f0",
               minWidth: 80,
               textAlign: "center",
             }}
@@ -654,3 +654,4 @@ function StaffDirectory() {
 }
 
 export default StaffDirectory;
+
