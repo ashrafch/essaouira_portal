@@ -227,6 +227,13 @@ class TenantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CompliancePolicyOut(BaseModel):
+    company_name: str
+    privacy_email: str
+    terms_url: str
+    privacy_url: str
+
+
 @app.get("/users", response_model=list[UserOut])
 def list_users(request: Request, db: Session = Depends(get_db)):
     _require_role(request, {"owner"})
@@ -356,6 +363,74 @@ def create_platform_tenant(
         reset_current_tenant_id(token)
 
     return tenant
+
+
+@app.get("/audit-logs.csv")
+def download_audit_logs_csv(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=1000, ge=1, le=10000),
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    username: str | None = None,
+):
+    _require_role(request, {"owner"})
+    q = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+    if from_date:
+        q = q.filter(AuditLog.created_at >= from_date)
+    if to_date:
+        q = q.filter(AuditLog.created_at <= to_date)
+    if username:
+        q = q.filter(AuditLog.username == username)
+    logs = q.limit(limit).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "id",
+            "created_at",
+            "event_type",
+            "username",
+            "role",
+            "method",
+            "path",
+            "status_code",
+            "client_ip",
+            "details",
+        ]
+    )
+    for log in logs:
+        writer.writerow(
+            [
+                log.id,
+                log.created_at,
+                log.event_type,
+                log.username,
+                log.role,
+                log.method,
+                log.path,
+                log.status_code,
+                log.client_ip,
+                log.details,
+            ]
+        )
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="audit_logs.csv"'},
+    )
+
+
+@app.get("/compliance/policy", response_model=CompliancePolicyOut)
+def get_compliance_policy():
+    return CompliancePolicyOut(
+        company_name=settings.compliance_company_name,
+        privacy_email=settings.compliance_privacy_email,
+        terms_url=settings.compliance_terms_url,
+        privacy_url=settings.compliance_privacy_url,
+    )
 
 
 # ---------- UNITS ----------

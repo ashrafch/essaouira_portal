@@ -12,4 +12,5 @@ export const APP_ROUTES = [
   { path: "/tariffe-canali", key: "pricing" },
   { path: "/maintenance", key: "maintenance" },
   { path: "/expenses", key: "expenses" },
+  { path: "/admin-control", key: "adminControl" },
 ];

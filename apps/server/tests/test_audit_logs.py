@@ -60,3 +60,11 @@ def test_audit_logs_are_tenant_scoped():
         logs_other = client.get("/audit-logs", headers=owner_other)
         assert logs_other.status_code == 200
         assert any(log["path"] == "/cost-items" and log["status_code"] == 200 for log in logs_other.json())
+
+
+def test_audit_logs_csv_export():
+    with TestClient(app) as client:
+        owner_headers = _headers("owner", "default")
+        csv_resp = client.get("/audit-logs.csv?limit=50", headers=owner_headers)
+        assert csv_resp.status_code == 200
+        assert "text/csv" in csv_resp.headers.get("content-type", "")

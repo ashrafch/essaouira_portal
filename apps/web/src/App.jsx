@@ -19,6 +19,7 @@ const Pricing = lazy(() => import("./pages/Pricing.jsx"));
 const BookingDocument = lazy(() => import("./pages/BookingDocument.jsx"));
 const Maintenance = lazy(() => import("./pages/Maintenance.jsx"));
 const Expenses = lazy(() => import("./pages/Expenses.jsx"));
+const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 
 function PageFallback() {
@@ -39,6 +40,7 @@ const ROUTE_COMPONENTS = {
   pricing: Pricing,
   maintenance: Maintenance,
   expenses: Expenses,
+  adminControl: AdminControl,
 };
 
 function App() {

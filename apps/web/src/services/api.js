@@ -143,6 +143,21 @@ export function getAuditLogs(params = {}) {
   return apiGet("/audit-logs", params);
 }
 
+export async function downloadAuditLogsCsv(params = {}) {
+  const res = await fetch(`${BASE_URL}/audit-logs.csv${buildQuery(params)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Errore export audit CSV ${res.status}: ${text}`);
+  }
+  return res.blob();
+}
+
+export function getCompliancePolicy() {
+  return apiGet("/compliance/policy");
+}
+
 export async function downloadMonthCostLinesCsv(year, month) {
   const res = await fetch(
     `${BASE_URL}/analytics/month-cost-lines.csv${buildQuery({ year, month })}`,
@@ -252,4 +267,12 @@ export function updateMaintenanceTicket(id, payload) {
 
 export function deleteMaintenanceTicket(id) {
   return apiDelete(`/maintenance/${id}`);
+}
+
+export function getPlatformTenants() {
+  return apiGet("/platform/tenants");
+}
+
+export function createPlatformTenant(payload) {
+  return apiPost("/platform/tenants", payload);
 }

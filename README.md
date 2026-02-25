@@ -72,6 +72,10 @@ Backend (`apps/server/.env`):
 - `ADMIN_PASSWORD_HASH` (preferito in produzione)
 - `ADMIN_ROLE` (`viewer|operator|manager|owner`)
 - `ADMIN_TENANT_ID` (tenant/cliente nel token)
+- `COMPLIANCE_COMPANY_NAME`
+- `COMPLIANCE_PRIVACY_EMAIL`
+- `COMPLIANCE_TERMS_URL`
+- `COMPLIANCE_PRIVACY_URL`
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
 
@@ -86,6 +90,13 @@ Audit trail:
 Tenant onboarding (piattaforma):
 - endpoint `GET/POST /platform/tenants` (solo platform owner `owner@default`)
 - crea tenant + owner iniziale per nuovo cliente
+
+Admin frontend:
+- pagina `/admin-control` con:
+  - audit logs live
+  - export CSV audit
+  - compliance links
+  - onboarding tenant (owner)
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`

@@ -18,6 +18,7 @@ AUTH_EXCLUDED_PATHS = {
     "/redoc",
     "/openapi.json",
     "/metrics",
+    "/compliance/policy",
 }
 
 READ_ONLY_METHODS = {"GET", "HEAD", "OPTIONS"}

@@ -7,6 +7,8 @@
 - Isolamento dati tenant a livello ORM (`tenant_id` + filtri automatici): completato
 - Audit trail backend (`audit_logs` + endpoint consultazione owner): completato
 - Tenant onboarding piattaforma (`/platform/tenants` + owner seed): completato
+- Admin UI (`/admin-control`) per audit/compliance/onboarding: completato
+- Compliance policy endpoint pubblico (`/compliance/policy`): completato
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

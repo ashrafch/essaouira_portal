@@ -130,6 +130,7 @@ function Sidebar() {
     property: false,
     staff: false,
     facility: true, // Apro la nuova sezione per evidenziarla
+    platform: false,
   });
 
   const [todayStats, setTodayStats] = useState({
@@ -202,6 +203,11 @@ function Sidebar() {
           badge: "openTickets",
         },
       ],
+    },
+    {
+      id: "platform",
+      title: "Platform",
+      items: [{ to: "/admin-control", label: "Audit & Tenant", badge: null }],
     },
   ];
 
