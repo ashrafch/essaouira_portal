@@ -1,6 +1,7 @@
 import os
 import csv
 import io
+from contextlib import asynccontextmanager
 from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from app.db import get_db
 from app.api.middlewares import authentication, request_logging
@@ -30,7 +31,15 @@ from app.models.maintenance import MaintenanceTicket
 
 
 setup_logging()
-app = FastAPI(title="Portale Essaouira API")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    initialize_schema_and_seed()
+    yield
+
+
+app = FastAPI(title="Portale Essaouira API", lifespan=lifespan)
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 cors_origins_raw = os.getenv(
@@ -49,11 +58,6 @@ app.add_middleware(
 
 app.middleware("http")(request_logging)
 app.middleware("http")(authentication)
-
-
-@app.on_event("startup")
-def on_startup():
-    initialize_schema_and_seed()
 
 
 # ---------- HEALTH CHECK ----------
@@ -98,8 +102,7 @@ class UnitOut(BaseModel):
     base_nightly_rate: float | None
     currency: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UnitUpdate(BaseModel):
@@ -167,13 +170,16 @@ class BookingBase(BaseModel):
 
     # late check-out
     has_late_checkout: bool = False
-    
-    class Config:
-        from_attributes = True
-        # Aiuta pydantic v1/v2 compatibilità con oggetti time
-        json_encoders = {
-            time: lambda v: v.strftime("%H:%M")
-        }
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    @field_serializer("estimated_arrival_time", when_used="json")
+    def serialize_estimated_arrival_time(self, value: time | None):
+        if value is None:
+            return None
+        return value.strftime("%H:%M")
 
 
 class BookingCreate(BookingBase):
@@ -873,8 +879,7 @@ class MonthCostLine(BaseModel):
     staff_task_id: int | None = None
     origin: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 def _get_month_range(year: int, month: int):
@@ -1417,8 +1422,7 @@ class StaffTaskUpdate(StaffTaskBase):
 class StaffTaskOut(StaffTaskBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])
@@ -1607,8 +1611,7 @@ class CostItemUpdate(CostItemBase):
 class CostItemOut(CostItemBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @app.get("/cost-items", response_model=list[CostItemOut])
@@ -1681,8 +1684,7 @@ class StaffDefaultsOut(BaseModel):
     cleaning_default_hours: float | None = None
     currency: str = "EUR"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StaffDefaultsUpdate(BaseModel):
@@ -1743,8 +1745,7 @@ class StaffMemberUpdate(BaseModel):
 class StaffMemberOut(StaffMemberBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @app.get("/staff-members", response_model=List[StaffMemberOut])
@@ -1923,8 +1924,7 @@ class MaintenanceOut(MaintenanceBase):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @app.get("/maintenance", response_model=List[MaintenanceOut])

@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBookings, getUnits } from "../services/api";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 // --- STILI SCHERMO ---
 const screenContainerStyle = {
@@ -151,6 +149,10 @@ function BookingDocument() {
     const element = documentRef.current;
     if (!element) return;
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
