@@ -31,6 +31,7 @@ WRITE_PROTECTED_PREFIXES = (
     "/staff-members",
     "/pricing-defaults",
     "/maintenance",
+    "/users",
 )
 
 

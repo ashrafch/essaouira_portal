@@ -45,12 +45,12 @@ export function isAuthenticated() {
   return Boolean(getAccessToken());
 }
 
-export async function login(username, password, baseUrl) {
+export async function login(username, password, tenantId, baseUrl) {
   const apiBase = (baseUrl || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").trim();
   const res = await fetch(`${apiBase}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, tenant_id: tenantId }),
   });
 
   if (!res.ok) {

@@ -16,9 +16,17 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 from app.db import get_db
 from app.api.middlewares import authentication, request_logging
 from app.bootstrap import initialize_schema_and_seed
-from app.core.auth import authenticate_user, create_access_token, validate_auth_configuration
+from app.core.auth import (
+    ALLOWED_ROLES,
+    authenticate_user,
+    create_access_token,
+    hash_password,
+    validate_auth_configuration,
+    verify_password,
+)
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tenant import normalize_tenant_id, reset_current_tenant_id, set_current_tenant_id
 from app.main_types import StaffRole
 from app.models.unit import Unit
 from app.models.booking import Booking
@@ -28,6 +36,7 @@ from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
 from app.models.maintenance import MaintenanceTicket
+from app.models.user import User
 
 
 setup_logging()
@@ -71,6 +80,7 @@ def health():
 class AuthLoginRequest(BaseModel):
     username: str
     password: str
+    tenant_id: str | None = None
 
 
 class AuthLoginResponse(BaseModel):
@@ -88,7 +98,7 @@ class AuthMeResponse(BaseModel):
 
 
 @app.post("/auth/login", response_model=AuthLoginResponse)
-def auth_login(payload: AuthLoginRequest):
+def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     if not settings.auth_enabled:
         token = create_access_token("anonymous", role="owner", tenant_id="default")
         return AuthLoginResponse(
@@ -98,19 +108,34 @@ def auth_login(payload: AuthLoginRequest):
             tenant_id="default",
         )
 
-    if not authenticate_user(payload.username, payload.password):
+    tenant_id = normalize_tenant_id(payload.tenant_id or settings.admin_tenant_id)
+    role = None
+
+    tenant_token = set_current_tenant_id(tenant_id)
+    try:
+        db_user = (
+            db.query(User)
+            .filter(User.username == payload.username, User.is_active.is_(True))
+            .first()
+        )
+    finally:
+        reset_current_tenant_id(tenant_token)
+
+    if db_user and verify_password(payload.password, db_user.password_hash):
+        role = db_user.role
+    elif authenticate_user(payload.username, payload.password):
+        if tenant_id != normalize_tenant_id(settings.admin_tenant_id):
+            raise HTTPException(status_code=401, detail="Credenziali non valide")
+        role = settings.admin_role
+    else:
         raise HTTPException(status_code=401, detail="Credenziali non valide")
 
-    token = create_access_token(
-        payload.username,
-        role=settings.admin_role,
-        tenant_id=settings.admin_tenant_id,
-    )
+    token = create_access_token(payload.username, role=role, tenant_id=tenant_id)
     return AuthLoginResponse(
         access_token=token,
         username=payload.username,
-        role=settings.admin_role,
-        tenant_id=settings.admin_tenant_id,
+        role=role,
+        tenant_id=tenant_id,
     )
 
 
@@ -122,6 +147,98 @@ def auth_me(request: Request):
     if not username:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return AuthMeResponse(username=username, role=role, tenant_id=tenant_id)
+
+
+def _require_role(request: Request, allowed_roles: set[str]) -> None:
+    role = getattr(request.state, "role", None)
+    if role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "viewer"
+    is_active: bool = True
+
+
+class UserUpdateRequest(BaseModel):
+    password: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    role: str
+    is_active: bool
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@app.get("/users", response_model=list[UserOut])
+def list_users(request: Request, db: Session = Depends(get_db)):
+    _require_role(request, {"owner"})
+    return db.query(User).order_by(User.username).all()
+
+
+@app.post("/users", response_model=UserOut)
+def create_user(payload: UserCreateRequest, request: Request, db: Session = Depends(get_db)):
+    _require_role(request, {"owner"})
+    role = payload.role.strip().lower()
+    if role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail="Ruolo non valido")
+
+    username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username obbligatorio")
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password troppo corta (min 8)")
+
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Username gia esistente")
+
+    user = User(
+        username=username,
+        password_hash=hash_password(payload.password),
+        role=role,
+        is_active=payload.is_active,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.put("/users/{user_id}", response_model=UserOut)
+def update_user(
+    user_id: int, payload: UserUpdateRequest, request: Request, db: Session = Depends(get_db)
+):
+    _require_role(request, {"owner"})
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    if payload.role is not None:
+        role = payload.role.strip().lower()
+        if role not in ALLOWED_ROLES:
+            raise HTTPException(status_code=400, detail="Ruolo non valido")
+        user.role = role
+
+    if payload.password is not None:
+        if len(payload.password) < 8:
+            raise HTTPException(status_code=400, detail="Password troppo corta (min 8)")
+        user.password_hash = hash_password(payload.password)
+
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 # ---------- UNITS ----------

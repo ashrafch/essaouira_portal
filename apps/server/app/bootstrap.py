@@ -1,10 +1,12 @@
 import logging
 
 from app.core.config import settings
+from app.core.auth import hash_password
 from app.db import Base, engine, get_db
 from app.models.pricing_defaults import PricingDefaults
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
+from app.models.user import User
 from app.models.unit import Unit
 from app.main_types import StaffRole
 
@@ -95,6 +97,26 @@ def initialize_schema_and_seed() -> None:
                 currency="EUR",
             )
             db.add(pricing_defaults)
+            db.commit()
+
+        owner_user = (
+            db.query(User)
+            .filter(User.username == settings.admin_username)
+            .first()
+        )
+        if owner_user is None:
+            if settings.admin_password_hash:
+                password_hash = settings.admin_password_hash
+            else:
+                password_hash = hash_password(settings.admin_password)
+
+            owner_user = User(
+                username=settings.admin_username,
+                password_hash=password_hash,
+                role=settings.admin_role,
+                is_active=True,
+            )
+            db.add(owner_user)
             db.commit()
     finally:
         db.close()

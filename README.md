@@ -75,6 +75,10 @@ Backend (`apps/server/.env`):
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
 
+Gestione utenti:
+- endpoint `GET/POST/PUT /users` (owner del tenant)
+- login supporta `tenant_id` nel payload
+
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
 
