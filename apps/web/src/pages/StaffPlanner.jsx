@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getStaffTasks, getUnits, updateStaffTask } from "../services/api";
+import {
+  getStaffMembers,
+  getStaffTasks,
+  getUnits,
+  updateStaffTask,
+} from "../services/api";
 
 const pageWrapper = {
   display: "flex",
@@ -240,11 +245,13 @@ function StaffPlanner() {
 
   const [tasks, setTasks] = useState([]);
   const [unitsById, setUnitsById] = useState({});
+  const [staffMembers, setStaffMembers] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [editingTask, setEditingTask] = useState(null);
   const [editForm, setEditForm] = useState({
     assignee_name: "",
+    assignee_manual: "",
     status: "planned",
     estimated_hours: "",
     cost: "",
@@ -255,19 +262,23 @@ function StaffPlanner() {
 
   // carica unità
   useEffect(() => {
-    async function loadUnits() {
+    async function loadBaseData() {
       try {
-        const units = await getUnits();
+        const [units, staff] = await Promise.all([
+          getUnits(),
+          getStaffMembers({ active_only: true }),
+        ]);
         const map = {};
         units.forEach((u) => {
           map[u.id] = u;
         });
         setUnitsById(map);
+        setStaffMembers(staff || []);
       } catch (err) {
-        console.error("Errore caricamento units", err);
+        console.error("Errore caricamento base data", err);
       }
     }
-    loadUnits();
+    loadBaseData();
   }, []);
 
   // carica task del giorno
@@ -322,6 +333,7 @@ function StaffPlanner() {
     setSaveError("");
     setEditForm({
       assignee_name: task.assignee_name || "",
+      assignee_manual: "",
       status: task.status || "planned",
       estimated_hours:
         task.estimated_hours != null ? String(task.estimated_hours) : "",
@@ -345,7 +357,7 @@ function StaffPlanner() {
         date: editingTask.date,
         time: editingTask.time,
         task_type: editingTask.task_type,
-        assignee_name: editForm.assignee_name || null,
+        assignee_name: editForm.assignee_manual.trim() || editForm.assignee_name || null,
         estimated_hours:
           editForm.estimated_hours !== ""
             ? Number(editForm.estimated_hours)
@@ -479,13 +491,27 @@ function StaffPlanner() {
 
             <div style={modalRow}>
               <label style={modalLabel}>Operatore</label>
-              <input
+              <select
                 style={modalInput}
                 value={editForm.assignee_name}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, assignee_name: e.target.value }))
                 }
-                placeholder="Es. Operatore 1"
+              >
+                <option value="">Nessun assegnatario</option>
+                {staffMembers.map((m) => (
+                  <option key={m.id} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                style={{ ...modalInput, marginTop: 6 }}
+                value={editForm.assignee_manual}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, assignee_manual: e.target.value }))
+                }
+                placeholder="Oppure inserisci nome manuale"
               />
             </div>
 
