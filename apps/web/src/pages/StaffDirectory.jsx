@@ -309,6 +309,8 @@ function StaffDirectory() {
             gap: 8,
             alignItems: "center",
             fontSize: 11,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
           }}
         >
           <button
@@ -363,6 +365,9 @@ function StaffDirectory() {
               {inactiveCount}
             </div>
           </div>
+          <button type="button" style={buttonPrimary} onClick={openCreateModal}>
+            Nuovo membro
+          </button>
         </div>
       </div>
 
@@ -543,9 +548,6 @@ function StaffDirectory() {
                 I membri disattivi non compariranno nel planner staff.
               </p>
             </div>
-            <button type="button" style={buttonPrimary} onClick={openCreateModal}>
-              Nuovo membro
-            </button>
             <label
               style={{
                 fontSize: 11,

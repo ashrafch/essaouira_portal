@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AppModal from "../components/AppModal";
+import PageInfoHelp from "../components/PageInfoHelp";
 import {
   createMessageTemplate,
   createTaskChecklistItem,
@@ -172,6 +173,25 @@ function OpsAutomation() {
           Gestione template messaggi, coda invii e checklist housekeeping.
         </p>
       </div>
+      <div
+        style={{
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          background: "#f8fafc",
+          padding: 12,
+          fontSize: 13,
+          color: "#334155",
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        <strong>Come funziona questa pagina</strong>
+        <ol style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+          <li>Crea i template con trigger + offset.</li>
+          <li>Monitora i message jobs e gli stati di invio.</li>
+          <li>Gestisci checklist housekeeping per standardizzare le task.</li>
+        </ol>
+      </div>
 
       {error ? <p style={{ color: "#b91c1c", fontSize: 12 }}>{error}</p> : null}
       {loading ? <p style={{ fontSize: 13 }}>Caricamento automazioni...</p> : null}
@@ -305,6 +325,7 @@ function OpsAutomation() {
                   borderRadius: 8,
                   padding: "6px 8px",
                   background: "#fff",
+                  color: "#0f172a",
                   cursor: "pointer",
                 }}
               >
@@ -315,7 +336,17 @@ function OpsAutomation() {
         </section>
 
         <section style={card}>
-          <h2 style={{ marginTop: 0, fontSize: 14 }}>Message jobs</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 14 }}>Message jobs</h2>
+            <PageInfoHelp title="Come usare Message jobs" maxWidth={640}>
+              <p>Message jobs e la coda invii generata dai template.</p>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                <li>`scheduled`: pronto ma non inviato.</li>
+                <li>`sent`: inviato correttamente.</li>
+                <li>`failed`: errore da verificare.</li>
+              </ul>
+            </PageInfoHelp>
+          </div>
           <div style={{ maxHeight: 320, overflowY: "auto", fontSize: 12 }}>
             {jobs.length === 0 ? (
               <p style={{ color: "#6b7280" }}>Nessun job in coda.</p>
@@ -364,7 +395,17 @@ function OpsAutomation() {
       </div>
 
       <section style={card}>
-        <h2 style={{ marginTop: 0, fontSize: 14 }}>Checklist housekeeping per task</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 14 }}>Checklist housekeeping per task</h2>
+          <PageInfoHelp title="Come usare Checklist housekeeping" maxWidth={640}>
+            <p>Checklist associa sotto-attivita a un task staff (`Task ID`).</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+              <li>Carica checklist con Task ID.</li>
+              <li>Aggiungi voci standard operative.</li>
+              <li>Spunta completato per controllo qualita.</li>
+            </ul>
+          </PageInfoHelp>
+        </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <input
             style={input}
@@ -405,6 +446,7 @@ function OpsAutomation() {
                   borderRadius: 8,
                   padding: "6px 8px",
                   background: it.is_done ? "#ecfdf5" : "#fff",
+                  color: "#0f172a",
                   cursor: "pointer",
                 }}
               >
