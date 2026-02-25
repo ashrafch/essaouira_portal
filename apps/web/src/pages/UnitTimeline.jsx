@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUnitSchedule } from "../services/api";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -524,6 +525,16 @@ function UnitTimeline() {
         </div>
 
         <div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+            <PageInfoHelp title="Come usare Timeline unita">
+              <p>La timeline unita mostra prenotazioni e task staff sullo stesso asse temporale.</p>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                <li>Cambia intervallo date per analisi breve o stagionale.</li>
+                <li>Filtra vista tra booking, staff o combinata.</li>
+                <li>Usa KPI per confrontare occupazione, revenue e costo operativo.</li>
+              </ul>
+            </PageInfoHelp>
+          </div>
           <div style={{ marginBottom: 4, fontSize: 12, color: "#6b7280" }}>
             Intervallo visualizzato
           </div>

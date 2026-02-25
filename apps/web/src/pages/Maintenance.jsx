@@ -7,6 +7,7 @@ import {
   getUnits,
   getStaffMembers,
 } from "../services/api";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 const PRIORITY_COLORS = {
   low: "#d1fae5", // verde chiaro
@@ -164,20 +165,30 @@ function Maintenance() {
             Gestisci guasti, acquisti e lavori da fare nella struttura.
           </p>
         </div>
-        <button
-          onClick={() => openModal()}
-          style={{
-            backgroundColor: "#0f766e",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + Nuova Segnalazione
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <PageInfoHelp title="Come usare Manutenzioni">
+            <p>Board Kanban per gestire ticket di guasto, acquisto e miglioria.</p>
+            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+              <li>Crea ticket con priorita, tipo e assegnatario.</li>
+              <li>Sposta stato tra `todo`, `in_progress`, `done`.</li>
+              <li>Traccia costo per analisi budget manutenzione.</li>
+            </ul>
+          </PageInfoHelp>
+          <button
+            onClick={() => openModal()}
+            style={{
+              backgroundColor: "#0f766e",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 16px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Nuova Segnalazione
+          </button>
+        </div>
       </div>
 
       {loading && (

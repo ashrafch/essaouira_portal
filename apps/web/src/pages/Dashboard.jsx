@@ -19,6 +19,7 @@ import {
   getAdvancedKpis,
   getTodayAlerts,
 } from "../services/api";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
@@ -162,7 +163,15 @@ function Dashboard() {
           </p>
         </div>
         
-        <div style={{ display: "flex", gap: "12px" }}>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <PageInfoHelp title="Come usare Dashboard">
+            <p>Dashboard unisce KPI finanziari, operativi e alert della giornata.</p>
+            <ol style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+              <li>Seleziona mese/anno per analisi economica.</li>
+              <li>Controlla alert e arrivi oggi per priorita operative.</li>
+              <li>Usa revpar, share direct e pipeline per decisioni prezzo/canali.</li>
+            </ol>
+          </PageInfoHelp>
           <select style={selectStyle} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>

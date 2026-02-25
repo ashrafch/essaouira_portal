@@ -8,6 +8,7 @@ import {
   getPlatformTenants,
 } from "../services/api";
 import { getCurrentRole } from "../services/auth";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 const card = {
   background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
@@ -89,7 +90,17 @@ function AdminControl() {
 
   return (
     <div style={{ padding: 4, display: "grid", gap: 16 }}>
-      <h1 style={{ margin: 0 }}>Admin Control</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h1 style={{ margin: 0 }}>Admin Control</h1>
+        <PageInfoHelp title="Come usare Admin Control">
+          <p>Area governance piattaforma: compliance, audit e onboarding tenant.</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Compliance mostra policy legali configurate.</li>
+            <li>Audit Log traccia azioni utente per sicurezza e controllo.</li>
+            <li>Tenant Onboarding (owner) crea nuovi clienti/ambienti.</li>
+          </ul>
+        </PageInfoHelp>
+      </div>
       {error ? <div style={{ color: "#b91c1c" }}>{error}</div> : null}
 
       <section style={card}>

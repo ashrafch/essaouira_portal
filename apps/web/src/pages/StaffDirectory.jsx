@@ -48,6 +48,7 @@ function StaffDirectory() {
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -310,6 +311,24 @@ function StaffDirectory() {
             fontSize: 11,
           }}
         >
+          <button
+            type="button"
+            onClick={() => setIsInfoOpen(true)}
+            aria-label="Info anagrafica staff"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 999,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#0f172a",
+              fontWeight: 700,
+              padding: 0,
+              cursor: "pointer",
+            }}
+          >
+            i
+          </button>
           <div
             style={{
               padding: "6px 10px",
@@ -348,6 +367,21 @@ function StaffDirectory() {
       </div>
 
       {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+      <AppModal
+        open={isInfoOpen}
+        onClose={() => setIsInfoOpen(false)}
+        title="Come usare Anagrafica Staff"
+        maxWidth={720}
+      >
+        <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+          <p>Anagrafica staff centralizza persone, ruolo, costo orario e stato attivo/disattivo.</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Usa ruoli standard per automazioni su task e planner.</li>
+            <li>Disattiva membri senza perdere lo storico operativo.</li>
+            <li>Il costo orario entra nei calcoli Business/controllo costi.</li>
+          </ul>
+        </div>
+      </AppModal>
 
       <div
         style={{

@@ -31,6 +31,7 @@ function Expenses() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [error, setError] = useState(null);
 
   // Form state
@@ -185,6 +186,14 @@ function Expenses() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={() => setIsInfoOpen(true)}
+            style={{ ...btnSecondary, width: 24, height: 24, padding: 0, fontWeight: 700 }}
+            aria-label="Info spese generali"
+          >
+            i
+          </button>
           <span style={{ fontSize: 12, color: "#6b7280" }}>Periodo:</span>
           <select style={{...inputStyle, width: "auto"}} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {Array.from({ length: 12 }, (_, i) => (
@@ -219,9 +228,24 @@ function Expenses() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, alignItems: "flex-start" }}>
-        <AppModal
-          open={isExpenseModalOpen}
-          onClose={() => setIsExpenseModalOpen(false)}
+      <AppModal
+        open={isInfoOpen}
+        onClose={() => setIsInfoOpen(false)}
+        title="Come usare Spese Generali"
+        maxWidth={700}
+      >
+        <div style={{ display: "grid", gap: 10, fontSize: 13, color: "#334155" }}>
+          <p>Qui registri costi non direttamente legati a un task staff.</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Inserisci data, categoria e importo per una rendicontazione pulita.</li>
+            <li>Collega facoltativamente la voce a una unita.</li>
+            <li>Usa il filtro mese/anno per controllo budget periodico.</li>
+          </ul>
+        </div>
+      </AppModal>
+      <AppModal
+        open={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
           title={editingId ? "Modifica Spesa" : "Nuova Spesa"}
           maxWidth={620}
         >

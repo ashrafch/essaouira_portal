@@ -10,6 +10,7 @@ import {
   getStaffMembers,
   getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 function formatDate(d) {
   if (!d) return "";
@@ -898,6 +899,14 @@ function Staff() {
               />
             </div>
             <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+              <PageInfoHelp title="Come usare Staff e Pulizie">
+                <p>Board operativo per pianificare e consuntivare task giornalieri/settimanali.</p>
+                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                  <li>Filtra per unita e tipo task per distribuire carichi.</li>
+                  <li>Assegna membri staff o nome manuale in creazione rapida/modale.</li>
+                  <li>Costo e ore alimentano automaticamente la Business.</li>
+                </ul>
+              </PageInfoHelp>
               <button
                 type="button"
                 style={modeButton(mode === "day")}

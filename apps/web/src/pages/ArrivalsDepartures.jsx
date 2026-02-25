@@ -8,6 +8,7 @@ import {
   updateStaffTask,
 } from "../services/api";
 import MessageModal from "../components/MessageModal";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 function formatDate(d) {
   if (!d) return "";
@@ -339,6 +340,14 @@ function ArrivalsDepartures() {
             Vista operativa del giorno: check-in, check-out e task staff.
           </p>
         </div>
+        <PageInfoHelp title="Come usare Arrivi e Partenze">
+          <p>Questa pagina serve per coordinare operazioni giornaliere front desk e housekeeping.</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Filtra per data e unita per vedere arrivi, partenze e task collegati.</li>
+            <li>Usa azioni rapide per aprire booking, segnare pagato o aggiornare task.</li>
+            <li>WhatsApp e documento aiutano la comunicazione operativa con gli ospiti.</li>
+          </ul>
+        </PageInfoHelp>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div>

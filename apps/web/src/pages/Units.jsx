@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { getUnits } from "../services/api";
 import db from "../offline/dbLocal";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 function Units() {
   const [units, setUnits] = useState([]);
@@ -129,6 +130,15 @@ function Units() {
         </div>
 
         <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+            <PageInfoHelp title="Come usare la pagina Appartamenti">
+              <p>Pagina riepilogo unita con stato e capienza complessiva.</p>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                <li>Verifica rapidamente disponibilita dati e stato offline.</li>
+                <li>Apri la timeline per analizzare prenotazioni e task della singola unita.</li>
+              </ul>
+            </PageInfoHelp>
+          </div>
           <div style={{ marginBottom: 4 }}>
             Totale capacità: <strong>{totalCapacity}</strong> ospiti
           </div>
@@ -214,4 +224,5 @@ function Units() {
 }
 
 export default Units;
+
 

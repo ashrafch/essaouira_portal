@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getBookings, getUnits, updateBooking } from "../services/api";
 import db from "../offline/dbLocal";
+import PageInfoHelp from "../components/PageInfoHelp";
 
 const MONTH_LABELS = [
   "Gennaio",
@@ -559,6 +560,14 @@ function Calendar() {
         <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>
           <div style={{ marginBottom: 4 }}>
             <div style={navControls}>
+              <PageInfoHelp title="Come usare Calendario occupazione">
+                <p>Il calendario mostra le prenotazioni giorno per giorno con stato live/offline.</p>
+                <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                  <li>Pulsante `+` per creare booking sul giorno selezionato.</li>
+                  <li>Click su una card per aprire la prenotazione in modifica.</li>
+                  <li>Drag and drop disponibile solo in modalita live, non da cache offline.</li>
+                </ul>
+              </PageInfoHelp>
               <button style={navButton} type="button" onClick={prevMonth}>
                 ◀️
               </button>
