@@ -70,6 +70,8 @@ Backend (`apps/server/.env`):
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 - `ADMIN_PASSWORD_HASH` (preferito in produzione)
+- `ADMIN_ROLE` (`viewer|operator|manager|owner`)
+- `ADMIN_TENANT_ID` (tenant/cliente nel token)
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
 
@@ -98,6 +100,14 @@ Generare password hash admin (consigliato):
 cd apps/server
 python -c "from app.core.auth import hash_password; print(hash_password('cambia-questa-password'))"
 ```
+
+RBAC backend (minimo):
+- `viewer` e `operator`: sola lettura sulle risorse core
+- `manager` e `owner`: lettura + scrittura
+
+Tenant context:
+- il token include `tenant_id`
+- opzionalmente puoi inviare header `X-Tenant-Id`; se diverso dal token viene rifiutato (`403`)
 
 Frontend:
 ```bash

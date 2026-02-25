@@ -35,6 +35,8 @@ def test_login_and_access_units():
         me_response = client.get("/auth/me", headers=headers)
         assert me_response.status_code == 200
         assert me_response.json()["username"] == "owner"
+        assert me_response.json()["role"] == "owner"
+        assert me_response.json()["tenant_id"] == "default"
 
         response = client.get("/units", headers=headers)
         assert response.status_code == 200

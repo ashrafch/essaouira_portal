@@ -77,31 +77,51 @@ class AuthLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+    role: str
+    tenant_id: str
 
 
 class AuthMeResponse(BaseModel):
     username: str
+    role: str
+    tenant_id: str
 
 
 @app.post("/auth/login", response_model=AuthLoginResponse)
 def auth_login(payload: AuthLoginRequest):
     if not settings.auth_enabled:
-        token = create_access_token("anonymous")
-        return AuthLoginResponse(access_token=token, username="anonymous")
+        token = create_access_token("anonymous", role="owner", tenant_id="default")
+        return AuthLoginResponse(
+            access_token=token,
+            username="anonymous",
+            role="owner",
+            tenant_id="default",
+        )
 
     if not authenticate_user(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="Credenziali non valide")
 
-    token = create_access_token(payload.username)
-    return AuthLoginResponse(access_token=token, username=payload.username)
+    token = create_access_token(
+        payload.username,
+        role=settings.admin_role,
+        tenant_id=settings.admin_tenant_id,
+    )
+    return AuthLoginResponse(
+        access_token=token,
+        username=payload.username,
+        role=settings.admin_role,
+        tenant_id=settings.admin_tenant_id,
+    )
 
 
 @app.get("/auth/me", response_model=AuthMeResponse)
 def auth_me(request: Request):
     username = getattr(request.state, "user", None)
+    role = getattr(request.state, "role", None)
+    tenant_id = getattr(request.state, "tenant_id", None)
     if not username:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return AuthMeResponse(username=username)
+    return AuthMeResponse(username=username, role=role, tenant_id=tenant_id)
 
 
 # ---------- UNITS ----------

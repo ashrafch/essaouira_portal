@@ -18,6 +18,8 @@ class Settings:
     admin_username: str = os.getenv("ADMIN_USERNAME", "owner")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "owner123")
     admin_password_hash: str = os.getenv("ADMIN_PASSWORD_HASH", "")
+    admin_role: str = os.getenv("ADMIN_ROLE", "owner").strip().lower()
+    admin_tenant_id: str = os.getenv("ADMIN_TENANT_ID", "default").strip().lower()
     auto_create_schema: bool = _as_bool(os.getenv("AUTO_CREATE_SCHEMA"), True)
     auto_seed_data: bool = _as_bool(os.getenv("AUTO_SEED_DATA"), True)
 

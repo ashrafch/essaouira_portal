@@ -8,6 +8,8 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 
+ALLOWED_ROLES = {"viewer", "operator", "manager", "owner"}
+
 
 class AuthError(HTTPException):
     def __init__(self, detail: str = "Not authenticated"):
@@ -47,6 +49,14 @@ def validate_auth_configuration() -> None:
     if not settings.auth_enabled:
         return
 
+    if settings.admin_role not in ALLOWED_ROLES:
+        raise RuntimeError(
+            "ADMIN_ROLE non valido. Valori consentiti: viewer, operator, manager, owner."
+        )
+
+    if not settings.admin_tenant_id:
+        raise RuntimeError("ADMIN_TENANT_ID non puo essere vuoto.")
+
     if settings.environment != "production":
         return
 
@@ -72,12 +82,21 @@ def authenticate_user(username: str, password: str) -> bool:
     return hmac.compare_digest(password, settings.admin_password)
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(subject: str, role: str = "owner", tenant_id: str = "default") -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.auth_access_token_minutes
     )
+    if role not in ALLOWED_ROLES:
+        raise ValueError("Invalid role")
+
+    tenant = tenant_id.strip().lower()
+    if not tenant:
+        raise ValueError("Invalid tenant_id")
+
     payload = {
         "sub": subject,
+        "role": role,
+        "tenant_id": tenant,
         "exp": expires_at,
         "type": "access",
     }
@@ -91,7 +110,15 @@ def decode_access_token(token: str) -> dict:
             settings.auth_secret_key,
             algorithms=[settings.auth_algorithm],
         )
-        if payload.get("type") != "access" or not payload.get("sub"):
+        role = payload.get("role")
+        tenant_id = payload.get("tenant_id")
+        if (
+            payload.get("type") != "access"
+            or not payload.get("sub")
+            or role not in ALLOWED_ROLES
+            or not isinstance(tenant_id, str)
+            or not tenant_id.strip()
+        ):
             raise AuthError("Invalid token")
         return payload
     except jwt.PyJWTError as exc:
