@@ -106,6 +106,30 @@ export function deleteBooking(id) {
   return apiDelete(`/bookings/${id}`);
 }
 
+export function getGuests(params = {}) {
+  return apiGet("/guests", params);
+}
+
+export function getGuestBookings(guestId) {
+  return apiGet(`/guests/${guestId}/bookings`);
+}
+
+export function getBookingPayments(bookingId) {
+  return apiGet(`/bookings/${bookingId}/payments`);
+}
+
+export function createBookingPayment(bookingId, payload) {
+  return apiPost(`/bookings/${bookingId}/payments`, payload);
+}
+
+export function getInvoices() {
+  return apiGet("/invoices");
+}
+
+export function createBookingInvoice(bookingId, payload = {}) {
+  return apiPost(`/bookings/${bookingId}/invoice`, payload);
+}
+
 /**
  * Calendario/schedule per singola unità
  * params può contenere: { from_date: "2025-11-01", to_date: "2025-11-30" }

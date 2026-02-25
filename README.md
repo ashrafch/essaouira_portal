@@ -86,6 +86,11 @@ Gestione utenti:
 - login supporta `tenant_id` nel payload
 - endpoint `POST /auth/change-password` (utente autenticato)
 
+Sales core (Fase 1):
+- guest CRM: `GET /guests`, `GET /guests/{id}`, `GET /guests/{id}/bookings`
+- pagamenti prenotazione: `GET/POST /bookings/{id}/payments`
+- fatture: `GET /invoices`, `POST /bookings/{id}/invoice`
+
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
 - registrazione automatica write operations su risorse core

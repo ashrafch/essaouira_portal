@@ -12,6 +12,7 @@
 - Release readiness pipeline (quality + migration + backup/restore drill): completato
 - Script operativi restore (`db-restore.sh`) e drill (`backup-restore-drill.sh`): completato
 - User lifecycle enterprise (policy password + reset owner + change password self-service): completato
+- Fase 1 Sales Core completata (CRM ospiti + pagamenti + invoice endpoints): completata
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

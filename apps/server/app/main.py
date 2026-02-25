@@ -34,6 +34,9 @@ from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
 from app.models.audit_log import AuditLog
+from app.models.guest_profile import GuestProfile
+from app.models.invoice_document import InvoiceDocument
+from app.models.payment_transaction import PaymentTransaction
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
@@ -612,6 +615,61 @@ class BookingOut(BookingBase):
     id: int
 
 
+class GuestProfileOut(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: str | None = None
+    notes: str | None = None
+    total_stays: int
+    total_revenue: float
+    last_stay_date: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PaymentCreateRequest(BaseModel):
+    amount: float
+    currency: str = "EUR"
+    method: str = "cash"
+    status: str = "captured"
+    external_ref: str | None = None
+    notes: str | None = None
+
+
+class PaymentOut(BaseModel):
+    id: int
+    booking_id: int
+    amount: float
+    currency: str
+    method: str
+    status: str
+    external_ref: str | None = None
+    notes: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InvoiceCreateRequest(BaseModel):
+    issue_date: date | None = None
+    notes: str | None = None
+
+
+class InvoiceOut(BaseModel):
+    id: int
+    booking_id: int
+    invoice_number: str
+    issue_date: date
+    amount: float
+    currency: str
+    status: str
+    notes: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ---------- HELPERS: TIME, DEFAULTS & LOGIC ----------
 
 def _parse_time_str(value: str | None) -> Optional[time]:
@@ -635,6 +693,69 @@ def _format_time_value(t: Optional[time]) -> Optional[str]:
     if t is None:
         return None
     return t.strftime("%H:%M")
+
+
+def _upsert_guest_profile_from_booking(db: Session, booking: Booking):
+    email = (booking.guest_email or "").strip().lower()
+    if not email:
+        return
+    profile = db.query(GuestProfile).filter(GuestProfile.email == email).first()
+    if not profile:
+        profile = GuestProfile(
+            full_name=booking.guest_name,
+            email=email,
+            phone=booking.guest_phone,
+            notes=None,
+            total_stays=1,
+            total_revenue=float(booking.total_price or 0),
+            last_stay_date=datetime.combine(booking.checkout_date, time.min, tzinfo=timezone.utc),
+        )
+        db.add(profile)
+        db.commit()
+        return
+
+    profile.full_name = booking.guest_name or profile.full_name
+    profile.phone = booking.guest_phone or profile.phone
+    stays = (
+        db.query(Booking)
+        .filter(Booking.guest_email == email)
+        .count()
+    )
+    revenue_rows = (
+        db.query(Booking.total_price)
+        .filter(Booking.guest_email == email)
+        .all()
+    )
+    profile.total_stays = stays
+    profile.total_revenue = round(sum(float(r[0] or 0) for r in revenue_rows), 2)
+    profile.last_stay_date = datetime.combine(booking.checkout_date, time.min, tzinfo=timezone.utc)
+    db.commit()
+
+
+def _recompute_booking_payment_status(db: Session, booking_id: int):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        return
+    payments = (
+        db.query(PaymentTransaction)
+        .filter(PaymentTransaction.booking_id == booking_id)
+        .all()
+    )
+    total_paid = round(sum(float(p.amount or 0) for p in payments if p.status == "captured"), 2)
+    total_price = float(booking.total_price or 0)
+    booking.is_paid = total_paid >= total_price and total_price > 0
+    db.commit()
+
+
+def _next_invoice_number(db: Session) -> str:
+    year = datetime.now(timezone.utc).year
+    year_prefix = f"INV-{year}-"
+    count = (
+        db.query(InvoiceDocument)
+        .filter(InvoiceDocument.invoice_number.like(f"{year_prefix}%"))
+        .count()
+    )
+    return f"{year_prefix}{count + 1:05d}"
 
 
 def _get_or_create_staff_defaults(db: Session) -> StaffDefaults:
@@ -913,6 +1034,7 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(booking)
 
+    _upsert_guest_profile_from_booking(db, booking)
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -1011,6 +1133,7 @@ def update_booking(
     db.commit()
     db.refresh(booking)
 
+    _upsert_guest_profile_from_booking(db, booking)
     _create_auto_staff_tasks_for_booking(db, booking)
 
     return booking
@@ -1025,6 +1148,117 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     db.delete(booking)
     db.commit()
     return
+
+
+@app.get("/guests", response_model=list[GuestProfileOut])
+def list_guest_profiles(
+    db: Session = Depends(get_db),
+    q: str | None = None,
+):
+    query = db.query(GuestProfile).order_by(GuestProfile.last_stay_date.desc())
+    if q:
+        term = f"%{q.strip().lower()}%"
+        query = query.filter(
+            (GuestProfile.email.ilike(term))
+            | (GuestProfile.full_name.ilike(term))
+        )
+    return query.all()
+
+
+@app.get("/guests/{guest_id}", response_model=GuestProfileOut)
+def get_guest_profile(guest_id: int, db: Session = Depends(get_db)):
+    guest = db.query(GuestProfile).filter(GuestProfile.id == guest_id).first()
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest non trovato")
+    return guest
+
+
+@app.get("/guests/{guest_id}/bookings", response_model=list[BookingOut])
+def get_guest_bookings(guest_id: int, db: Session = Depends(get_db)):
+    guest = db.query(GuestProfile).filter(GuestProfile.id == guest_id).first()
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest non trovato")
+    return (
+        db.query(Booking)
+        .filter(Booking.guest_email == guest.email)
+        .order_by(Booking.checkin_date.desc())
+        .all()
+    )
+
+
+@app.get("/bookings/{booking_id}/payments", response_model=list[PaymentOut])
+def list_booking_payments(booking_id: int, db: Session = Depends(get_db)):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+    return (
+        db.query(PaymentTransaction)
+        .filter(PaymentTransaction.booking_id == booking_id)
+        .order_by(PaymentTransaction.created_at.desc())
+        .all()
+    )
+
+
+@app.post("/bookings/{booking_id}/payments", response_model=PaymentOut)
+def create_booking_payment(
+    booking_id: int,
+    payload: PaymentCreateRequest,
+    db: Session = Depends(get_db),
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Importo non valido")
+
+    payment = PaymentTransaction(
+        booking_id=booking_id,
+        amount=payload.amount,
+        currency=payload.currency,
+        method=payload.method,
+        status=payload.status,
+        external_ref=payload.external_ref,
+        notes=payload.notes,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    _recompute_booking_payment_status(db, booking_id)
+    return payment
+
+
+@app.get("/invoices", response_model=list[InvoiceOut])
+def list_invoices(db: Session = Depends(get_db)):
+    return db.query(InvoiceDocument).order_by(InvoiceDocument.created_at.desc()).all()
+
+
+@app.post("/bookings/{booking_id}/invoice", response_model=InvoiceOut)
+def create_booking_invoice(
+    booking_id: int,
+    payload: InvoiceCreateRequest,
+    db: Session = Depends(get_db),
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
+
+    existing = db.query(InvoiceDocument).filter(InvoiceDocument.booking_id == booking_id).first()
+    if existing:
+        return existing
+
+    invoice = InvoiceDocument(
+        booking_id=booking_id,
+        invoice_number=_next_invoice_number(db),
+        issue_date=payload.issue_date or date.today(),
+        amount=float(booking.total_price or 0),
+        currency=booking.currency or "EUR",
+        status="issued",
+        notes=payload.notes,
+    )
+    db.add(invoice)
+    db.commit()
+    db.refresh(invoice)
+    return invoice
 
 
 # ---------- UNIT SCHEDULE (TIMELINE SINGOLA UNITÀ) ----------
