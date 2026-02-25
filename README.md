@@ -185,3 +185,45 @@ CI/CD:
 - Merge su `dev` solo dopo test passati
 
 Roadmap prodotto: `ROADMAP_PRODUCT.md`
+
+## Schema Tenant & Ruoli
+
+### Modello tenant
+- Un `tenant` = un cliente/account separato (es. una property management company).
+- Ogni tenant ha dati isolati: prenotazioni, costi, staff, manutenzioni, utenti, audit.
+- Il backend applica isolamento dati via `tenant_id` su query e scritture.
+
+### Ruoli
+- `platform owner`:
+  - Identita: `owner@default` (tenant piattaforma)
+  - Può creare nuovi tenant (`/platform/tenants`)
+  - Può vedere/gestire tutto nel tenant `default`
+- `owner` (tenant):
+  - Controllo completo del proprio tenant
+  - Gestione utenti del tenant (`/users`, reset password, audit)
+- `manager` (tenant):
+  - Operatività completa sui dati business del tenant
+  - Non gestisce tenant piattaforma
+- `operator` (tenant):
+  - Read-only su risorse core (nessuna scrittura)
+- `viewer` (tenant):
+  - Read-only su risorse core (profilo consultazione)
+
+### Matrice accessi sintetica
+- `Platform/Tenant onboarding`:
+  - `platform owner`: sì
+  - `owner/manager/operator/viewer`: no
+- `User management tenant`:
+  - `owner`: sì
+  - altri: no
+- `Write su risorse core (bookings, costs, staff, maintenance, ...)`:
+  - `owner`, `manager`: sì
+  - `operator`, `viewer`: no
+- `Read risorse core`:
+  - tutti i ruoli tenant: sì
+
+### Flusso operativo consigliato
+1. Platform owner crea un nuovo tenant con owner iniziale.
+2. Owner tenant fa login con `tenant_id` dedicato.
+3. Owner tenant crea manager/operator/viewer interni.
+4. Ogni utente lavora solo nel proprio tenant.
