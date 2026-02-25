@@ -24,6 +24,18 @@ import PageInfoHelp from "../components/PageInfoHelp";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
+function toSafeNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatCurrency(value) {
+  return `EUR ${toSafeNumber(value).toLocaleString("it-IT", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function Dashboard() {
   const isMobile = useIsMobile(900);
   const today = new Date();
@@ -191,19 +203,19 @@ function Dashboard() {
         <div style={kpiCard("#1d4ed8")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>RevPAR</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            EUR {advancedKpis?.revpar?.toLocaleString?.()  -  0}
+            {formatCurrency(advancedKpis?.revpar)}
           </div>
         </div>
         <div style={kpiCard("#0ea5e9")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Share Direct</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            {advancedKpis?.direct_share_percent  -  0}%
+            {toSafeNumber(advancedKpis?.direct_share_percent).toFixed(2)}%
           </div>
         </div>
         <div style={kpiCard("#7c3aed")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Pipeline 30g</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.()  -  0}
+            {formatCurrency(advancedKpis?.pipeline_revenue_next_30_days)}
           </div>
         </div>
         <div style={kpiCard("#f97316")}>
