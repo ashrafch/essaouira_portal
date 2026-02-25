@@ -79,6 +79,10 @@ Gestione utenti:
 - endpoint `GET/POST/PUT /users` (owner del tenant)
 - login supporta `tenant_id` nel payload
 
+Audit trail:
+- endpoint `GET /audit-logs` (owner del tenant)
+- registrazione automatica write operations su risorse core
+
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
 

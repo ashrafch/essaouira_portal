@@ -139,6 +139,10 @@ export function getTodayAlerts() {
   return apiGet("/alerts/today");
 }
 
+export function getAuditLogs(params = {}) {
+  return apiGet("/audit-logs", params);
+}
+
 export async function downloadMonthCostLinesCsv(year, month) {
   const res = await fetch(
     `${BASE_URL}/analytics/month-cost-lines.csv${buildQuery({ year, month })}`,

@@ -5,6 +5,7 @@
 - RBAC base (viewer/operator read-only, manager/owner write): completato
 - Tenant context su token/header: completato
 - Isolamento dati tenant a livello ORM (`tenant_id` + filtri automatici): completato
+- Audit trail backend (`audit_logs` + endpoint consultazione owner): completato
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

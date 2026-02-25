@@ -2,6 +2,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.core.auth import decode_access_token
+from app.core.audit import record_audit_event
 from app.core.config import settings
 from app.core.logging import log_request_middleware
 from app.core.tenant import (
@@ -32,6 +33,7 @@ WRITE_PROTECTED_PREFIXES = (
     "/pricing-defaults",
     "/maintenance",
     "/users",
+    "/audit-logs",
 )
 
 
@@ -39,6 +41,10 @@ def _is_write_protected(path: str, method: str) -> bool:
     if method not in WRITE_METHODS:
         return False
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in WRITE_PROTECTED_PREFIXES)
+
+
+def _should_audit(path: str, method: str) -> bool:
+    return _is_write_protected(path, method)
 
 
 async def request_logging(request: Request, call_next):
@@ -91,6 +97,18 @@ async def authentication(request: Request, call_next):
 
     token = set_current_tenant_id(request.state.tenant_id)
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        if _should_audit(request.url.path, request.method):
+            client_ip = request.client.host if request.client else None
+            record_audit_event(
+                event_type="write",
+                username=request.state.user,
+                role=request.state.role,
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                client_ip=client_ip,
+            )
+        return response
     finally:
         reset_current_tenant_id(token)

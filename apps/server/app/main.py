@@ -32,6 +32,7 @@ from app.models.unit import Unit
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
+from app.models.audit_log import AuditLog
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
@@ -178,6 +179,21 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AuditLogOut(BaseModel):
+    id: int
+    event_type: str
+    username: str | None = None
+    role: str | None = None
+    method: str
+    path: str
+    status_code: int
+    client_ip: str | None = None
+    details: str | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 @app.get("/users", response_model=list[UserOut])
 def list_users(request: Request, db: Session = Depends(get_db)):
     _require_role(request, {"owner"})
@@ -239,6 +255,26 @@ def update_user(
     db.commit()
     db.refresh(user)
     return user
+
+
+@app.get("/audit-logs", response_model=list[AuditLogOut])
+def list_audit_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=100, ge=1, le=500),
+    from_date: datetime | None = None,
+    to_date: datetime | None = None,
+    username: str | None = None,
+):
+    _require_role(request, {"owner"})
+    q = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+    if from_date:
+        q = q.filter(AuditLog.created_at >= from_date)
+    if to_date:
+        q = q.filter(AuditLog.created_at <= to_date)
+    if username:
+        q = q.filter(AuditLog.username == username)
+    return q.limit(limit).all()
 
 
 # ---------- UNITS ----------
