@@ -39,7 +39,9 @@ from app.models.housekeeping_checklist_item import HousekeepingChecklistItem
 from app.models.invoice_document import InvoiceDocument
 from app.models.message_job import MessageJob
 from app.models.message_template import MessageTemplate
+from app.models.channel_connection import ChannelConnection
 from app.models.payment_transaction import PaymentTransaction
+from app.models.revenue_rule import RevenueRule
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
@@ -744,6 +746,83 @@ class ChecklistItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ChannelConnectionBase(BaseModel):
+    channel: str
+    listing_external_id: str | None = None
+    commission_percent: float = 0
+    payout_delay_days: int = 0
+    is_active: bool = True
+    sync_enabled: bool = False
+    notes: str | None = None
+
+
+class ChannelConnectionCreate(ChannelConnectionBase):
+    pass
+
+
+class ChannelConnectionUpdate(ChannelConnectionBase):
+    last_sync_status: str | None = None
+    last_sync_at: datetime | None = None
+
+
+class ChannelConnectionOut(ChannelConnectionBase):
+    id: int
+    last_sync_status: str | None = None
+    last_sync_at: datetime | None = None
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RevenueRuleBase(BaseModel):
+    name: str
+    is_active: bool = True
+    priority: int = 100
+    min_occupancy_percent: float = 0
+    max_occupancy_percent: float = 100
+    min_lead_days: int = 0
+    max_lead_days: int = 365
+    adjustment_percent: float = 0
+    min_price: float | None = None
+    max_price: float | None = None
+    notes: str | None = None
+
+
+class RevenueRuleCreate(RevenueRuleBase):
+    pass
+
+
+class RevenueRuleUpdate(RevenueRuleBase):
+    pass
+
+
+class RevenueRuleOut(RevenueRuleBase):
+    id: int
+    created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RateRecommendationItem(BaseModel):
+    date: date
+    occupancy_percent: float
+    lead_days: int
+    base_rate: float
+    suggested_rate: float
+    applied_rule_name: str | None = None
+
+
+class ChannelPerformanceItem(BaseModel):
+    channel: str
+    bookings_count: int
+    nights: int
+    gross_revenue: float
+    channel_fees: float
+    net_revenue: float
+    adr: float | None = None
+    avg_commission_percent: float | None = None
+
+
 # ---------- HELPERS: TIME, DEFAULTS & LOGIC ----------
 
 def _parse_time_str(value: str | None) -> Optional[time]:
@@ -1046,6 +1125,54 @@ def _create_auto_staff_tasks_for_booking(db: Session, booking: Booking):
         current += timedelta(days=1)
 
     db.commit()
+
+
+def _occupancy_for_day(db: Session, day: date, unit_id: int | None = None) -> float:
+    units_query = db.query(Unit)
+    if unit_id is not None:
+        units_query = units_query.filter(Unit.id == unit_id)
+    units_count = units_query.count()
+    if units_count == 0:
+        return 0.0
+
+    bookings_query = db.query(Booking).filter(
+        Booking.checkin_date <= day,
+        Booking.checkout_date > day,
+    )
+    if unit_id is not None:
+        bookings_query = bookings_query.filter(Booking.unit_id == unit_id)
+    occupied = bookings_query.count()
+    return round((occupied / units_count) * 100.0, 2)
+
+
+def _apply_revenue_rules(
+    base_rate: float,
+    occupancy_percent: float,
+    lead_days: int,
+    rules: list[RevenueRule],
+) -> tuple[float, str | None]:
+    chosen_rule = None
+    suggested = base_rate
+    sorted_rules = sorted(rules, key=lambda r: (int(r.priority or 100), int(r.id)))
+    for rule in sorted_rules:
+        if not rule.is_active:
+            continue
+        min_occ = float(rule.min_occupancy_percent or 0)
+        max_occ = float(rule.max_occupancy_percent or 100)
+        min_lead = int(rule.min_lead_days or 0)
+        max_lead = int(rule.max_lead_days or 365)
+        if occupancy_percent < min_occ or occupancy_percent > max_occ:
+            continue
+        if lead_days < min_lead or lead_days > max_lead:
+            continue
+        chosen_rule = rule
+        suggested = base_rate * (1 + float(rule.adjustment_percent or 0) / 100.0)
+        if rule.min_price is not None:
+            suggested = max(suggested, float(rule.min_price))
+        if rule.max_price is not None:
+            suggested = min(suggested, float(rule.max_price))
+        break
+    return round(suggested, 2), (chosen_rule.name if chosen_rule else None)
 
 
 # ---------- BOOKING endpoints ----------
@@ -1509,6 +1636,176 @@ def update_task_checklist_item(
     db.commit()
     db.refresh(item)
     return item
+
+
+@app.get("/channel-connections", response_model=list[ChannelConnectionOut])
+def list_channel_connections(db: Session = Depends(get_db)):
+    return db.query(ChannelConnection).order_by(ChannelConnection.channel.asc()).all()
+
+
+@app.post("/channel-connections", response_model=ChannelConnectionOut)
+def create_channel_connection(
+    payload: ChannelConnectionCreate, db: Session = Depends(get_db)
+):
+    channel = payload.channel.strip().lower()
+    if channel not in {"direct", "airbnb", "booking", "vrbo", "expedia", "other"}:
+        raise HTTPException(status_code=400, detail="Canale non supportato")
+    existing = db.query(ChannelConnection).filter(ChannelConnection.channel == channel).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Canale gia configurato")
+
+    item = ChannelConnection(
+        channel=channel,
+        listing_external_id=payload.listing_external_id,
+        commission_percent=payload.commission_percent,
+        payout_delay_days=payload.payout_delay_days,
+        is_active=payload.is_active,
+        sync_enabled=payload.sync_enabled,
+        notes=payload.notes,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.put("/channel-connections/{connection_id}", response_model=ChannelConnectionOut)
+def update_channel_connection(
+    connection_id: int,
+    payload: ChannelConnectionUpdate,
+    db: Session = Depends(get_db),
+):
+    item = db.query(ChannelConnection).filter(ChannelConnection.id == connection_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Canale non trovato")
+
+    channel = payload.channel.strip().lower()
+    if channel not in {"direct", "airbnb", "booking", "vrbo", "expedia", "other"}:
+        raise HTTPException(status_code=400, detail="Canale non supportato")
+    duplicate = (
+        db.query(ChannelConnection)
+        .filter(ChannelConnection.channel == channel, ChannelConnection.id != connection_id)
+        .first()
+    )
+    if duplicate:
+        raise HTTPException(status_code=400, detail="Canale gia configurato")
+
+    item.channel = channel
+    item.listing_external_id = payload.listing_external_id
+    item.commission_percent = payload.commission_percent
+    item.payout_delay_days = payload.payout_delay_days
+    item.is_active = payload.is_active
+    item.sync_enabled = payload.sync_enabled
+    item.notes = payload.notes
+    item.last_sync_status = payload.last_sync_status
+    item.last_sync_at = payload.last_sync_at
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.get("/revenue-rules", response_model=list[RevenueRuleOut])
+def list_revenue_rules(db: Session = Depends(get_db)):
+    return db.query(RevenueRule).order_by(RevenueRule.priority.asc(), RevenueRule.id.asc()).all()
+
+
+@app.post("/revenue-rules", response_model=RevenueRuleOut)
+def create_revenue_rule(payload: RevenueRuleCreate, db: Session = Depends(get_db)):
+    if payload.min_occupancy_percent > payload.max_occupancy_percent:
+        raise HTTPException(status_code=400, detail="Range occupancy non valido")
+    if payload.min_lead_days > payload.max_lead_days:
+        raise HTTPException(status_code=400, detail="Range lead days non valido")
+
+    rule = RevenueRule(
+        name=payload.name,
+        is_active=payload.is_active,
+        priority=payload.priority,
+        min_occupancy_percent=payload.min_occupancy_percent,
+        max_occupancy_percent=payload.max_occupancy_percent,
+        min_lead_days=payload.min_lead_days,
+        max_lead_days=payload.max_lead_days,
+        adjustment_percent=payload.adjustment_percent,
+        min_price=payload.min_price,
+        max_price=payload.max_price,
+        notes=payload.notes,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+
+@app.put("/revenue-rules/{rule_id}", response_model=RevenueRuleOut)
+def update_revenue_rule(
+    rule_id: int,
+    payload: RevenueRuleUpdate,
+    db: Session = Depends(get_db),
+):
+    rule = db.query(RevenueRule).filter(RevenueRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Regola non trovata")
+    if payload.min_occupancy_percent > payload.max_occupancy_percent:
+        raise HTTPException(status_code=400, detail="Range occupancy non valido")
+    if payload.min_lead_days > payload.max_lead_days:
+        raise HTTPException(status_code=400, detail="Range lead days non valido")
+
+    rule.name = payload.name
+    rule.is_active = payload.is_active
+    rule.priority = payload.priority
+    rule.min_occupancy_percent = payload.min_occupancy_percent
+    rule.max_occupancy_percent = payload.max_occupancy_percent
+    rule.min_lead_days = payload.min_lead_days
+    rule.max_lead_days = payload.max_lead_days
+    rule.adjustment_percent = payload.adjustment_percent
+    rule.min_price = payload.min_price
+    rule.max_price = payload.max_price
+    rule.notes = payload.notes
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+
+@app.get("/revenue/rate-recommendations", response_model=list[RateRecommendationItem])
+def get_rate_recommendations(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    unit_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    if to_date <= from_date:
+        raise HTTPException(status_code=400, detail="to_date deve essere successiva a from_date")
+
+    if unit_id is not None:
+        unit = db.query(Unit).filter(Unit.id == unit_id).first()
+        if not unit:
+            raise HTTPException(status_code=404, detail="Unita non trovata")
+        base_rate = float(unit.base_nightly_rate or 0)
+    else:
+        units = db.query(Unit).all()
+        if not units:
+            return []
+        base_rate = sum(float(u.base_nightly_rate or 0) for u in units) / len(units)
+
+    rules = db.query(RevenueRule).filter(RevenueRule.is_active.is_(True)).all()
+    items: list[RateRecommendationItem] = []
+    current = from_date
+    today = date.today()
+    while current < to_date:
+        occupancy = _occupancy_for_day(db, current, unit_id=unit_id)
+        lead_days = max((current - today).days, 0)
+        suggested, rule_name = _apply_revenue_rules(base_rate, occupancy, lead_days, rules)
+        items.append(
+            RateRecommendationItem(
+                date=current,
+                occupancy_percent=occupancy,
+                lead_days=lead_days,
+                base_rate=round(base_rate, 2),
+                suggested_rate=suggested,
+                applied_rule_name=rule_name,
+            )
+        )
+        current += timedelta(days=1)
+    return items
 
 
 # ---------- UNIT SCHEDULE (TIMELINE SINGOLA UNITÀ) ----------
@@ -2179,6 +2476,75 @@ def advanced_kpis(
         pipeline_revenue_next_30_days=round(pipeline_revenue, 2),
         upcoming_arrivals_next_7_days=upcoming_arrivals_7,
     )
+
+
+@app.get("/analytics/channel-performance", response_model=list[ChannelPerformanceItem])
+def analytics_channel_performance(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+):
+    month_start, next_month_start, _ = _get_month_range(year, month)
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.checkin_date < next_month_start,
+            Booking.checkout_date > month_start,
+        )
+        .all()
+    )
+    configured_channels = {
+        c.channel: c
+        for c in db.query(ChannelConnection).all()
+    }
+
+    stats: dict[str, dict] = {}
+    for b in bookings:
+        channel = (b.source or "unknown").strip().lower()
+        if channel == "":
+            channel = "unknown"
+        stay_start = max(b.checkin_date, month_start)
+        stay_end = min(b.checkout_date, next_month_start)
+        nights = max((stay_end - stay_start).days, 0)
+
+        gross = float(b.total_price or 0)
+        channel_fee = float(b.channel_fee or 0)
+        if channel_fee == 0 and channel in configured_channels:
+            commission = float(configured_channels[channel].commission_percent or 0)
+            channel_fee = round(gross * commission / 100.0, 2)
+
+        if channel not in stats:
+            stats[channel] = {
+                "bookings_count": 0,
+                "nights": 0,
+                "gross_revenue": 0.0,
+                "channel_fees": 0.0,
+            }
+        stats[channel]["bookings_count"] += 1
+        stats[channel]["nights"] += nights
+        stats[channel]["gross_revenue"] += gross
+        stats[channel]["channel_fees"] += channel_fee
+
+    out: list[ChannelPerformanceItem] = []
+    for channel, val in sorted(stats.items(), key=lambda it: it[0]):
+        gross = round(val["gross_revenue"], 2)
+        fees = round(val["channel_fees"], 2)
+        nights = int(val["nights"])
+        adr = round(gross / nights, 2) if nights > 0 else None
+        avg_commission = round((fees / gross) * 100, 2) if gross > 0 else None
+        out.append(
+            ChannelPerformanceItem(
+                channel=channel,
+                bookings_count=int(val["bookings_count"]),
+                nights=nights,
+                gross_revenue=gross,
+                channel_fees=fees,
+                net_revenue=round(gross - fees, 2),
+                adr=adr,
+                avg_commission_percent=avg_commission,
+            )
+        )
+    return out
 
 
 class AlertItem(BaseModel):

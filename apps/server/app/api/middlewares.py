@@ -38,6 +38,8 @@ WRITE_PROTECTED_PREFIXES = (
     "/platform/tenants",
     "/message-templates",
     "/message-jobs",
+    "/channel-connections",
+    "/revenue-rules",
 )
 
 

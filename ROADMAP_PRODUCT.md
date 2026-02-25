@@ -14,6 +14,7 @@
 - User lifecycle enterprise (policy password + reset owner + change password self-service): completato
 - Fase 1 Sales Core completata (CRM ospiti + pagamenti + invoice endpoints): completata
 - Fase 2 Ops Automation completata (message templates/jobs + housekeeping checklist): completata
+- Fase 3 Distribution & Revenue completata (channel manager + revenue rules + channel analytics): completata
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:

@@ -96,6 +96,12 @@ Ops automation (Fase 2):
 - coda invii: `GET /message-jobs`, `PUT /message-jobs/{id}/status`
 - checklist housekeeping per task: `GET/POST/PUT /staff-tasks/{id}/checklist...`
 
+Distribution & Revenue (Fase 3):
+- connessioni canali OTA/direct: `GET/POST/PUT /channel-connections`
+- regole revenue management: `GET/POST/PUT /revenue-rules`
+- suggerimenti tariffari: `GET /revenue/rate-recommendations`
+- performance canali: `GET /analytics/channel-performance`
+
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
 - registrazione automatica write operations su risorse core

@@ -162,6 +162,34 @@ export function updateTaskChecklistItem(taskId, itemId, payload) {
   return apiPut(`/staff-tasks/${taskId}/checklist/${itemId}`, payload);
 }
 
+export function getChannelConnections() {
+  return apiGet("/channel-connections");
+}
+
+export function createChannelConnection(payload) {
+  return apiPost("/channel-connections", payload);
+}
+
+export function updateChannelConnection(id, payload) {
+  return apiPut(`/channel-connections/${id}`, payload);
+}
+
+export function getRevenueRules() {
+  return apiGet("/revenue-rules");
+}
+
+export function createRevenueRule(payload) {
+  return apiPost("/revenue-rules", payload);
+}
+
+export function updateRevenueRule(id, payload) {
+  return apiPut(`/revenue-rules/${id}`, payload);
+}
+
+export function getRateRecommendations(params = {}) {
+  return apiGet("/revenue/rate-recommendations", params);
+}
+
 /**
  * Calendario/schedule per singola unità
  * params può contenere: { from_date: "2025-11-01", to_date: "2025-11-30" }
@@ -189,6 +217,10 @@ export function getMonthCostLines(year, month) {
 
 export function getAdvancedKpis(year, month) {
   return apiGet("/analytics/advanced-kpis", { year, month });
+}
+
+export function getChannelPerformance(year, month) {
+  return apiGet("/analytics/channel-performance", { year, month });
 }
 
 export function getTodayAlerts() {
