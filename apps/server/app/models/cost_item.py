@@ -2,9 +2,10 @@ from sqlalchemy import Column, Integer, String, Date, Numeric, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.db import Base
+from app.models.tenant_scoped import TenantScopedMixin
 
 
-class CostItem(Base):
+class CostItem(TenantScopedMixin, Base):
     __tablename__ = "cost_items"
 
     id = Column(Integer, primary_key=True, index=True)

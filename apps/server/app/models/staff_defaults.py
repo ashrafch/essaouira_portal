@@ -1,8 +1,9 @@
 from sqlalchemy import Column, Integer, String, Float
 from app.db import Base
+from app.models.tenant_scoped import TenantScopedMixin
 
 
-class StaffDefaults(Base):
+class StaffDefaults(TenantScopedMixin, Base):
     __tablename__ = "staff_defaults"
 
     id = Column(Integer, primary_key=True, index=True)

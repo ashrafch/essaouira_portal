@@ -146,3 +146,5 @@ CI/CD:
 - Aprire sempre un branch feature da `dev`
 - Eseguire test/lint/build
 - Merge su `dev` solo dopo test passati
+
+Roadmap prodotto: `ROADMAP_PRODUCT.md`

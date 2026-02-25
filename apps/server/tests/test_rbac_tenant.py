@@ -51,3 +51,35 @@ def test_tenant_header_must_match_token_tenant():
         response = client.get("/units", headers=owner_headers)
         assert response.status_code == 403
         assert "tenant mismatch" in response.text.lower()
+
+
+def test_tenant_data_isolation_between_tokens():
+    with TestClient(app) as client:
+        owner_default = _headers_for("owner", tenant_id="default")
+        owner_other = _headers_for("owner", tenant_id="client-b")
+
+        create_resp = client.post(
+            "/cost-items",
+            headers=owner_other,
+            json={
+                "date": "2026-03-11",
+                "category": "marketing",
+                "description": "Tenant B Google Ads",
+                "amount": 99,
+                "currency": "EUR",
+                "unit_id": None,
+            },
+        )
+        assert create_resp.status_code == 200
+
+        default_list = client.get("/cost-items", headers=owner_default)
+        assert default_list.status_code == 200
+        assert all(
+            item.get("description") != "Tenant B Google Ads" for item in default_list.json()
+        )
+
+        other_list = client.get("/cost-items", headers=owner_other)
+        assert other_list.status_code == 200
+        assert any(
+            item.get("description") == "Tenant B Google Ads" for item in other_list.json()
+        )

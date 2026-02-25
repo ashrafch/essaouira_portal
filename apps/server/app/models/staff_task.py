@@ -10,9 +10,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db import Base
+from app.models.tenant_scoped import TenantScopedMixin
 
 
-class StaffTask(Base):
+class StaffTask(TenantScopedMixin, Base):
     __tablename__ = "staff_tasks"
 
     id = Column(Integer, primary_key=True, index=True)

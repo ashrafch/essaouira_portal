@@ -1,8 +1,9 @@
 from sqlalchemy import Column, Integer, String, Numeric
 from app.db import Base
+from app.models.tenant_scoped import TenantScopedMixin
 
 
-class PricingDefaults(Base):
+class PricingDefaults(TenantScopedMixin, Base):
     __tablename__ = "pricing_defaults"
 
     id = Column(Integer, primary_key=True, index=True)

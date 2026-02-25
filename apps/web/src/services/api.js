@@ -1,11 +1,15 @@
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 const TOKEN_KEY = "essaouira_portal_token";
+const TENANT_KEY = "essaouira_portal_tenant";
 
 function getAuthHeaders() {
   const token = window.localStorage.getItem(TOKEN_KEY);
-  if (!token) return {};
-  return { Authorization: `Bearer ${token}` };
+  const tenantId = window.localStorage.getItem(TENANT_KEY);
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (tenantId) headers["X-Tenant-Id"] = tenantId;
+  return headers;
 }
 
 async function handleResponse(res) {

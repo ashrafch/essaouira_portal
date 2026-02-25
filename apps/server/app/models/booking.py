@@ -11,9 +11,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db import Base
+from app.models.tenant_scoped import TenantScopedMixin
 
 
-class Booking(Base):
+class Booking(TenantScopedMixin, Base):
     __tablename__ = "bookings"
     __table_args__ = {"extend_existing": True}  # evita conflitti se recreate_all
 
