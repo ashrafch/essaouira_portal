@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
 
@@ -125,13 +125,13 @@ function makeLinkStyle({ level }) {
   });
 }
 
-function Sidebar() {
+function Sidebar({ onNavigate = null }) {
   const location = useLocation();
   const [openSections, setOpenSections] = useState({
     bookings: false,
     property: false,
     staff: false,
-    facility: true, // Apro la nuova sezione per evidenziarla
+    facility: true,
     platform: false,
   });
 
@@ -162,7 +162,7 @@ function Sidebar() {
     },
     {
       id: "property",
-      title: "Proprietà",
+      title: "Proprieta",
       items: [
         { to: "/units", label: "Appartamenti", badge: null },
         { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null },
@@ -218,7 +218,6 @@ function Sidebar() {
     },
   ];
 
-  // carico badge ogni volta che cambio pagina
   useEffect(() => {
     async function loadStats() {
       try {
@@ -226,15 +225,12 @@ function Sidebar() {
 
         let maintenanceCount = 0;
         try {
-            // Recupera i ticket per il badge
-            const tickets = await getMaintenanceTickets();
-            // Conta solo quelli aperti (todo o in_progress)
-            if (Array.isArray(tickets)) {
-              maintenanceCount = tickets.filter(t => t.status !== 'done').length;
-            }
+          const tickets = await getMaintenanceTickets();
+          if (Array.isArray(tickets)) {
+            maintenanceCount = tickets.filter((t) => t.status !== "done").length;
+          }
         } catch {
-            // Ignora errori se la tabella non esiste ancora
-            console.log("Tabella maintenance forse non pronta");
+          console.log("Tabella maintenance forse non pronta");
         }
 
         const [bookings, tasksToday] = await Promise.all([
@@ -273,7 +269,6 @@ function Sidebar() {
     loadStats();
   }, [location.pathname]);
 
-  // apre le sezioni che contengono la route corrente
   useEffect(() => {
     const path = location.pathname;
     setOpenSections((prev) => {
@@ -301,11 +296,7 @@ function Sidebar() {
     if (type === "arrivalsDepartures") {
       const { arrivals, departures } = todayStats;
       if (!arrivals && !departures) return null;
-      return (
-        <span style={badgePill}>
-          {arrivals}/{departures}
-        </span>
-      );
+      return <span style={badgePill}>{arrivals}/{departures}</span>;
     }
 
     if (type === "staysToday") {
@@ -321,10 +312,19 @@ function Sidebar() {
     }
 
     if (type === "openTickets") {
-        const { openTickets } = todayStats;
-        if (!openTickets) return null;
-        // Rosso per i problemi aperti
-        return <span style={{...badgePill, backgroundColor: "#fee2e2", color: "#b91c1c"}}>{openTickets}</span>;
+      const { openTickets } = todayStats;
+      if (!openTickets) return null;
+      return (
+        <span
+          style={{
+            ...badgePill,
+            backgroundColor: "#fee2e2",
+            color: "#b91c1c",
+          }}
+        >
+          {openTickets}
+        </span>
+      );
     }
 
     return null;
@@ -338,18 +338,14 @@ function Sidebar() {
       </div>
 
       <div style={navContainer}>
-        {/* DASHBOARD SINGOLA */}
-        <NavLink to="/" end style={topLinkStyle}>
+        <NavLink to="/" end style={topLinkStyle} onClick={onNavigate}>
           <span>Dashboard</span>
         </NavLink>
 
-        {/* SEZIONI COLLASSABILI */}
         {sections.map((section) => {
           const isOpen = openSections[section.id];
           const path = location.pathname;
-          const hasActiveChild = section.items.some((item) =>
-            path.startsWith(item.to)
-          );
+          const hasActiveChild = section.items.some((item) => path.startsWith(item.to));
 
           const headerStyle = {
             ...sectionHeaderButtonBase,
@@ -374,9 +370,7 @@ function Sidebar() {
                       width: 6,
                       height: 6,
                       borderRadius: "999px",
-                      backgroundColor: hasActiveChild
-                        ? "#0f766e"
-                        : "#cbd5e1",
+                      backgroundColor: hasActiveChild ? "#0f766e" : "#cbd5e1",
                     }}
                   />
                   <span style={titleStyle}>{section.title}</span>
@@ -384,20 +378,21 @@ function Sidebar() {
                 <span style={caret}>{isOpen ? "▾" : "▸"}</span>
               </button>
 
-              {isOpen && (
+              {isOpen ? (
                 <div style={subLinksWrapper}>
                   {section.items.map((item) => (
                     <NavLink
                       key={item.to}
                       to={item.to}
                       style={subLinkStyle}
+                      onClick={onNavigate}
                     >
                       <span>{item.label}</span>
                       {renderBadge(item.badge)}
                     </NavLink>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
@@ -405,11 +400,10 @@ function Sidebar() {
 
       <div style={footer}>
         <div>Owner workspace</div>
-        <div>Control center � local</div>
+        <div>Control center · local</div>
       </div>
     </div>
   );
 }
 
 export default Sidebar;
-

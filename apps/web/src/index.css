@@ -150,3 +150,37 @@ svg {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@media (max-width: 1024px) {
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  h2 {
+    font-size: 1.15rem;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+}

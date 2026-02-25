@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   clearAuthSession,
   getCurrentRole,
@@ -6,16 +6,7 @@ import {
   getCurrentUsername,
 } from "../services/auth";
 
-const wrapper = {
-  height: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "0 22px",
-  gap: 12,
-};
-
-function Topbar() {
+function Topbar({ isMobile = false, onMenuToggle = null }) {
   const [online, setOnline] = useState(navigator.onLine);
   const username = getCurrentUsername() || "Owner";
   const role = getCurrentRole() || "owner";
@@ -54,16 +45,65 @@ function Topbar() {
   });
 
   return (
-    <div style={wrapper}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em" }}>
-          Operatività Giornaliera
-        </div>
-        <div style={{ fontSize: 12, color: "#64748b" }}>
-          Controllo live prenotazioni, staff, costi e manutenzione
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: isMobile ? "0 10px" : "0 22px",
+        gap: 12,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        {isMobile ? (
+          <button
+            type="button"
+            style={{
+              fontSize: 18,
+              lineHeight: 1,
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+              background: "white",
+              color: "#0f172a",
+              padding: 0,
+            }}
+            onClick={() => onMenuToggle?.()}
+            aria-label="Apri menu"
+          >
+            ≡
+          </button>
+        ) : null}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em" }}>
+            Operativita Giornaliera
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "#64748b",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            Controllo live prenotazioni, staff, costi e manutenzione
+          </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+          justifyContent: "flex-end",
+        }}
+      >
         <div
           style={{
             ...badge,
@@ -72,20 +112,24 @@ function Topbar() {
           }}
         >
           <span style={dot(online ? "#22c55e" : "#ef4444")} />
-          {online ? "Online" : "Offline (solo cache)"}
+          {online ? "Online" : "Offline"}
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "#475569",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            borderRadius: 999,
-            padding: "5px 10px",
-          }}
-        >
-          <strong>{username}</strong> ({role}) · tenant <strong>{tenantId}</strong>
-        </div>
+
+        {!isMobile ? (
+          <div
+            style={{
+              fontSize: 12,
+              color: "#475569",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 999,
+              padding: "5px 10px",
+            }}
+          >
+            <strong>{username}</strong> ({role}) · tenant <strong>{tenantId}</strong>
+          </div>
+        ) : null}
+
         <button
           type="button"
           style={{
