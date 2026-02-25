@@ -11,7 +11,8 @@ const wrapper = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "0 24px",
+  padding: "0 22px",
+  gap: 12,
 };
 
 function Topbar() {
@@ -54,10 +55,15 @@ function Topbar() {
 
   return (
     <div style={wrapper}>
-      <div style={{ fontWeight: 600, fontSize: "16px" }}>
-        Gestione villa & appartamenti
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em" }}>
+          Operatività Giornaliera
+        </div>
+        <div style={{ fontSize: 12, color: "#64748b" }}>
+          Controllo live prenotazioni, staff, costi e manutenzione
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
         <div
           style={{
             ...badge,
@@ -68,14 +74,24 @@ function Topbar() {
           <span style={dot(online ? "#22c55e" : "#ef4444")} />
           {online ? "Online" : "Offline (solo cache)"}
         </div>
-        <div style={{ fontSize: "13px", color: "#6b7280" }}>
-          Logged as <strong>{username}</strong> ({role}) - tenant <strong>{tenantId}</strong>
+        <div
+          style={{
+            fontSize: 12,
+            color: "#475569",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 999,
+            padding: "5px 10px",
+          }}
+        >
+          <strong>{username}</strong> ({role}) · tenant <strong>{tenantId}</strong>
         </div>
         <button
           type="button"
           style={{
             fontSize: 12,
-            padding: "4px 10px",
+            fontWeight: 600,
+            padding: "5px 10px",
             borderRadius: 999,
             border: "1px solid #d1d5db",
             background: "white",

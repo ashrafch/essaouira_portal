@@ -234,6 +234,12 @@ function Bookings() {
   const totalCount = bookings.length;
   const selectedBooking =
     bookings.find((b) => b.id === selectedBookingId) || null;
+  const bookingStats = useMemo(() => {
+    const unpaid = bookings.filter((b) => !b.is_paid).length;
+    const direct = bookings.filter((b) => (b.source || "").toLowerCase() === "direct").length;
+    const totalValue = bookings.reduce((sum, b) => sum + Number(b.total_price || 0), 0);
+    return { unpaid, direct, totalValue };
+  }, [bookings]);
 
   useEffect(() => {
     if (filteredBookings.length === 0) {
@@ -506,17 +512,17 @@ function Bookings() {
 
   const container = {
     display: "grid",
-    gridTemplateColumns: "minmax(260px, 340px) 1fr",
+    gridTemplateColumns: "1fr",
     gap: 16,
     alignItems: "flex-start",
   };
 
   const card = {
     backgroundColor: "white",
-    borderRadius: "14px",
+    borderRadius: "16px",
     padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+    border: "1px solid #e2e8f0",
   };
 
   const field = {
@@ -608,6 +614,23 @@ function Bookings() {
     justifyContent: "space-between",
     marginBottom: 16,
     alignItems: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+  };
+
+  const statsGrid = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 10,
+    marginBottom: 14,
+  };
+
+  const statCard = {
+    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+    border: "1px solid #e2e8f0",
+    borderRadius: 14,
+    padding: "10px 12px",
+    boxShadow: "0 4px 14px rgba(15,23,42,0.04)",
   };
 
   const chip = (bg, color) => ({
@@ -722,6 +745,31 @@ function Bookings() {
 
       {error && (
         <p style={{ color: "red", fontSize: 12, marginBottom: 8 }}>{error}</p>
+      )}
+
+      {!loading && (
+        <div style={statsGrid}>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: "#64748b" }}>Prenotazioni Totali</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{totalCount}</div>
+          </div>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: "#64748b" }}>Da Incassare</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#b91c1c" }}>
+              {bookingStats.unpaid}
+            </div>
+          </div>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: "#64748b" }}>Dirette</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{bookingStats.direct}</div>
+          </div>
+          <div style={statCard}>
+            <div style={{ fontSize: 11, color: "#64748b" }}>Valore Portafoglio</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>
+              € {bookingStats.totalValue.toFixed(0)}
+            </div>
+          </div>
+        </div>
       )}
 
       {loading ? (

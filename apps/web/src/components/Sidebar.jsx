@@ -3,24 +3,26 @@ import { NavLink, useLocation } from "react-router-dom";
 import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
 
 const wrapper = {
-  padding: "20px 16px",
+  padding: "18px 14px",
   display: "flex",
   flexDirection: "column",
   height: "100%",
-  backgroundColor: "#f9fafb",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.92) 100%)",
 };
 
 const brand = {
-  fontSize: "20px",
+  fontSize: "22px",
   fontWeight: 700,
-  marginBottom: "16px",
+  marginBottom: "6px",
   color: "#111827",
+  letterSpacing: "-0.02em",
 };
 
 const brandSub = {
   fontSize: "11px",
-  color: "#6b7280",
-  marginBottom: "16px",
+  color: "#64748b",
+  marginBottom: "14px",
 };
 
 const navContainer = {
@@ -29,15 +31,15 @@ const navContainer = {
   paddingRight: "4px",
   display: "flex",
   flexDirection: "column",
-  gap: "12px",
+  gap: "10px",
 };
 
 const linkBase = {
-  padding: "8px 12px",
-  borderRadius: "8px",
+  padding: "9px 12px",
+  borderRadius: "10px",
   textDecoration: "none",
   fontSize: "14px",
-  fontWeight: 500,
+  fontWeight: 600,
   color: "#374151",
   border: "1px solid transparent",
   display: "flex",
@@ -57,8 +59,8 @@ const sectionHeaderButtonBase = {
   alignItems: "center",
   justifyContent: "space-between",
   width: "100%",
-  padding: "6px 10px",
-  borderRadius: "8px",
+  padding: "8px 10px",
+  borderRadius: "10px",
   border: "none",
   background: "transparent",
   cursor: "pointer",
@@ -71,10 +73,10 @@ const sectionHeaderLeft = {
 };
 
 const sectionTitle = {
-  fontSize: "11px",
+  fontSize: "10px",
   fontWeight: 600,
   textTransform: "uppercase",
-  letterSpacing: "0.04em",
+  letterSpacing: "0.08em",
 };
 
 const caret = {
@@ -114,12 +116,12 @@ function makeLinkStyle({ level }) {
     ...linkBase,
     paddingLeft,
     fontSize,
-    backgroundColor: isActive ? "#0f766e" : "transparent",
+    backgroundColor: isActive ? "#0f766e" : "#ffffff",
     color: isActive ? "#ffffff" : "#374151",
-    borderColor: isActive ? "#0f766e" : "transparent",
+    borderColor: isActive ? "#0f766e" : "#e5e7eb",
     boxShadow: isActive
-      ? "0 1px 2px rgba(15,23,42,0.15)"
-      : "none",
+      ? "0 6px 18px rgba(15,118,110,0.25)"
+      : "0 1px 2px rgba(15,23,42,0.04)",
   });
 }
 
@@ -351,7 +353,7 @@ function Sidebar() {
 
           const headerStyle = {
             ...sectionHeaderButtonBase,
-            backgroundColor: hasActiveChild ? "#e0f2fe" : "transparent",
+            backgroundColor: hasActiveChild ? "#e6fffa" : "transparent",
           };
 
           const titleStyle = {
@@ -374,7 +376,7 @@ function Sidebar() {
                       borderRadius: "999px",
                       backgroundColor: hasActiveChild
                         ? "#0f766e"
-                        : "#cbd5f5",
+                        : "#cbd5e1",
                     }}
                   />
                   <span style={titleStyle}>{section.title}</span>
@@ -402,11 +404,12 @@ function Sidebar() {
       </div>
 
       <div style={footer}>
-        <div>Owner dashboard</div>
-        <div>v0.1 Â· local dev</div>
+        <div>Owner workspace</div>
+        <div>Control center · local</div>
       </div>
     </div>
   );
 }
 
 export default Sidebar;
+

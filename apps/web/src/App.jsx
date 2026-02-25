@@ -24,7 +24,19 @@ const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 
 function PageFallback() {
-  return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        color: "#334155",
+        fontWeight: 600,
+      }}
+    >
+      Caricamento pagina...
+    </div>
+  );
 }
 
 const ROUTE_COMPONENTS = {
