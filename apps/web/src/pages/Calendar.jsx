@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
+import useIsMobile from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
 import { getBookings, getUnits, updateBooking } from "../services/api";
 import db from "../offline/dbLocal";
@@ -46,7 +47,7 @@ function formatISO(d) {
 function getWeeksForMonth(year, month) {
   const firstOfMonth = new Date(year, month, 1);
   const start = new Date(firstOfMonth);
-  // portiamo il cursore al lunedì della settimana del primo del mese
+  // portiamo il cursore al lunedÃ¬ della settimana del primo del mese
   const day = start.getDay(); // 0=dom,1=lun,...6=sab
   const diffToMonday = day === 0 ? -6 : 1 - day;
   start.setDate(start.getDate() + diffToMonday);
@@ -76,6 +77,7 @@ function getWeeksForMonth(year, month) {
 }
 
 function Calendar() {
+  const isMobile = useIsMobile(900);
   const navigate = useNavigate();
   const today = new Date();
 
@@ -190,7 +192,7 @@ function Calendar() {
     );
   }, [bookingsWithParsedDates, selectedUnitId, monthStart, monthEnd]);
 
-  // occupazione mese per unità selezionata
+  // occupazione mese per unitÃ  selezionata
   const unitOccupancy = useMemo(() => {
     if (!selectedUnitId || daysInMonth === 0) return null;
     const occupied = new Array(daysInMonth).fill(false);
@@ -398,6 +400,7 @@ function Calendar() {
     display: "grid",
     gridTemplateRows: "auto",
     gap: 4,
+    minWidth: isMobile ? 720 : undefined,
   };
 
   const weekRow = {
@@ -419,7 +422,7 @@ function Calendar() {
     border: "1px solid #e2e8f0",
     backgroundColor: isCurrentMonth ? "#f8fafc" : "#fdfdfd",
     position: "relative",
-    minHeight: 90,
+    minHeight: isMobile ? 84 : 90,
     padding: "4px 4px 4px 4px",
     fontSize: 11,
     cursor: draggingBooking && !fromCache ? "copy" : "default",
@@ -436,7 +439,7 @@ function Calendar() {
     color: isCurrentMonth ? "#111827" : "#9ca3af",
   });
 
-  // 🔧 bottone + centrato
+  // ðŸ”§ bottone + centrato
   const addButton = {
     position: "absolute",
     top: 4,
@@ -457,13 +460,13 @@ function Calendar() {
   };
 
   const bookingsContainer = {
-    marginTop: 22,
+    marginTop: isMobile ? 20 : 22,
     display: "flex",
     flexDirection: "column",
     gap: 4,
   };
 
-  // 🎨 colori più accesi per le pill
+  // ðŸŽ¨ colori piÃ¹ accesi per le pill
   const bookingPill = (source, isDragging) => {
     let bg = "#bbf7d0";
     let border = "#10b981";
@@ -496,7 +499,7 @@ function Calendar() {
     };
   };
 
-  // STILI TIMELINE UNITÀ
+  // STILI TIMELINE UNITÃ€
   const timelineCard = {
     ...card,
     marginTop: 16,
@@ -505,6 +508,10 @@ function Calendar() {
   const timelineWrapper = {
     marginTop: 10,
     overflowX: "auto",
+  };
+
+  const calendarScroll = {
+    overflowX: isMobile ? "auto" : "visible",
   };
 
   const timelineRow = {
@@ -530,7 +537,7 @@ function Calendar() {
     color: "#9ca3af",
   };
 
-  // 🎨 timeline bar con colori coerenti e più evidenti
+  // ðŸŽ¨ timeline bar con colori coerenti e piÃ¹ evidenti
   const timelineBar = (source) => {
     let bg = "#4ade80"; // direct
     if (source === "airbnb") bg = "#fb923c";
@@ -569,21 +576,21 @@ function Calendar() {
                 </ul>
               </PageInfoHelp>
               <button style={navButton} type="button" onClick={prevMonth}>
-                ◀️
+                â—€ï¸
               </button>
               <div style={{ fontWeight: 600 }}>
                 {MONTH_LABELS[month]} {year}
               </div>
               <button style={navButton} type="button" onClick={nextMonth}>
-                ▶️
+                â–¶ï¸
               </button>
             </div>
           </div>
           <div>
             <span style={fromCache ? badgeOffline : badgeInfo}>
               {fromCache
-                ? "Offline – spostamento dsisabilitato (solo cache)"
-                : "Dati live – drag & drop attivo"}
+                ? "Offline â€“ spostamento dsisabilitato (solo cache)"
+                : "Dati live â€“ drag & drop attivo"}
             </span>
           </div>
         </div>
@@ -614,6 +621,7 @@ function Calendar() {
               </span>
             </div>
 
+            <div style={calendarScroll}>
             <div style={calendarGrid}>
               {/* intestazione giorni della settimana */}
               <div style={weekRow}>
@@ -670,11 +678,11 @@ function Calendar() {
                               draggingBooking &&
                               draggingBooking.id === b.id;
 
-                            const title = `${b.guest_name || "Ospite"} – ${
+                            const title = `${b.guest_name || "Ospite"} â€“ ${
                               unit?.name || `Unit #${b.unit_id}`
                             }\n${new Date(
                               b.checkin_date
-                            ).toLocaleDateString("it-IT")} → ${new Date(
+                            ).toLocaleDateString("it-IT")} â†’ ${new Date(
                               b.checkout_date
                             ).toLocaleDateString("it-IT")}\nFonte: ${
                               b.source
@@ -704,7 +712,7 @@ function Calendar() {
                                 }}
                               >
                                 <span>
-                                  {b.guest_name || "Ospite"} ·{" "}
+                                  {b.guest_name || "Ospite"} Â·{" "}
                                   {unit?.name || `Unit #${b.unit_id}`}
                                 </span>
                                 <span style={{ fontSize: 10 }}>
@@ -730,6 +738,7 @@ function Calendar() {
                 </div>
               ))}
             </div>
+            </div>
 
             {error && !fromCache && (
               <p style={{ color: "red", fontSize: 12, marginTop: 8 }}>
@@ -740,7 +749,7 @@ function Calendar() {
         )}
       </div>
 
-      {/* TIMELINE PER SINGOLA UNITÀ */}
+      {/* TIMELINE PER SINGOLA UNITÃ€ */}
       <div style={timelineCard}>
         <div
           style={{
@@ -756,7 +765,7 @@ function Calendar() {
               Timeline per appartamento
             </h2>
             <p style={{ fontSize: 12, color: "#6b7280" }}>
-              Occupazione sul mese corrente per una singola unità.
+              Occupazione sul mese corrente per una singola unitÃ .
             </p>
           </div>
           <div>
@@ -779,7 +788,7 @@ function Calendar() {
 
         {(!selectedUnitId || units.length === 0) && (
           <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Nessuna unità selezionata.
+            Nessuna unitÃ  selezionata.
           </p>
         )}
 
@@ -807,7 +816,7 @@ function Calendar() {
                               booking.checkin_date
                             ).toLocaleDateString(
                               "it-IT"
-                            )} → ${new Date(
+                            )} â†’ ${new Date(
                               booking.checkout_date
                             ).toLocaleDateString("it-IT")}`
                           : ""
@@ -824,7 +833,7 @@ function Calendar() {
               </div>
             </div>
 
-            {/* riepilogo occupazione unità */}
+            {/* riepilogo occupazione unitÃ  */}
             {unitOccupancy && (
               <div
                 style={{
@@ -858,4 +867,7 @@ function Calendar() {
 }
 
 export default Calendar;
+
+
+
 

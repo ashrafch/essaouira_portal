@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   BarChart,
   Bar,
@@ -24,6 +25,7 @@ import PageInfoHelp from "../components/PageInfoHelp";
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 function Dashboard() {
+  const isMobile = useIsMobile(900);
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -128,7 +130,7 @@ function Dashboard() {
     display: "flex", flexDirection: "column", justifyContent: "space-between"
   });
 
-  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 };
+  const gridCharts = { display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 };
   
   const chartCard = {
     background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)", borderRadius: 16, padding: 18,
@@ -235,19 +237,19 @@ function Dashboard() {
         <div style={kpiCard("#0f766e")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Ricavi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            € {pnl?.revenue_total.toLocaleString()}
+            â‚¬ {pnl?.revenue_total.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard("#dc2626")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Costi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
-            € {pnl?.costs_total.toLocaleString()}
+            â‚¬ {pnl?.costs_total.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard(pnl?.profit >= 0 ? "#16a34a" : "#dc2626")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Profitto Netto</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "#16a34a" : "#dc2626", marginTop: "8px" }}>
-            € {pnl?.profit.toLocaleString()}
+            â‚¬ {pnl?.profit.toLocaleString()}
           </div>
         </div>
         <div style={kpiCard("#f59e0b")}>
@@ -255,7 +257,7 @@ function Dashboard() {
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
              <span style={{ fontSize: "28px", fontWeight: "700", color: "#111827" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
              <span style={{ fontSize: "14px", color: "#6b7280" }}>
-               (€ {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
+               (â‚¬ {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
              </span>
           </div>
         </div>
@@ -283,7 +285,7 @@ function Dashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `€ ${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value) => `â‚¬ ${value.toLocaleString()}`} />
                   <Legend verticalAlign="bottom" height={36}/>
                 </PieChart>
               </ResponsiveContainer>
@@ -305,7 +307,7 @@ function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => `€ ${value.toLocaleString()}`} />
+                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => `â‚¬ ${value.toLocaleString()}`} />
                   <Bar dataKey="Importo" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -317,7 +319,7 @@ function Dashboard() {
       </div>
 
       {/* 3. SEZIONE OPERATIVA OGGI */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
         
         {/* Arrivi di Oggi */}
         <div style={operationCard}>
@@ -339,7 +341,7 @@ function Dashboard() {
                   </div>
                   <div>
                     <div style={{ fontWeight: "600", fontSize: "14px", color: "#111827" }}>{booking.guest_name}</div>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Unit #{booking.unit_id} · {booking.num_adults} pax</div>
+                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Unit #{booking.unit_id} Â· {booking.num_adults} pax</div>
                   </div>
                   <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "#0f766e" }}>
                     {booking.estimated_arrival_time ? booking.estimated_arrival_time.slice(0,5) : "Orario n/d"}
@@ -366,11 +368,11 @@ function Dashboard() {
 
           {tasksTotal > 0 && tasksCompleted < tasksTotal ? (
             <div style={{ fontSize: "13px", color: "#d97706", backgroundColor: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d" }}>
-              ⚠️ Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attività da completare oggi.
+              âš ï¸ Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attivitÃ  da completare oggi.
             </div>
           ) : tasksTotal > 0 ? (
             <div style={{ fontSize: "13px", color: "#047857", backgroundColor: "#ecfdf5", padding: "10px", borderRadius: "8px", border: "1px solid #6ee7b7" }}>
-              ✅ Ottimo lavoro! Tutte le attività di oggi sono completate.
+              âœ… Ottimo lavoro! Tutte le attivitÃ  di oggi sono completate.
             </div>
           ) : (
             <div style={{ fontSize: "13px", color: "#6b7280" }}>Nessun task programmato per oggi.</div>
@@ -383,4 +385,7 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
+
+
 

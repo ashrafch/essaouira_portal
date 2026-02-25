@@ -122,6 +122,28 @@ Admin frontend:
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
 
+## Mobile & Web App (iPhone + Android)
+
+- UI responsive desktop/mobile con:
+  - sidebar desktop
+  - drawer mobile da topbar
+  - bottom navigation mobile
+  - modali full-screen su smartphone
+- PWA installabile (manifest + service worker)
+
+Test locale:
+```bash
+cd apps/web
+npm run build
+npm run preview
+```
+
+Poi apri `http://localhost:4173` da telefono (stessa rete) oppure via emulatore.
+
+Installazione:
+- Android/Chrome: menu browser -> `Installa app`.
+- iPhone/Safari: `Condividi` -> `Aggiungi a Home`.
+
 ## Migrazioni
 
 ```bash

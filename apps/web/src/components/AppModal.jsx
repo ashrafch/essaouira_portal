@@ -1,4 +1,7 @@
+import useIsMobile from "../hooks/useIsMobile";
+
 function AppModal({ open, title, onClose, children, maxWidth = 760 }) {
+  const isMobile = useIsMobile(900);
   if (!open) return null;
 
   return (
@@ -12,17 +15,18 @@ function AppModal({ open, title, onClose, children, maxWidth = 760 }) {
         alignItems: "center",
         justifyContent: "center",
         zIndex: 2000,
-        padding: 16,
+        padding: isMobile ? 0 : 16,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth,
-          maxHeight: "85vh",
+          maxWidth: isMobile ? "100vw" : maxWidth,
+          maxHeight: isMobile ? "100vh" : "85vh",
+          height: isMobile ? "100vh" : "auto",
           overflowY: "auto",
-          borderRadius: 14,
+          borderRadius: isMobile ? 0 : 14,
           border: "1px solid #e5e7eb",
           backgroundColor: "#ffffff",
           boxShadow: "0 10px 30px rgba(15,23,42,0.25)",

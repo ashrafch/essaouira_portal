@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
+import useIsMobile from "../hooks/useIsMobile";
 import AppModal from "../components/AppModal";
 import {
   downloadMonthCostLinesCsv,
@@ -25,6 +26,7 @@ function formatDate(d) {
 }
 
 function Business() {
+  const isMobile = useIsMobile(900);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
@@ -79,7 +81,7 @@ function Business() {
 
   const [selectedCostCategory, setSelectedCostCategory] = useState("all");
 
-  // mappa unità
+  // mappa unitÃ 
   const unitMap = useMemo(
     () =>
       units.reduce((acc, u) => {
@@ -158,11 +160,11 @@ function Business() {
       case "manual":
         return "Manuale";
       case "booking_cleaning_fee":
-        return "Booking · Cleaning fee";
+        return "Booking Â· Cleaning fee";
       case "booking_channel_fee":
-        return "Booking · Channel fee";
+        return "Booking Â· Channel fee";
       case "booking_city_tax":
-        return "Booking · City tax";
+        return "Booking Â· City tax";
       case "staff_task":
         return "Staff task";
       default:
@@ -444,7 +446,7 @@ function Business() {
 
   const sectionRow = {
     display: "grid",
-    gridTemplateColumns: "1.2fr 1fr",
+    gridTemplateColumns: isMobile ? "1fr" : "1.2fr 1fr",
     gap: 12,
   };
 
@@ -572,15 +574,15 @@ function Business() {
             </div>
             <div style={card}>
               <div style={cardTitle}>Ricavi totali</div>
-              <div style={cardValue}>{pnl.revenue_total.toFixed(2)} €</div>
+              <div style={cardValue}>{pnl.revenue_total.toFixed(2)} â‚¬</div>
               <div style={cardSub}>
                 ADR (tariffa media per notte):{" "}
-                {pnl.adr != null ? `${pnl.adr.toFixed(2)} €` : "—"}
+                {pnl.adr != null ? `${pnl.adr.toFixed(2)} â‚¬` : "â€”"}
               </div>
             </div>
             <div style={card}>
               <div style={cardTitle}>Costi totali</div>
-              <div style={cardValue}>{pnl.costs_total.toFixed(2)} €</div>
+              <div style={cardValue}>{pnl.costs_total.toFixed(2)} â‚¬</div>
               <div style={cardSub}>
                 Somma di tutte le spese (booking, staff e costi manuali) nel
                 mese.
@@ -594,15 +596,15 @@ function Business() {
                   color: pnl.profit >= 0 ? "#15803d" : "#b91c1c",
                 }}
               >
-                {pnl.profit.toFixed(2)} €
+                {pnl.profit.toFixed(2)} â‚¬
               </div>
               <div style={cardSub}>
-                Ricavi − Costi (tutti i canali e tutte le unità).
+                Ricavi âˆ’ Costi (tutti i canali e tutte le unitÃ ).
               </div>
             </div>
           </div>
 
-          {/* Ricavi per sorgente / unità */}
+          {/* Ricavi per sorgente / unitÃ  */}
           <div style={sectionRow}>
             <div style={card}>
               <div style={sectionTitle}>Ricavi per sorgente</div>
@@ -623,7 +625,7 @@ function Business() {
                       ([src, value]) => (
                         <tr key={src}>
                           <td style={td}>{src || "Altro"}</td>
-                          <td style={td}>{value.toFixed(2)} €</td>
+                          <td style={td}>{value.toFixed(2)} â‚¬</td>
                         </tr>
                       )
                     )}
@@ -633,7 +635,7 @@ function Business() {
             </div>
 
             <div style={card}>
-              <div style={sectionTitle}>Ricavi per unità</div>
+              <div style={sectionTitle}>Ricavi per unitÃ </div>
               {pnl.revenue_by_unit.length === 0 ? (
                 <p style={{ fontSize: 12, color: "#6b7280" }}>
                   Nessuna prenotazione nel mese selezionato.
@@ -642,7 +644,7 @@ function Business() {
                 <table style={table}>
                   <thead>
                     <tr>
-                      <th style={th}>Unità</th>
+                      <th style={th}>UnitÃ </th>
                       <th style={th}>Notti occupate</th>
                       <th style={th}>Ricavi</th>
                     </tr>
@@ -652,7 +654,7 @@ function Business() {
                       <tr key={u.unit_id}>
                         <td style={td}>{u.unit_name}</td>
                         <td style={td}>{u.nights_occupied}</td>
-                        <td style={td}>{u.revenue.toFixed(2)} €</td>
+                        <td style={td}>{u.revenue.toFixed(2)} â‚¬</td>
                       </tr>
                     ))}
                   </tbody>
@@ -681,7 +683,7 @@ function Business() {
                     }}
                   >
                     <p style={{ fontSize: 11, color: "#6b7280" }}>
-                      Il valore in tabella è il{" "}
+                      Il valore in tabella Ã¨ il{" "}
                       <strong>totale dei costi</strong> per ciascuna
                       categoria nel mese selezionato.
                       <br />
@@ -738,7 +740,7 @@ function Business() {
                                   fontWeight: active ? 600 : 400,
                                 }}
                               >
-                                {c.total.toFixed(2)} €
+                                {c.total.toFixed(2)} â‚¬
                               </td>
                               <td
                                 style={{
@@ -773,9 +775,9 @@ function Business() {
                   selectedCategoryTotal != null && (
                     <>
                       {" "}
-                      · Totale costi:{" "}
+                      Â· Totale costi:{" "}
                       <strong>
-                        {selectedCategoryTotal.toFixed(2)} €
+                        {selectedCategoryTotal.toFixed(2)} â‚¬
                       </strong>
                       {selectedCategoryPerc != null && (
                         <>
@@ -807,7 +809,7 @@ function Business() {
                         <th style={th}>Origine</th>
                         <th style={th}>Riferimento</th>
                         <th style={th}>Descrizione</th>
-                        <th style={th}>Unità</th>
+                        <th style={th}>UnitÃ </th>
                         <th style={th}>Importo</th>
                       </tr>
                     </thead>
@@ -829,14 +831,14 @@ function Business() {
                               ? `Booking #${c.booking_id}`
                               : c.staff_task_id
                               ? `Task #${c.staff_task_id}`
-                              : "—"}
+                              : "â€”"}
                           </td>
-                          <td style={td}>{c.description || "—"}</td>
+                          <td style={td}>{c.description || "â€”"}</td>
                           <td style={td}>
                             {c.unit_id
                               ? unitMap[c.unit_id]?.name ||
                                 `Unit #${c.unit_id}`
-                              : "—"}
+                              : "â€”"}
                           </td>
                           <td style={td}>
                             {c.currency || "EUR"}{" "}
@@ -879,14 +881,14 @@ function Business() {
                           <td style={td}>{row.channel}</td>
                           <td style={td}>{row.bookings_count}</td>
                           <td style={td}>{row.nights}</td>
-                          <td style={td}>{row.gross_revenue.toFixed(2)} €</td>
-                          <td style={td}>{row.channel_fees.toFixed(2)} €</td>
-                          <td style={td}>{row.net_revenue.toFixed(2)} €</td>
-                          <td style={td}>{row.adr != null ? `${row.adr.toFixed(2)} €` : "—"}</td>
+                          <td style={td}>{row.gross_revenue.toFixed(2)} â‚¬</td>
+                          <td style={td}>{row.channel_fees.toFixed(2)} â‚¬</td>
+                          <td style={td}>{row.net_revenue.toFixed(2)} â‚¬</td>
+                          <td style={td}>{row.adr != null ? `${row.adr.toFixed(2)} â‚¬` : "â€”"}</td>
                           <td style={td}>
                             {row.avg_commission_percent != null
                               ? `${row.avg_commission_percent.toFixed(2)}%`
-                              : "—"}
+                              : "â€”"}
                           </td>
                         </tr>
                       ))}
@@ -923,7 +925,7 @@ function Business() {
                   maxWidth={640}
                 >
                 <form onSubmit={handleSaveChannelConnection} style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <select
                       style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
                       value={channelForm.channel}
@@ -947,7 +949,7 @@ function Business() {
                       placeholder="Listing external id"
                     />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <input
                       type="number"
                       style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
@@ -1055,7 +1057,7 @@ function Business() {
                         }
                       }
                     >
-                      {c.channel} · {Number(c.commission_percent || 0).toFixed(2)}%
+                      {c.channel} Â· {Number(c.commission_percent || 0).toFixed(2)}%
                     </button>
                   ))}
                 </div>
@@ -1114,7 +1116,7 @@ function Business() {
                     />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div>
                       <label style={fieldLabel}>Adjustment %</label>
                       <input
@@ -1142,7 +1144,7 @@ function Business() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div>
                       <label style={fieldLabel}>Occupazione minima %</label>
                       <input
@@ -1169,7 +1171,7 @@ function Business() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div>
                       <label style={fieldLabel}>Lead days minimi</label>
                       <input
@@ -1196,7 +1198,7 @@ function Business() {
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
                     <div>
                       <label style={fieldLabel}>Prezzo minimo (opzionale)</label>
                       <input
@@ -1312,7 +1314,7 @@ function Business() {
                     Il motore prende il prezzo base da Pricing, applica la prima regola valida per
                     quella data e restituisce la tariffa suggerita.
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 8 }}>
                     <input
                       type="date"
                       style={{ borderRadius: 8, border: "1px solid #d1d5db", padding: "6px 8px" }}
@@ -1336,7 +1338,7 @@ function Business() {
                         setRecommendationFilters((s) => ({ ...s, unit_id: e.target.value }))
                       }
                     >
-                      <option value="">Tutte le unità</option>
+                      <option value="">Tutte le unitÃ </option>
                       {units.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
@@ -1445,5 +1447,9 @@ function Business() {
 }
 
 export default Business;
+
+
+
+
 
 

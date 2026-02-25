@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import useIsMobile from "../hooks/useIsMobile";
 import AppModal from "../components/AppModal";
 import PageInfoHelp from "../components/PageInfoHelp";
 import {
@@ -64,6 +65,7 @@ const TEMPLATE_PRESETS = [
 ];
 
 function OpsAutomation() {
+  const isMobile = useIsMobile(900);
   const [activePanel, setActivePanel] = useState("templates");
 
   const [templates, setTemplates] = useState([]);
@@ -428,7 +430,7 @@ function OpsAutomation() {
             <div style={statCard}><div>Failed</div><strong>{jobStats.failed}</strong></div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 180px", gap: 8, marginBottom: 8 }}>
             <input
               style={input}
               value={jobSearch}
@@ -493,7 +495,7 @@ function OpsAutomation() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 8, marginBottom: 8 }}>
             <select
               style={input}
               value={checklistTaskId}
@@ -571,7 +573,7 @@ function OpsAutomation() {
         maxWidth={680}
       >
         <form onSubmit={handleSaveTemplate} style={{ display: "grid", gap: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
             <input
               style={input}
               value={templateForm.name}
@@ -589,7 +591,7 @@ function OpsAutomation() {
             </select>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
             <input
               style={input}
               type="number"
@@ -671,4 +673,5 @@ function OpsAutomation() {
 }
 
 export default OpsAutomation;
+
 

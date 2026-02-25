@@ -1,21 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import useIsMobile from "../hooks/useIsMobile";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
-
-function useIsMobile(breakpoint = 1024) {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
-
-  useEffect(() => {
-    function onResize() {
-      setIsMobile(window.innerWidth < breakpoint);
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [breakpoint]);
-
-  return isMobile;
-}
 
 function MobileBottomNav() {
   const items = useMemo(
@@ -36,7 +23,8 @@ function MobileBottomNav() {
         left: 0,
         right: 0,
         bottom: 0,
-        height: 62,
+        height: "calc(62px + env(safe-area-inset-bottom))",
+        paddingBottom: "env(safe-area-inset-bottom)",
         borderTop: "1px solid #e2e8f0",
         background: "rgba(255,255,255,0.98)",
         backdropFilter: "blur(6px)",
@@ -114,7 +102,7 @@ function Layout({ children }) {
   const contentWrapper = {
     gridRow: "2 / 3",
     gridColumn: isMobile ? "1 / 2" : "2 / 3",
-    padding: isMobile ? "14px 12px 84px" : "24px 26px 30px",
+    padding: isMobile ? "14px 10px calc(84px + env(safe-area-inset-bottom))" : "24px 26px 30px",
     overflowX: "hidden",
   };
 
@@ -131,7 +119,7 @@ function Layout({ children }) {
       </header>
 
       <main style={contentWrapper}>
-        <div style={{ maxWidth: 1480, margin: "0 auto" }}>{content}</div>
+        <div style={{ maxWidth: isMobile ? "100%" : 1480, margin: "0 auto" }}>{content}</div>
       </main>
 
       {isMobile ? <MobileBottomNav /> : null}
