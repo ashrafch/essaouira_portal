@@ -130,6 +130,7 @@ Audit trail:
 
 Tenant onboarding (piattaforma):
 - endpoint `GET/POST /platform/tenants` (solo platform owner `owner@default`)
+- endpoint `PUT /platform/tenants/{tenant_id}` (update nome/stato/branding)
 - crea tenant + owner iniziale per nuovo cliente
 
 Admin frontend:
@@ -138,6 +139,7 @@ Admin frontend:
   - export CSV audit
   - compliance links
   - onboarding tenant guidato a step (owner)
+  - branding tenant base (primary color + logo URL)
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`

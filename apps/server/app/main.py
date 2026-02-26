@@ -110,6 +110,9 @@ class AuthMeResponse(BaseModel):
     username: str
     role: str
     tenant_id: str
+    tenant_name: str | None = None
+    tenant_brand_primary_color: str | None = None
+    tenant_brand_logo_url: str | None = None
     must_change_password: bool = False
 
 
@@ -176,11 +179,15 @@ def auth_me(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     user = db.query(User).filter(User.username == username).first()
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == tenant_id).first()
     must_change_password = bool(user.must_change_password) if user else False
     return AuthMeResponse(
         username=username,
         role=role,
         tenant_id=tenant_id,
+        tenant_name=tenant.name if tenant else tenant_id,
+        tenant_brand_primary_color=tenant.brand_primary_color if tenant else None,
+        tenant_brand_logo_url=tenant.brand_logo_url if tenant else None,
         must_change_password=must_change_password,
     )
 
@@ -281,11 +288,22 @@ class TenantCreateRequest(BaseModel):
     name: str
     owner_username: str
     owner_password: str
+    brand_primary_color: str | None = None
+    brand_logo_url: str | None = None
+
+
+class TenantUpdateRequest(BaseModel):
+    name: str | None = None
+    is_active: bool | None = None
+    brand_primary_color: str | None = None
+    brand_logo_url: str | None = None
 
 
 class TenantOut(BaseModel):
     tenant_id: str
     name: str
+    brand_primary_color: str | None = None
+    brand_logo_url: str | None = None
     is_active: bool
     created_at: datetime | None = None
 
@@ -426,7 +444,13 @@ def create_platform_tenant(
     if existing_tenant:
         raise HTTPException(status_code=409, detail="Tenant gia esistente")
 
-    tenant = Tenant(tenant_id=tenant_id, name=payload.name.strip() or tenant_id, is_active=True)
+    tenant = Tenant(
+        tenant_id=tenant_id,
+        name=payload.name.strip() or tenant_id,
+        brand_primary_color=(payload.brand_primary_color or "").strip() or None,
+        brand_logo_url=(payload.brand_logo_url or "").strip() or None,
+        is_active=True,
+    )
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
@@ -449,6 +473,33 @@ def create_platform_tenant(
     finally:
         reset_current_tenant_id(token)
 
+    return tenant
+
+
+@app.put("/platform/tenants/{tenant_id}", response_model=TenantOut)
+def update_platform_tenant(
+    tenant_id: str,
+    payload: TenantUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    _require_platform_owner(request)
+    normalized = normalize_tenant_id(tenant_id)
+    tenant = db.query(Tenant).filter(Tenant.tenant_id == normalized).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant non trovato")
+
+    if payload.name is not None:
+        tenant.name = payload.name.strip() or tenant.name
+    if payload.is_active is not None:
+        tenant.is_active = payload.is_active
+    if payload.brand_primary_color is not None:
+        tenant.brand_primary_color = payload.brand_primary_color.strip() or None
+    if payload.brand_logo_url is not None:
+        tenant.brand_logo_url = payload.brand_logo_url.strip() or None
+
+    db.commit()
+    db.refresh(tenant)
     return tenant
 
 

@@ -7,6 +7,7 @@ import {
   getAuditLogs,
   getCompliancePolicy,
   getPlatformTenants,
+  updatePlatformTenant,
 } from "../services/api";
 import { getCurrentRole } from "../services/auth";
 import PageInfoHelp from "../components/PageInfoHelp";
@@ -49,12 +50,16 @@ function AdminControl() {
   const [wizardStep, setWizardStep] = useState(1);
   const [isCreatingTenant, setIsCreatingTenant] = useState(false);
   const [tenantSearch, setTenantSearch] = useState("");
+  const [editingTenant, setEditingTenant] = useState(null);
+  const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
 
   const [form, setForm] = useState({
     tenant_id: "",
     name: "",
     owner_username: "",
     owner_password: "",
+    brand_primary_color: "",
+    brand_logo_url: "",
   });
 
   const [onboardingResult, setOnboardingResult] = useState(null);
@@ -129,6 +134,8 @@ function AdminControl() {
       name: "",
       owner_username: "",
       owner_password: "",
+      brand_primary_color: "",
+      brand_logo_url: "",
     });
   }
 
@@ -188,6 +195,8 @@ function AdminControl() {
         name: form.name.trim(),
         owner_username: form.owner_username.trim(),
         owner_password: form.owner_password,
+        brand_primary_color: form.brand_primary_color.trim() || null,
+        brand_logo_url: form.brand_logo_url.trim() || null,
       });
 
       const result = {
@@ -215,6 +224,24 @@ function AdminControl() {
       URL.revokeObjectURL(url);
     } catch (e) {
       setError(e?.message || "Errore export audit");
+    }
+  }
+
+  async function saveTenantBranding(e) {
+    e.preventDefault();
+    if (!editingTenant?.tenant_id) return;
+    try {
+      await updatePlatformTenant(editingTenant.tenant_id, {
+        name: editingTenant.name?.trim() || editingTenant.tenant_id,
+        is_active: Boolean(editingTenant.is_active),
+        brand_primary_color: editingTenant.brand_primary_color?.trim() || null,
+        brand_logo_url: editingTenant.brand_logo_url?.trim() || null,
+      });
+      setIsBrandModalOpen(false);
+      setEditingTenant(null);
+      await loadAll();
+    } catch (e2) {
+      setError(e2?.message || "Errore aggiornando tenant");
     }
   }
 
@@ -276,6 +303,18 @@ function AdminControl() {
             onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
             required
           />
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: 8 }}>
+            <input
+              placeholder="#0f766e"
+              value={form.brand_primary_color}
+              onChange={(e) => setForm((s) => ({ ...s, brand_primary_color: e.target.value }))}
+            />
+            <input
+              placeholder="Logo URL (opzionale)"
+              value={form.brand_logo_url}
+              onChange={(e) => setForm((s) => ({ ...s, brand_logo_url: e.target.value }))}
+            />
+          </div>
         </div>
       );
     }
@@ -313,6 +352,8 @@ function AdminControl() {
         <div>Tenant ID: <strong>{sanitizedTenantId}</strong></div>
         <div>Nome tenant: <strong>{form.name.trim()}</strong></div>
         <div>Owner username: <strong>{form.owner_username.trim()}</strong></div>
+        <div>Brand color: <strong>{form.brand_primary_color.trim() || "-"}</strong></div>
+        <div>Brand logo URL: <strong>{form.brand_logo_url.trim() || "-"}</strong></div>
         <div>
           Password owner: <strong>{form.owner_password ? "impostata" : "mancante"}</strong>
         </div>
@@ -422,8 +463,20 @@ function AdminControl() {
                   <div>
                     <div style={{ fontWeight: 700 }}>{t.name}</div>
                     <div style={{ color: "#64748b", fontSize: 12 }}>tenant_id: {t.tenant_id}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 11, color: "#64748b" }}>
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 999,
+                          border: "1px solid #cbd5e1",
+                          background: t.brand_primary_color || "#e2e8f0",
+                        }}
+                      />
+                      {t.brand_primary_color || "no brand color"}
+                    </div>
                   </div>
-                  <div style={{ alignSelf: "center", fontSize: 12 }}>
+                  <div style={{ alignSelf: "center", fontSize: 12, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: isMobile ? "flex-start" : "flex-end" }}>
                     <span
                       style={{
                         borderRadius: 999,
@@ -435,6 +488,29 @@ function AdminControl() {
                     >
                       {t.is_active ? "active" : "inactive"}
                     </span>
+                    <button
+                      type="button"
+                      style={{
+                        borderRadius: 999,
+                        border: "1px solid #d1d5db",
+                        background: "#fff",
+                        color: "#334155",
+                        padding: "3px 8px",
+                        fontSize: 11,
+                      }}
+                      onClick={() => {
+                        setEditingTenant({
+                          tenant_id: t.tenant_id,
+                          name: t.name || "",
+                          is_active: Boolean(t.is_active),
+                          brand_primary_color: t.brand_primary_color || "",
+                          brand_logo_url: t.brand_logo_url || "",
+                        });
+                        setIsBrandModalOpen(true);
+                      }}
+                    >
+                      Branding
+                    </button>
                   </div>
                 </div>
               ))}
@@ -491,6 +567,67 @@ function AdminControl() {
                 </div>
               ) : null}
             </form>
+          </AppModal>
+
+          <AppModal
+            open={isBrandModalOpen}
+            onClose={() => {
+              setIsBrandModalOpen(false);
+              setEditingTenant(null);
+            }}
+            title="Modifica branding tenant"
+            maxWidth={620}
+          >
+            {editingTenant ? (
+              <form onSubmit={saveTenantBranding} style={{ display: "grid", gap: 10 }}>
+                <input
+                  value={editingTenant.name}
+                  onChange={(e) =>
+                    setEditingTenant((s) => ({ ...s, name: e.target.value }))
+                  }
+                  placeholder="Nome tenant"
+                />
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "120px 1fr", gap: 8 }}>
+                  <input
+                    value={editingTenant.brand_primary_color}
+                    onChange={(e) =>
+                      setEditingTenant((s) => ({ ...s, brand_primary_color: e.target.value }))
+                    }
+                    placeholder="#0f766e"
+                  />
+                  <input
+                    value={editingTenant.brand_logo_url}
+                    onChange={(e) =>
+                      setEditingTenant((s) => ({ ...s, brand_logo_url: e.target.value }))
+                    }
+                    placeholder="Logo URL"
+                  />
+                </div>
+                <label style={{ fontSize: 13, color: "#334155" }}>
+                  <input
+                    type="checkbox"
+                    checked={editingTenant.is_active}
+                    onChange={(e) =>
+                      setEditingTenant((s) => ({ ...s, is_active: e.target.checked }))
+                    }
+                  />{" "}
+                  Tenant attivo
+                </label>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBrandModalOpen(false);
+                      setEditingTenant(null);
+                    }}
+                    style={{ background: "white", color: "#111827", border: "1px solid #d1d5db" }}
+                  >
+                    Annulla
+                  </button>
+                  <button type="submit">Salva branding</button>
+                </div>
+              </form>
+            ) : null}
           </AppModal>
         </section>
       ) : null}

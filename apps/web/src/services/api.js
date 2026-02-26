@@ -405,6 +405,10 @@ export function createPlatformTenant(payload) {
   return apiPost("/platform/tenants", payload);
 }
 
+export function updatePlatformTenant(tenantId, payload) {
+  return apiPut(`/platform/tenants/${tenantId}`, payload);
+}
+
 export function resetUserPassword(userId, payload) {
   return apiPost(`/users/${userId}/reset-password`, payload);
 }
