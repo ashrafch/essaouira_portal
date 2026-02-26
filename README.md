@@ -137,7 +137,7 @@ Admin frontend:
   - audit logs live
   - export CSV audit
   - compliance links
-  - onboarding tenant (owner)
+  - onboarding tenant guidato a step (owner)
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
