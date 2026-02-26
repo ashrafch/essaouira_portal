@@ -15,12 +15,20 @@
 - Fase 1 Sales Core completata (CRM ospiti + pagamenti + invoice endpoints): completata
 - Fase 2 Ops Automation completata (message templates/jobs + housekeeping checklist): completata
 - Fase 3 Distribution & Revenue completata (channel manager + revenue rules + channel analytics): completata
+- Mobile-first UX hardening (layout responsive core + pagine secondarie + modal usability): completata
 
 ## Backlog post-core (come richiesto)
 - Osservabilita completa:
   - dashboard Grafana pronte all'uso (API latency p95, error rate, saturazione)
   - alerting Prometheus (Slack/Email) con soglie operative
   - runbook incidenti e SLO/SLA
+- Productization commerciale:
+  - onboarding cliente guidato step-by-step
+  - packaging piano/profili (starter/pro) e limiti feature
+  - white-label minimo (logo/brand/colori tenant)
+- QA e release discipline:
+  - checklist go-live mobile obbligatoria su ogni release
+  - smoke test E2E post-deploy (auth + booking + staff + business)
 
 ## Prossimi blocchi per "prodotto 100%"
 1. Gestione utenti reale (non solo admin singolo):

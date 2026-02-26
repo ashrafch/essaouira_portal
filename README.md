@@ -15,10 +15,18 @@ docker compose up --build -d
 ```
 
 URL:
-- Frontend: `http://localhost:8080`
-- API health: `http://localhost:8080/api/health`
+- Frontend: `http://localhost:8081` (default)
+- API health (via web proxy): `http://localhost:8081/api/health`
 - API diretta: `http://localhost:8000/health`
 - Login default: `owner` / `owner123`
+
+Porte configurabili (senza modificare file):
+
+```bash
+set WEB_PORT=8081
+set API_PORT=8000
+docker compose up --build -d
+```
 
 Stop:
 
@@ -31,6 +39,18 @@ Reset completo DB:
 ```bash
 docker compose down -v
 ```
+
+Troubleshooting pull immagini (Docker Hub TLS timeout):
+
+```bash
+docker logout
+docker login
+docker pull nginx:1.27-alpine
+docker pull node:22-alpine
+docker pull python:3.13-slim
+```
+
+Se persiste: riavvia Docker Desktop e rete/hotspot, imposta DNS pubblico (1.1.1.1 / 8.8.8.8), poi rilancia `docker compose up --build -d`.
 
 ## Avvio manuale (senza Docker)
 
@@ -122,6 +142,10 @@ Admin frontend:
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
 
+Compose (root `.env` opzionale):
+- `WEB_PORT` (default `8081`)
+- `API_PORT` (default `8000`)
+
 ## Mobile & Web App (iPhone + Android)
 
 - UI responsive desktop/mobile con:
@@ -139,6 +163,12 @@ npm run preview
 ```
 
 Poi apri `http://localhost:4173` da telefono (stessa rete) oppure via emulatore.
+
+Test su telefono reale via hotspot:
+1. collega telefono e PC alla stessa rete/hotspot
+2. trova IP PC (`ipconfig`)
+3. apri `http://<IP_PC>:8081` dal telefono
+4. se non apre: consenti porta TCP `8081` nel firewall Windows
 
 Installazione:
 - Android/Chrome: menu browser -> `Installa app`.
@@ -217,6 +247,11 @@ CI/CD:
 - pipeline CI: `.github/workflows/ci.yml`
 - pipeline staging (manual trigger): `.github/workflows/staging.yml`
 - pipeline release readiness (manual trigger): `.github/workflows/release-readiness.yml`
+
+## QA Go-Live Mobile
+
+- checklist ufficiale: `docs/GO_LIVE_MOBILE_QA.md`
+- eseguire checklist completa prima di merge su `dev` e prima di release cliente
 
 ## Workflow branch
 
