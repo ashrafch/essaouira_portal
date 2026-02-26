@@ -270,7 +270,9 @@ function Staff() {
 
   const assigneeOptions = assignees;
 
-  const weekColumnsPerPage = isMobile ? 2 : 5;
+  const weekColumnsPerPage = isMobile ? 2 : 4;
+  const dayColumnWidth = isMobile ? 110 : 130;
+  const staffColumnMinWidth = isMobile ? 150 : 170;
   const totalWeekAssigneePages = Math.max(
     1,
     Math.ceil(assignees.length / weekColumnsPerPage)
@@ -709,14 +711,17 @@ function Staff() {
 
   const boardWrapper = {
     overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+    border: "1px solid #eef2f7",
+    borderRadius: 12,
   };
 
   const board = {
     minWidth: boardAssignees.length
-      ? boardAssignees.length * (isMobile ? 180 : 220) + (isMobile ? 110 : 140)
+      ? boardAssignees.length * staffColumnMinWidth + dayColumnWidth
       : 320,
     display: "grid",
-    gridTemplateColumns: `${isMobile ? 110 : 140}px repeat(${boardAssignees.length || 1}, minmax(${isMobile ? 160 : 200}px, 1fr))`,
+    gridTemplateColumns: `${dayColumnWidth}px repeat(${boardAssignees.length || 1}, minmax(${staffColumnMinWidth}px, 1fr))`,
     borderCollapse: "collapse",
     fontSize: 12,
   };
@@ -1196,7 +1201,16 @@ function Staff() {
                   Staff precedenti
                 </button>
                 <span style={{ fontSize: 11, color: "#6b7280" }}>
-                  Pagina staff {effectiveWeekPage + 1}/{totalWeekAssigneePages}
+                  Pagina staff {effectiveWeekPage + 1}/{totalWeekAssigneePages} ·
+                  {" "}
+                  membri{" "}
+                  {effectiveWeekPage * weekColumnsPerPage + 1}
+                  -
+                  {Math.min(
+                    assignees.length,
+                    (effectiveWeekPage + 1) * weekColumnsPerPage
+                  )}{" "}
+                  di {assignees.length}
                 </span>
                 <button
                   type="button"
@@ -1230,7 +1244,7 @@ function Staff() {
                     position: "sticky",
                     left: 0,
                     zIndex: 2,
-                    minWidth: isMobile ? 110 : 140,
+                    minWidth: dayColumnWidth,
                   }}
                 >
                   Giorno
@@ -1274,7 +1288,7 @@ function Staff() {
                         position: "sticky",
                         left: 0,
                         zIndex: 1,
-                        minWidth: isMobile ? 110 : 140,
+                        minWidth: dayColumnWidth,
                       }}
                     >
                       <div>{formatDate(d)}</div>
