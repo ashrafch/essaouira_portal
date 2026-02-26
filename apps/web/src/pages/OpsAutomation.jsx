@@ -483,9 +483,9 @@ function OpsAutomation() {
 
       {activePanel === "checklist" ? (
         <section style={card}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 8, marginBottom: 8, alignItems: "center" }}>
             <input
-              style={{ ...input, minWidth: 260 }}
+              style={input}
               value={taskQuery}
               onChange={(e) => setTaskQuery(e.target.value)}
               placeholder="Cerca task per data, unita o operatore"
@@ -520,7 +520,7 @@ function OpsAutomation() {
             </button>
           </div>
 
-          <form onSubmit={handleAddChecklistItem} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <form onSubmit={handleAddChecklistItem} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 8, marginBottom: 8 }}>
             <input
               style={input}
               value={checklistTitle}

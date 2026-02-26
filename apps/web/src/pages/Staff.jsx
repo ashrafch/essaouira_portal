@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   getStaffTasks,
   getUnits,
@@ -47,6 +48,7 @@ function getRoleLabel(value) {
 }
 
 function Staff() {
+  const isMobile = useIsMobile(900);
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const [mode, setMode] = useState("day"); // "day" | "week"
@@ -682,9 +684,9 @@ function Staff() {
   };
 
   const board = {
-    minWidth: assignees.length ? assignees.length * 220 + 140 : 360,
+    minWidth: assignees.length ? assignees.length * (isMobile ? 180 : 220) + (isMobile ? 110 : 140) : 320,
     display: "grid",
-    gridTemplateColumns: `140px repeat(${assignees.length || 1}, minmax(200px, 1fr))`,
+    gridTemplateColumns: `${isMobile ? 110 : 140}px repeat(${assignees.length || 1}, minmax(${isMobile ? 160 : 200}px, 1fr))`,
     borderCollapse: "collapse",
     fontSize: 12,
   };
@@ -766,7 +768,7 @@ function Staff() {
 
   const layout = {
     display: "grid",
-    gridTemplateColumns: "minmax(260px, 320px) 1fr",
+    gridTemplateColumns: isMobile ? "1fr" : "minmax(260px, 320px) 1fr",
     gap: 12,
     alignItems: "flex-start",
   };
@@ -1064,7 +1066,7 @@ function Staff() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
                     gap: 8,
                   }}
                 >

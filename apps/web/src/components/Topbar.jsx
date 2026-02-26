@@ -81,17 +81,19 @@ function Topbar({ isMobile = false, onMenuToggle = null }) {
           <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em" }}>
             Operativita Giornaliera
           </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "#64748b",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            Controllo live prenotazioni, staff, costi e manutenzione
-          </div>
+          {!isMobile ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#64748b",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Controllo live prenotazioni, staff, costi e manutenzione
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -100,8 +102,9 @@ function Topbar({ isMobile = false, onMenuToggle = null }) {
           display: "flex",
           gap: 10,
           alignItems: "center",
-          flexWrap: "wrap",
+          flexWrap: isMobile ? "nowrap" : "wrap",
           justifyContent: "flex-end",
+          minWidth: 0,
         }}
       >
         <div
@@ -112,7 +115,7 @@ function Topbar({ isMobile = false, onMenuToggle = null }) {
           }}
         >
           <span style={dot(online ? "#22c55e" : "#ef4444")} />
-          {online ? "Online" : "Offline"}
+          {isMobile ? (online ? "On" : "Off") : online ? "Online" : "Offline"}
         </div>
 
         {!isMobile ? (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AppModal from "../components/AppModal";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   getStaffMembers,
   getStaffTasks,
@@ -56,12 +57,6 @@ const boardWrapper = {
   borderRadius: 16,
   padding: 16,
   border: "1px solid #e2e8f0",
-};
-
-const boardInner = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: 16,
 };
 
 const columnWrapper = {
@@ -239,6 +234,7 @@ const categories = [
 ];
 
 function StaffPlanner() {
+  const isMobile = useIsMobile(900);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().slice(0, 10);
@@ -452,7 +448,13 @@ function StaffPlanner() {
       </AppModal>
 
       <div style={boardWrapper}>
-        <div style={boardInner}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 16,
+          }}
+        >
           {categories.map((col) => {
             const colTasks = getColumnTasks(col.key);
             return (
@@ -575,7 +577,7 @@ function StaffPlanner() {
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}>
               <div style={{ ...modalRow, flex: 1 }}>
                 <label style={modalLabel}>Ore stimate</label>
                 <input

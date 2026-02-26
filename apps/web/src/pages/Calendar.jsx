@@ -400,7 +400,7 @@ function Calendar() {
     display: "grid",
     gridTemplateRows: "auto",
     gap: 4,
-    minWidth: isMobile ? 720 : undefined,
+    minWidth: isMobile ? 620 : undefined,
   };
 
   const weekRow = {
@@ -422,7 +422,7 @@ function Calendar() {
     border: "1px solid #e2e8f0",
     backgroundColor: isCurrentMonth ? "#f8fafc" : "#fdfdfd",
     position: "relative",
-    minHeight: isMobile ? 84 : 90,
+    minHeight: isMobile ? 76 : 90,
     padding: "4px 4px 4px 4px",
     fontSize: 11,
     cursor: draggingBooking && !fromCache ? "copy" : "default",
@@ -444,8 +444,8 @@ function Calendar() {
     position: "absolute",
     top: 4,
     left: 4,
-    width: 18,
-    height: 18,
+    width: isMobile ? 16 : 18,
+    height: isMobile ? 16 : 18,
     borderRadius: "999px",
     border: "1px solid #d1d5db",
     backgroundColor: "white",
@@ -460,10 +460,11 @@ function Calendar() {
   };
 
   const bookingsContainer = {
-    marginTop: isMobile ? 20 : 22,
+    marginTop: isMobile ? 18 : 22,
     display: "flex",
     flexDirection: "column",
-    gap: 4,
+      gap: 4,
+    minWidth: 0,
   };
 
   // colori piu accesi per le pill
@@ -493,6 +494,7 @@ function Calendar() {
       alignItems: "center",
       justifyContent: "space-between",
       gap: 4,
+      minWidth: 0,
       opacity: isDragging ? 0.4 : 1,
       cursor: fromCache ? "default" : "grab",
       userSelect: "none",
@@ -517,12 +519,12 @@ function Calendar() {
   const timelineRow = {
     display: "flex",
     alignItems: "stretch",
-    minWidth: daysInMonth * 26 + 80,
+    minWidth: daysInMonth * (isMobile ? 22 : 26) + 80,
   };
 
   const timelineDayCell = (isToday) => ({
-    width: 26,
-    minWidth: 26,
+    width: isMobile ? 22 : 26,
+    minWidth: isMobile ? 22 : 26,
     height: 32,
     borderRight: "1px solid #e5e7eb",
     backgroundColor: isToday ? "#ecfeff" : "white",
@@ -641,9 +643,10 @@ function Calendar() {
                     const dayKey = formatISO(dayDate);
                     const dayBookings = bookingsByDay[dayKey] || [];
 
-                    const visibleBookings = dayBookings.slice(0, 3);
+                    const maxVisible = isMobile ? 2 : 3;
+                    const visibleBookings = dayBookings.slice(0, maxVisible);
                     const extraCount =
-                      dayBookings.length > 3 ? dayBookings.length - 3 : 0;
+                      dayBookings.length > maxVisible ? dayBookings.length - maxVisible : 0;
 
                     return (
                       <div
@@ -711,7 +714,14 @@ function Calendar() {
                                   openBookingInEdit(b.id);
                                 }}
                               >
-                                <span>
+                                <span
+                                  style={{
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    minWidth: 0,
+                                  }}
+                                >
                                   {b.guest_name || "Ospite"} -{" "}
                                   {unit?.name || `Unit #${b.unit_id}`}
                                 </span>
