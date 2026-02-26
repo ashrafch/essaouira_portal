@@ -613,6 +613,7 @@ function Business() {
                   Nessun ricavo per il mese selezionato.
                 </p>
               ) : (
+                <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
@@ -631,6 +632,7 @@ function Business() {
                     )}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 
@@ -641,6 +643,7 @@ function Business() {
                   Nessuna prenotazione nel mese selezionato.
                 </p>
               ) : (
+                <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
@@ -659,6 +662,7 @@ function Business() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>

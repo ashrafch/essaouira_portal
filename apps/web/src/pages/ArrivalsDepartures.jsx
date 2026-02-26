@@ -454,6 +454,7 @@ function ArrivalsDepartures() {
                   Nessun check-in per questa data (con i filtri attuali).
                 </p>
               ) : (
+                <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
@@ -654,6 +655,7 @@ function ArrivalsDepartures() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 
@@ -667,6 +669,7 @@ function ArrivalsDepartures() {
                   Nessun check-out per questa data (con i filtri attuali).
                 </p>
               ) : (
+                <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
@@ -826,6 +829,7 @@ function ArrivalsDepartures() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>
