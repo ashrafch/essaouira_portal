@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   getBookings,
   getStaffTasks,
@@ -22,6 +23,7 @@ function whatsappLink(phone) {
 }
 
 function ArrivalsDepartures() {
+  const isMobile = useIsMobile(900);
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
 
@@ -236,7 +238,7 @@ function ArrivalsDepartures() {
 
   const cardGrid = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))",
     gap: 12,
   };
 
@@ -392,7 +394,7 @@ function ArrivalsDepartures() {
                   border: "1px solid #d1d5db",
                   padding: "6px 8px",
                   fontSize: 13,
-                  minWidth: 140,
+                  minWidth: isMobile ? 0 : 140,
                 }}
               >
                 <option value="all">Tutte le unità</option>

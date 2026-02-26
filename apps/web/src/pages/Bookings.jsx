@@ -1281,7 +1281,7 @@ function Bookings() {
                       ...input,
                       padding: "4px 8px",
                       fontSize: 12,
-                      width: 120,
+                      width: isMobile ? "100%" : 120,
                     }}
                     value={unitFilter}
                     onChange={(e) => setUnitFilter(e.target.value)}
@@ -1303,7 +1303,7 @@ function Bookings() {
                       ...input,
                       padding: "4px 8px",
                       fontSize: 12,
-                      width: 140,
+                      width: isMobile ? "100%" : 140,
                     }}
                     value={paymentFilter}
                     onChange={(e) => setPaymentFilter(e.target.value)}
