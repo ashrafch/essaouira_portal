@@ -3,6 +3,26 @@ const USER_KEY = "essaouira_portal_user";
 const ROLE_KEY = "essaouira_portal_role";
 const TENANT_KEY = "essaouira_portal_tenant";
 
+function parseJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token) {
+  const payload = parseJwtPayload(token);
+  if (!payload || !payload.exp) return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return Number(payload.exp) <= nowSec;
+}
+
 export function getAccessToken() {
   return window.localStorage.getItem(TOKEN_KEY);
 }
@@ -42,7 +62,13 @@ export function getCurrentTenantId() {
 }
 
 export function isAuthenticated() {
-  return Boolean(getAccessToken());
+  const token = getAccessToken();
+  if (!token) return false;
+  if (isTokenExpired(token)) {
+    clearAuthSession();
+    return false;
+  }
+  return true;
 }
 
 export async function login(username, password, tenantId, baseUrl) {

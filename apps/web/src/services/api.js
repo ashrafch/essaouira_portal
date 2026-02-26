@@ -2,6 +2,22 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 const TOKEN_KEY = "essaouira_portal_token";
 const TENANT_KEY = "essaouira_portal_tenant";
+const USER_KEY = "essaouira_portal_user";
+const ROLE_KEY = "essaouira_portal_role";
+
+function clearStoredSession() {
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(TENANT_KEY);
+  window.localStorage.removeItem(USER_KEY);
+  window.localStorage.removeItem(ROLE_KEY);
+}
+
+function handleUnauthorized() {
+  clearStoredSession();
+  if (window.location.pathname !== "/login") {
+    window.location.href = "/login?reason=session_expired";
+  }
+}
 
 function getAuthHeaders() {
   const token = window.localStorage.getItem(TOKEN_KEY);
@@ -15,6 +31,9 @@ function getAuthHeaders() {
 async function handleResponse(res) {
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      handleUnauthorized();
+    }
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
   if (res.status === 204) {
@@ -67,6 +86,9 @@ export async function apiDelete(path) {
   });
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      handleUnauthorized();
+    }
     throw new Error(`Errore API ${res.status}: ${text}`);
   }
   return;
@@ -249,6 +271,9 @@ export async function downloadAuditLogsCsv(params = {}) {
   });
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      handleUnauthorized();
+    }
     throw new Error(`Errore export audit CSV ${res.status}: ${text}`);
   }
   return res.blob();
@@ -265,6 +290,9 @@ export async function downloadMonthCostLinesCsv(year, month) {
   );
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      handleUnauthorized();
+    }
     throw new Error(`Errore export CSV ${res.status}: ${text}`);
   }
   return res.blob();

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { isAuthenticated, login } from "../services/auth";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("default");
@@ -15,6 +16,13 @@ function Login() {
       navigate("/", { replace: true });
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("reason") === "session_expired") {
+      setError("Sessione scaduta o non valida. Effettua di nuovo il login.");
+    }
+  }, [location.search]);
 
   async function handleSubmit(e) {
     e.preventDefault();
