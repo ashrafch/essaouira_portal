@@ -53,6 +53,7 @@ function Staff() {
 
   const [mode, setMode] = useState("day"); // "day" | "week"
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [weekAssigneePage, setWeekAssigneePage] = useState(0);
 
   const [units, setUnits] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -268,6 +269,33 @@ function Staff() {
   }, [filteredTasks, defAssignee, staffMembers]);
 
   const assigneeOptions = assignees;
+
+  const weekColumnsPerPage = isMobile ? 2 : 5;
+  const totalWeekAssigneePages = Math.max(
+    1,
+    Math.ceil(assignees.length / weekColumnsPerPage)
+  );
+  const effectiveWeekPage = Math.min(
+    weekAssigneePage,
+    totalWeekAssigneePages - 1
+  );
+  const boardAssignees =
+    mode === "week"
+      ? assignees.slice(
+          effectiveWeekPage * weekColumnsPerPage,
+          (effectiveWeekPage + 1) * weekColumnsPerPage
+        )
+      : assignees;
+
+  useEffect(() => {
+    if (mode !== "week" && weekAssigneePage !== 0) {
+      setWeekAssigneePage(0);
+      return;
+    }
+    if (weekAssigneePage > totalWeekAssigneePages - 1) {
+      setWeekAssigneePage(Math.max(0, totalWeekAssigneePages - 1));
+    }
+  }, [mode, weekAssigneePage, totalWeekAssigneePages]);
 
   const staffColorMap = useMemo(() => {
     const map = {};
@@ -684,9 +712,11 @@ function Staff() {
   };
 
   const board = {
-    minWidth: assignees.length ? assignees.length * (isMobile ? 180 : 220) + (isMobile ? 110 : 140) : 320,
+    minWidth: boardAssignees.length
+      ? boardAssignees.length * (isMobile ? 180 : 220) + (isMobile ? 110 : 140)
+      : 320,
     display: "grid",
-    gridTemplateColumns: `${isMobile ? 110 : 140}px repeat(${assignees.length || 1}, minmax(${isMobile ? 160 : 200}px, 1fr))`,
+    gridTemplateColumns: `${isMobile ? 110 : 140}px repeat(${boardAssignees.length || 1}, minmax(${isMobile ? 160 : 200}px, 1fr))`,
     borderCollapse: "collapse",
     fontSize: 12,
   };
@@ -1138,12 +1168,50 @@ function Staff() {
 
         {/* COLONNA DESTRA: BOARD */}
         <div style={card}>
-          <div style={sectionTitle}>
-            {mode === "day"
-              ? `Vista giornaliera · ${formatDate(selectedDate)}`
-              : `Vista settimanale · ${formatDate(from_date)} → ${formatDate(
-                  to_date
-                )}`}
+          <div
+            style={{
+              ...sectionTitle,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>
+              {mode === "day"
+                ? `Vista giornaliera · ${formatDate(selectedDate)}`
+                : `Vista settimanale · ${formatDate(from_date)} -> ${formatDate(
+                    to_date
+                  )}`}
+            </span>
+            {mode === "week" && assignees.length > weekColumnsPerPage && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  style={smallButton}
+                  disabled={effectiveWeekPage === 0}
+                  onClick={() => setWeekAssigneePage((p) => Math.max(0, p - 1))}
+                >
+                  Staff precedenti
+                </button>
+                <span style={{ fontSize: 11, color: "#6b7280" }}>
+                  Pagina staff {effectiveWeekPage + 1}/{totalWeekAssigneePages}
+                </span>
+                <button
+                  type="button"
+                  style={smallButton}
+                  disabled={effectiveWeekPage >= totalWeekAssigneePages - 1}
+                  onClick={() =>
+                    setWeekAssigneePage((p) =>
+                      Math.min(totalWeekAssigneePages - 1, p + 1)
+                    )
+                  }
+                >
+                  Staff successivi
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? (
@@ -1156,8 +1224,18 @@ function Staff() {
             <div style={boardWrapper}>
               <div style={board}>
                 {/* header: colonna giorni + colonne per assignee */}
-                <div style={boardHeaderCell}>Giorno</div>
-                {assignees.map((ass) => {
+                <div
+                  style={{
+                    ...boardHeaderCell,
+                    position: "sticky",
+                    left: 0,
+                    zIndex: 2,
+                    minWidth: isMobile ? 110 : 140,
+                  }}
+                >
+                  Giorno
+                </div>
+                {boardAssignees.map((ass) => {
                   const color = staffColorMap[ass];
                   return (
                     <div key={ass} style={boardHeaderCell}>
@@ -1190,12 +1268,20 @@ function Staff() {
                 {days.map((d) => (
                   <div key={d} style={{ display: "contents" }}>
                     {/* prima colonna: giorno */}
-                    <div style={boardDayCell}>
+                    <div
+                      style={{
+                        ...boardDayCell,
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 1,
+                        minWidth: isMobile ? 110 : 140,
+                      }}
+                    >
                       <div>{formatDate(d)}</div>
                       <div style={{ fontSize: 10, color: "#6b7280" }}>{d}</div>
                     </div>
                     {/* celle per ogni assignee */}
-                    {assignees.map((ass) => {
+                    {boardAssignees.map((ass) => {
                       const list = tasksByAssigneeAndDay[ass]?.[d] || [];
                       const isQuick =
                         quickCreateTarget &&

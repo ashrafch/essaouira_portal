@@ -282,9 +282,9 @@ function Dashboard() {
           <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
             Provenienza Ricavi
           </h3>
-          <div style={{ flex: 1, minHeight: "250px", minWidth: 0 }}>
+          <div style={{ height: isMobile ? 260 : 290, minWidth: 0 }}>
             {sourceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 280}>
                 <PieChart>
                   <Pie
                     data={sourceData}
@@ -312,9 +312,9 @@ function Dashboard() {
           <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
             Top 5 Categorie di Spesa
           </h3>
-          <div style={{ flex: 1, minHeight: "250px", minWidth: 0 }}>
+          <div style={{ height: isMobile ? 260 : 290, minWidth: 0 }}>
             {costData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 280}>
                 <BarChart data={costData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" hide />
