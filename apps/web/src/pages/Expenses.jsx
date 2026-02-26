@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppModal from "../components/AppModal";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   getCostItems,
   createCostItem,
@@ -22,6 +23,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 function Expenses() {
+  const isMobile = useIsMobile(900);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -185,7 +187,7 @@ function Expenses() {
             Registra bollette, affitti, tasse e altre spese non legate allo staff.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={() => setIsInfoOpen(true)}
@@ -195,12 +197,12 @@ function Expenses() {
             i
           </button>
           <span style={{ fontSize: 12, color: "#6b7280" }}>Periodo:</span>
-          <select style={{...inputStyle, width: "auto"}} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          <select style={{...inputStyle, width: isMobile ? "100%" : "auto"}} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>{new Date(2000, i, 1).toLocaleDateString("it-IT", { month: "long" })}</option>
             ))}
           </select>
-          <select style={{...inputStyle, width: "auto"}} value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          <select style={{...inputStyle, width: isMobile ? "100%" : "auto"}} value={year} onChange={(e) => setYear(Number(e.target.value))}>
              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button type="button" style={btnPrimary} onClick={openCreateModal}>
@@ -272,12 +274,12 @@ function Expenses() {
                 onChange={(e) => setDescription(e.target.value)} 
               />
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 8 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, color: "#6b7280" }}>Importo</label>
                 <input type="number" step="0.01" style={inputStyle} value={amount} onChange={(e) => setAmount(e.target.value)} required />
               </div>
-              <div style={{ width: 80 }}>
+              <div style={{ width: isMobile ? "100%" : 80 }}>
                 <label style={{ fontSize: 11, color: "#6b7280" }}>Valuta</label>
                 <input style={inputStyle} value={currency} onChange={(e) => setCurrency(e.target.value)} />
               </div>
@@ -290,7 +292,7 @@ function Expenses() {
               </select>
             </div>
             
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               <button type="submit" style={{ ...btnPrimary, flex: 1 }} disabled={saving}>
                 {saving ? "Salvataggio..." : editingId ? "Aggiorna" : "Aggiungi Spesa"}
               </button>
@@ -335,8 +337,8 @@ function Expenses() {
                       </td>
                       <td style={td}>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <button style={btnSecondary} onClick={() => editItem(item)}>✏️</button>
-                          <button style={{ ...btnSecondary, borderColor: "#fecaca", color: "#dc2626" }} onClick={() => handleDelete(item.id)}>🗑️</button>
+                          <button style={btnSecondary} onClick={() => editItem(item)}>Modifica</button>
+                          <button style={{ ...btnSecondary, borderColor: "#fecaca", color: "#dc2626" }} onClick={() => handleDelete(item.id)}>Elimina</button>
                         </div>
                       </td>
                     </tr>

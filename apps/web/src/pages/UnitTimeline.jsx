@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUnitSchedule } from "../services/api";
 import PageInfoHelp from "../components/PageInfoHelp";
+import useIsMobile from "../hooks/useIsMobile";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 function UnitTimeline() {
+  const isMobile = useIsMobile(900);
   const { unitId } = useParams();
   const navigate = useNavigate();
 
@@ -308,6 +310,7 @@ function UnitTimeline() {
     gap: 8,
     alignItems: "center",
     fontSize: 12,
+    flexWrap: "wrap",
   };
 
   const input = {
@@ -319,7 +322,7 @@ function UnitTimeline() {
 
   const timelineRow = {
     display: "grid",
-    gridTemplateColumns: "130px 1fr 120px",
+    gridTemplateColumns: isMobile ? "1fr" : "130px 1fr 120px",
     alignItems: "center",
     gap: 12,
     fontSize: 13,

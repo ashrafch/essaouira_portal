@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppModal from "../components/AppModal";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   createPlatformTenant,
   downloadAuditLogsCsv,
@@ -19,6 +20,7 @@ const card = {
 };
 
 function AdminControl() {
+  const isMobile = useIsMobile(900);
   const role = getCurrentRole() || "viewer";
   const isOwner = role === "owner";
   const [tenants, setTenants] = useState([]);
@@ -118,7 +120,7 @@ function AdminControl() {
       </section>
 
       <section style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <h2 style={{ marginTop: 0, marginBottom: 8 }}>Audit Log</h2>
           <button onClick={onExportAudit}>Export CSV</button>
         </div>
@@ -162,7 +164,7 @@ function AdminControl() {
             title="Crea tenant"
             maxWidth={640}
           >
-          <form onSubmit={onCreateTenant} style={{ display: "grid", gap: 8, maxWidth: 520 }}>
+          <form onSubmit={onCreateTenant} style={{ display: "grid", gap: 8, maxWidth: isMobile ? "100%" : 520 }}>
             <input
               placeholder="tenant_id (es. client-a)"
               value={form.tenant_id}

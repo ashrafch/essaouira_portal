@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AppModal from "../components/AppModal";
+import useIsMobile from "../hooks/useIsMobile";
 import {
   getStaffMembers,
   createStaffMember,
@@ -32,6 +33,7 @@ function getRoleLabel(roleValue) {
 }
 
 function StaffDirectory() {
+  const isMobile = useIsMobile(900);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -292,6 +294,7 @@ function StaffDirectory() {
           justifyContent: "space-between",
           alignItems: "flex-end",
           gap: 12,
+          flexWrap: "wrap",
         }}
       >
         <div>
@@ -310,7 +313,8 @@ function StaffDirectory() {
             alignItems: "center",
             fontSize: 11,
             flexWrap: "wrap",
-            justifyContent: "flex-end",
+            justifyContent: isMobile ? "flex-start" : "flex-end",
+            width: isMobile ? "100%" : "auto",
           }}
         >
           <button
@@ -475,7 +479,7 @@ function StaffDirectory() {
                   />
                 ))}
                 <input
-                  style={{ ...input, maxWidth: 110, fontSize: 12 }}
+                  style={{ ...input, maxWidth: isMobile ? "100%" : 110, fontSize: 12 }}
                   value={colorHex}
                   onChange={(e) => setColorHex(e.target.value)}
                   placeholder="#0f766e"
@@ -510,7 +514,7 @@ function StaffDirectory() {
               </label>
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               <button type="submit" style={buttonPrimary} disabled={saving}>
                 {saving
                   ? "Salvataggio..."
