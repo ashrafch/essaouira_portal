@@ -79,7 +79,7 @@ def test_device_command_lifecycle_for_relay_and_climate():
             headers=headers,
         )
         assert get_cmd.status_code == 200
-        assert get_cmd.json()["command_type"] == "power_on"
+        assert get_cmd.json()["command_type"] == "device.power.on"
 
 
 def test_device_command_scope_validation():

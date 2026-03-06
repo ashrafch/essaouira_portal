@@ -1,7 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.domains.smart_building.taxonomy import (
+    normalize_alert_type,
+    normalize_command_type,
+    normalize_event_type,
+    normalize_rule_action_type,
+    normalize_rule_trigger_type,
+    normalize_scene_action_type,
+    normalize_trigger_source,
+)
 
 
 class DeviceBase(BaseModel):
@@ -82,6 +92,11 @@ class DeviceEventCreate(BaseModel):
     source: str = Field(default="system", max_length=32)
     payload_json: str | None = None
 
+    @field_validator("event_type")
+    @classmethod
+    def _normalize_event_type(cls, value: str) -> str:
+        return normalize_event_type(value)
+
 
 class DeviceEventOut(BaseModel):
     id: int
@@ -105,6 +120,11 @@ class AlertCreate(BaseModel):
     title: str = Field(..., max_length=160)
     description: str | None = None
 
+    @field_validator("alert_type")
+    @classmethod
+    def _normalize_alert_type(cls, value: str) -> str:
+        return normalize_alert_type(value)
+
 
 class AlertOut(BaseModel):
     id: int
@@ -116,6 +136,7 @@ class AlertOut(BaseModel):
     status: str
     title: str
     description: str | None = None
+    correlation_id: str | None = None
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
     acknowledged_by: str | None = None
@@ -193,6 +214,11 @@ class DeviceCommandCreate(BaseModel):
     payload: dict = Field(default_factory=dict)
     ttl_seconds: int | None = Field(default=300, ge=30, le=86400)
 
+    @field_validator("command_type")
+    @classmethod
+    def _normalize_command_type(cls, value: str) -> str:
+        return normalize_command_type(value)
+
 
 class DeviceCommandOut(BaseModel):
     id: int
@@ -202,6 +228,7 @@ class DeviceCommandOut(BaseModel):
     provider: str
     command_type: str
     payload_json: str | None = None
+    correlation_id: str | None = None
     status: str
     requested_by: str | None = None
     requested_at: datetime | None = None
@@ -277,6 +304,11 @@ class SceneActionBase(BaseModel):
     payload: dict = Field(default_factory=dict)
     is_active: bool = True
 
+    @field_validator("action_type")
+    @classmethod
+    def _normalize_scene_action_type(cls, value: str) -> str:
+        return normalize_scene_action_type(value)
+
 
 class SceneActionCreate(SceneActionBase):
     pass
@@ -289,6 +321,13 @@ class SceneActionUpdate(BaseModel):
     target_unit_id: int | None = None
     payload: dict | None = None
     is_active: bool | None = None
+
+    @field_validator("action_type")
+    @classmethod
+    def _normalize_scene_action_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_scene_action_type(value)
 
 
 class SceneActionOut(BaseModel):
@@ -318,6 +357,16 @@ class AutomationRuleBase(BaseModel):
     payload: dict = Field(default_factory=dict)
     is_active: bool = True
 
+    @field_validator("trigger_type")
+    @classmethod
+    def _normalize_rule_trigger_type(cls, value: str) -> str:
+        return normalize_rule_trigger_type(value)
+
+    @field_validator("action_type")
+    @classmethod
+    def _normalize_rule_action_type(cls, value: str) -> str:
+        return normalize_rule_action_type(value)
+
 
 class AutomationRuleCreate(AutomationRuleBase):
     pass
@@ -333,6 +382,20 @@ class AutomationRuleUpdate(BaseModel):
     target_unit_id: int | None = None
     payload: dict | None = None
     is_active: bool | None = None
+
+    @field_validator("trigger_type")
+    @classmethod
+    def _normalize_rule_trigger_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_rule_trigger_type(value)
+
+    @field_validator("action_type")
+    @classmethod
+    def _normalize_rule_action_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_rule_action_type(value)
 
 
 class AutomationRuleOut(BaseModel):
@@ -360,7 +423,19 @@ class SceneRunRequest(BaseModel):
 
 class RuleTriggerRequest(BaseModel):
     trigger_type: str = Field(default="manual", max_length=64)
+    trigger_source: str = Field(default="manual.api", max_length=64)
+    correlation_id: str | None = Field(default=None, max_length=64)
     context: dict = Field(default_factory=dict)
+
+    @field_validator("trigger_type")
+    @classmethod
+    def _normalize_rule_trigger_type(cls, value: str) -> str:
+        return normalize_rule_trigger_type(value)
+
+    @field_validator("trigger_source")
+    @classmethod
+    def _normalize_trigger_source(cls, value: str) -> str:
+        return normalize_trigger_source(value)
 
 
 class AutomationExecutionOut(BaseModel):
@@ -369,6 +444,10 @@ class AutomationExecutionOut(BaseModel):
     scene_id: int | None = None
     rule_id: int | None = None
     trigger_type: str
+    trigger_source: str
+    trigger_snapshot_json: str | None = None
+    correlation_id: str
+    dedup_key: str | None = None
     status: str
     requested_by: str | None = None
     context_json: str | None = None

@@ -81,7 +81,7 @@ def test_scene_manual_run_dispatches_device_command_and_tracks_execution():
         assert cmds_res.status_code == 200
         commands = cmds_res.json()
         assert len(commands) >= 1
-        assert commands[0]["command_type"] == "power_on"
+        assert commands[0]["command_type"] == "device.power.on"
 
 
 def test_automation_rule_manual_trigger_creates_alert_and_execution():

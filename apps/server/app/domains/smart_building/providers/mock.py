@@ -94,16 +94,20 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
         payload = request.payload or {}
         provider_ref = f"mock-cmd-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
 
-        if command_type in {"power_on", "power_off"}:
+        if command_type in {"device.power.on", "device.power.off", "power_on", "power_off"}:
             return ProviderCommandResult(
                 accepted=True,
                 lifecycle_status="executed",
                 provider_ref=provider_ref,
                 executed=True,
-                result_payload={"power_state": "on" if command_type == "power_on" else "off"},
+                result_payload={
+                    "power_state": "on"
+                    if command_type in {"device.power.on", "power_on"}
+                    else "off"
+                },
             )
 
-        if command_type == "climate_set_mode":
+        if command_type in {"device.climate.set_mode", "climate_set_mode"}:
             mode = str(payload.get("mode", "")).strip().lower()
             if mode not in {"off", "heat", "cool", "eco", "auto"}:
                 return ProviderCommandResult(
@@ -120,7 +124,7 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
                 result_payload={"mode": mode},
             )
 
-        if command_type == "climate_set_setpoint":
+        if command_type in {"device.climate.set_setpoint", "climate_set_setpoint"}:
             try:
                 setpoint_c = float(payload.get("setpoint_c"))
             except (TypeError, ValueError):
@@ -138,7 +142,7 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
                 result_payload={"setpoint_c": setpoint_c},
             )
 
-        if command_type == "lock_set_state":
+        if command_type in {"device.lock.set_state", "lock_set_state"}:
             target = str(payload.get("target", "")).strip().lower()
             if target not in {"lock", "unlock"}:
                 return ProviderCommandResult(

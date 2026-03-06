@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import uuid
 from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import HTTPException
@@ -9,6 +11,20 @@ from sqlalchemy.orm import Session
 
 from app.domains.smart_building.providers.factory import get_provider
 from app.domains.smart_building.providers.base import ProviderCommandRequest
+from app.domains.smart_building.taxonomy import (
+    CANONICAL_COMMAND_TYPES,
+    CANONICAL_RULE_ACTION_TYPES,
+    CANONICAL_RULE_TRIGGER_TYPES,
+    CANONICAL_SCENE_ACTION_TYPES,
+    is_automatic_trigger_source,
+    normalize_alert_type,
+    normalize_command_type,
+    normalize_event_type,
+    normalize_rule_action_type,
+    normalize_rule_trigger_type,
+    normalize_scene_action_type,
+    normalize_trigger_source,
+)
 from app.domains.smart_building.schemas import (
     AlertCreate,
     AutomationRuleCreate,
@@ -45,10 +61,8 @@ SUPPORTED_COMMAND_STATUSES = {"pending", "accepted", "executed", "failed", "expi
 POWER_CATEGORIES = {"smart_relay", "smart_light", "smart_plug", "relay", "light"}
 CLIMATE_CATEGORIES = {"climate_controller", "thermostat", "hvac_controller"}
 LOCK_CATEGORIES = {"smart_lock", "lock_controller"}
-SCENE_ACTION_TYPES = {"device_command", "create_alert", "create_maintenance_ticket", "create_staff_task"}
-RULE_TRIGGER_TYPES = {"booking_checked_in", "booking_checked_out", "alert_raised", "manual"}
-RULE_ACTION_TYPES = {"device_command", "create_alert", "create_maintenance_ticket", "create_staff_task"}
 AUTOMATION_EXECUTION_STATUSES = {"running", "executed", "failed", "partial"}
+AUTOMATION_DEDUP_WINDOW = timedelta(minutes=5)
 
 
 class SmartBuildingService:
@@ -74,20 +88,29 @@ class SmartBuildingService:
         return parsed if isinstance(parsed, dict) else {}
 
     def _validate_scene_action_type(self, action_type: str) -> str:
-        normalized = (action_type or "").strip().lower()
-        if normalized not in SCENE_ACTION_TYPES:
+        try:
+            normalized = normalize_scene_action_type(action_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Tipo azione scena non supportato") from exc
+        if normalized not in CANONICAL_SCENE_ACTION_TYPES:
             raise HTTPException(status_code=400, detail="Tipo azione scena non supportato")
         return normalized
 
     def _validate_rule_trigger_type(self, trigger_type: str) -> str:
-        normalized = (trigger_type or "").strip().lower()
-        if normalized not in RULE_TRIGGER_TYPES:
+        try:
+            normalized = normalize_rule_trigger_type(trigger_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Tipo trigger regola non supportato") from exc
+        if normalized not in CANONICAL_RULE_TRIGGER_TYPES:
             raise HTTPException(status_code=400, detail="Tipo trigger regola non supportato")
         return normalized
 
     def _validate_rule_action_type(self, action_type: str) -> str:
-        normalized = (action_type or "").strip().lower()
-        if normalized not in RULE_ACTION_TYPES:
+        try:
+            normalized = normalize_rule_action_type(action_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Tipo azione regola non supportato") from exc
+        if normalized not in CANONICAL_RULE_ACTION_TYPES:
             raise HTTPException(status_code=400, detail="Tipo azione regola non supportato")
         return normalized
 
@@ -444,31 +467,37 @@ class SmartBuildingService:
     def _allowed_commands_for_category(self, category: str) -> set[str]:
         normalized = (category or "").strip().lower()
         if normalized in POWER_CATEGORIES:
-            return {"power_on", "power_off"}
+            return {"device.power.on", "device.power.off"}
         if normalized in CLIMATE_CATEGORIES:
-            return {"climate_set_mode", "climate_set_setpoint"}
+            return {"device.climate.set_mode", "device.climate.set_setpoint"}
         if normalized in LOCK_CATEGORIES:
-            return {"lock_set_state"}
+            return {"device.lock.set_state"}
         return set()
 
     def _validate_command_payload(self, command_type: str, payload: dict) -> dict:
-        if command_type in {"power_on", "power_off"}:
+        if command_type in {"device.power.on", "device.power.off"}:
             return {}
-        if command_type == "climate_set_mode":
+        if command_type == "device.climate.set_mode":
             mode = str((payload or {}).get("mode", "")).strip().lower()
             if mode not in {"off", "heat", "cool", "eco", "auto"}:
-                raise HTTPException(status_code=400, detail="climate_set_mode richiede mode valido")
+                raise HTTPException(status_code=400, detail="device.climate.set_mode richiede mode valido")
             return {"mode": mode}
-        if command_type == "climate_set_setpoint":
+        if command_type == "device.climate.set_setpoint":
             try:
                 setpoint_c = float((payload or {}).get("setpoint_c"))
             except (TypeError, ValueError):
-                raise HTTPException(status_code=400, detail="climate_set_setpoint richiede setpoint_c numerico")
+                raise HTTPException(
+                    status_code=400,
+                    detail="device.climate.set_setpoint richiede setpoint_c numerico",
+                )
             return {"setpoint_c": round(setpoint_c, 2)}
-        if command_type == "lock_set_state":
+        if command_type == "device.lock.set_state":
             target = str((payload or {}).get("target", "")).strip().lower()
             if target not in {"lock", "unlock"}:
-                raise HTTPException(status_code=400, detail="lock_set_state richiede target lock|unlock")
+                raise HTTPException(
+                    status_code=400,
+                    detail="device.lock.set_state richiede target lock|unlock",
+                )
             return {"target": target}
         raise HTTPException(status_code=400, detail="Tipo comando non supportato")
 
@@ -598,7 +627,7 @@ class SmartBuildingService:
             self.create_device_event(
                 device_id=device.id,
                 payload=DeviceEventCreate(
-                    event_type="provider_catalog_sync",
+                    event_type="provider.catalog.synced",
                     severity="info",
                     source=provider.provider_name,
                     payload_json=json.dumps(
@@ -681,10 +710,11 @@ class SmartBuildingService:
 
     def create_device_event(self, device_id: int, payload: DeviceEventCreate) -> DeviceEvent:
         device = self.get_device_or_404(device_id)
+        event_type = normalize_event_type(payload.event_type)
         event = DeviceEvent(
             device_id=device_id,
             unit_id=device.unit_id,
-            event_type=payload.event_type,
+            event_type=event_type,
             severity=payload.severity,
             source=payload.source,
             payload_json=payload.payload_json,
@@ -724,9 +754,15 @@ class SmartBuildingService:
         device_id: int,
         payload: DeviceCommandCreate,
         requested_by: str | None = None,
+        correlation_id: str | None = None,
     ) -> DeviceCommand:
         device = self.get_device_or_404(device_id)
-        command_type = payload.command_type.strip().lower()
+        try:
+            command_type = normalize_command_type(payload.command_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Tipo comando non supportato") from exc
+        if command_type not in CANONICAL_COMMAND_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo comando non supportato")
         allowed = self._allowed_commands_for_category(device.category)
         if command_type not in allowed:
             raise HTTPException(
@@ -743,6 +779,7 @@ class SmartBuildingService:
             provider=device.provider,
             command_type=command_type,
             payload_json=json.dumps(normalized_payload, ensure_ascii=True),
+            correlation_id=correlation_id,
             status="pending",
             requested_by=requested_by or "system",
             requested_at=now,
@@ -755,7 +792,7 @@ class SmartBuildingService:
         self.create_device_event(
             device_id=device.id,
             payload=DeviceEventCreate(
-                event_type="device_command_requested",
+                event_type="device.command.requested",
                 severity="info",
                 source="api",
                 payload_json=json.dumps(
@@ -763,6 +800,7 @@ class SmartBuildingService:
                         "command_id": command.id,
                         "command_type": command.command_type,
                         "requested_by": command.requested_by,
+                        "correlation_id": correlation_id,
                     },
                     ensure_ascii=True,
                 ),
@@ -779,11 +817,15 @@ class SmartBuildingService:
             self.create_device_event(
                 device_id=device.id,
                 payload=DeviceEventCreate(
-                    event_type="device_command_failed",
+                    event_type="device.command.failed",
                     severity="warning",
                     source=device.provider,
                     payload_json=json.dumps(
-                        {"command_id": command.id, "reason": command.error_message},
+                        {
+                            "command_id": command.id,
+                            "reason": command.error_message,
+                            "correlation_id": correlation_id,
+                        },
                         ensure_ascii=True,
                     ),
                 ),
@@ -828,13 +870,13 @@ class SmartBuildingService:
         self.db.refresh(command)
 
         outcome_event_type = (
-            "device_command_executed"
+            "device.command.executed"
             if command.status == "executed"
-            else "device_command_failed"
+            else "device.command.failed"
             if command.status == "failed"
-            else "device_command_expired"
+            else "device.command.expired"
             if command.status == "expired"
-            else "device_command_accepted"
+            else "device.command.accepted"
         )
         outcome_severity = "warning" if command.status in {"failed", "expired"} else "info"
         self.create_device_event(
@@ -849,6 +891,7 @@ class SmartBuildingService:
                         "status": command.status,
                         "provider_ref": command.provider_ref,
                         "error": command.error_message,
+                        "correlation_id": correlation_id,
                     },
                     ensure_ascii=True,
                 ),
@@ -856,16 +899,18 @@ class SmartBuildingService:
         )
         return command
 
-    def create_alert(self, payload: AlertCreate) -> Alert:
+    def create_alert(self, payload: AlertCreate, correlation_id: str | None = None) -> Alert:
         if payload.device_id is not None:
             self.get_device_or_404(payload.device_id)
+        normalized_alert_type = normalize_alert_type(payload.alert_type)
         alert = Alert(
             unit_id=payload.unit_id,
             device_id=payload.device_id,
-            alert_type=payload.alert_type,
+            alert_type=normalized_alert_type,
             severity=payload.severity,
             title=payload.title,
             description=payload.description,
+            correlation_id=correlation_id,
             status="open",
         )
         self.db.add(alert)
@@ -1052,12 +1097,75 @@ class SmartBuildingService:
         query = query.order_by(AutomationExecution.started_at.desc(), AutomationExecution.id.desc())
         return query.limit(max(1, min(limit, 200))).all()
 
+    def _make_correlation_id(self, supplied: str | None = None) -> str:
+        raw = (supplied or "").strip()
+        if raw:
+            return raw[:64]
+        return uuid.uuid4().hex
+
+    def _make_trigger_snapshot(
+        self,
+        *,
+        trigger_type: str,
+        trigger_source: str,
+        context: dict,
+    ) -> dict[str, object]:
+        return {
+            "trigger_type": trigger_type,
+            "trigger_source": trigger_source,
+            "booking_id": context.get("booking_id"),
+            "alert_id": context.get("alert_id"),
+            "device_id": context.get("device_id"),
+            "unit_id": context.get("unit_id"),
+            "event_id": context.get("event_id"),
+        }
+
+    def _make_dedup_key(
+        self,
+        *,
+        rule_id: int,
+        trigger_type: str,
+        trigger_source: str,
+        snapshot: dict[str, object],
+        occurred_at: datetime,
+    ) -> str:
+        bucket = int(occurred_at.timestamp() // int(AUTOMATION_DEDUP_WINDOW.total_seconds()))
+        material = json.dumps(
+            {
+                "tenant_id": self.tenant_id,
+                "rule_id": rule_id,
+                "trigger_type": trigger_type,
+                "trigger_source": trigger_source,
+                "snapshot": snapshot,
+                "bucket": bucket,
+            },
+            sort_keys=True,
+            ensure_ascii=True,
+        )
+        return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+    def _find_recent_execution_by_dedup_key(self, dedup_key: str) -> AutomationExecution | None:
+        threshold = datetime.now(timezone.utc) - AUTOMATION_DEDUP_WINDOW
+        return (
+            self.db.query(AutomationExecution)
+            .filter(
+                AutomationExecution.dedup_key == dedup_key,
+                AutomationExecution.started_at >= threshold,
+            )
+            .order_by(AutomationExecution.started_at.desc(), AutomationExecution.id.desc())
+            .first()
+        )
+
     def _create_execution(
         self,
         *,
         scene_id: int | None,
         rule_id: int | None,
         trigger_type: str,
+        trigger_source: str,
+        trigger_snapshot: dict[str, object] | None,
+        correlation_id: str,
+        dedup_key: str | None,
         requested_by: str | None,
         context: dict | None,
     ) -> AutomationExecution:
@@ -1065,6 +1173,10 @@ class SmartBuildingService:
             scene_id=scene_id,
             rule_id=rule_id,
             trigger_type=trigger_type,
+            trigger_source=trigger_source,
+            trigger_snapshot_json=self._safe_json_dumps(trigger_snapshot or {}),
+            correlation_id=correlation_id,
+            dedup_key=dedup_key,
             status="running",
             requested_by=requested_by or "system",
             context_json=self._safe_json_dumps(context or {}),
@@ -1117,12 +1229,19 @@ class SmartBuildingService:
         target_unit_id: int | None,
         payload: dict,
         requested_by: str | None,
+        correlation_id: str,
     ) -> dict:
-        normalized = (action_type or "").strip().lower()
-        if normalized == "device_command":
+        try:
+            normalized = normalize_rule_action_type(action_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Azione non supportata") from exc
+        if normalized == "action.dispatch_device_command":
             if target_device_id is None:
-                raise HTTPException(status_code=400, detail="device_command richiede target_device_id")
-            command_type = str(payload.get("command_type", "")).strip().lower()
+                raise HTTPException(
+                    status_code=400,
+                    detail="action.dispatch_device_command richiede target_device_id",
+                )
+            command_type = normalize_command_type(str(payload.get("command_type", "")))
             command_payload = payload.get("payload", {}) if isinstance(payload.get("payload", {}), dict) else {}
             ttl_seconds = payload.get("ttl_seconds", 300)
             command = self.create_device_command(
@@ -1133,15 +1252,17 @@ class SmartBuildingService:
                     ttl_seconds=ttl_seconds,
                 ),
                 requested_by=requested_by,
+                correlation_id=correlation_id,
             )
             return {
                 "entity": "device_command",
                 "id": command.id,
                 "status": command.status,
                 "device_id": command.device_id,
+                "correlation_id": correlation_id,
             }
 
-        if normalized == "create_alert":
+        if normalized == "action.create_alert":
             alert = self.create_alert(
                 AlertCreate(
                     unit_id=target_unit_id or payload.get("unit_id"),
@@ -1150,11 +1271,17 @@ class SmartBuildingService:
                     severity=str(payload.get("severity") or "warning"),
                     title=str(payload.get("title") or "Automation alert"),
                     description=payload.get("description"),
-                )
+                ),
+                correlation_id=correlation_id,
             )
-            return {"entity": "alert", "id": alert.id, "status": alert.status}
+            return {
+                "entity": "alert",
+                "id": alert.id,
+                "status": alert.status,
+                "correlation_id": correlation_id,
+            }
 
-        if normalized == "create_maintenance_ticket":
+        if normalized == "action.create_maintenance_ticket":
             unit_id = target_unit_id or payload.get("unit_id")
             self._validate_target_unit(unit_id)
             ticket = MaintenanceTicket(
@@ -1169,9 +1296,14 @@ class SmartBuildingService:
             self.db.add(ticket)
             self.db.commit()
             self.db.refresh(ticket)
-            return {"entity": "maintenance_ticket", "id": ticket.id, "status": ticket.status}
+            return {
+                "entity": "maintenance_ticket",
+                "id": ticket.id,
+                "status": ticket.status,
+                "correlation_id": correlation_id,
+            }
 
-        if normalized == "create_staff_task":
+        if normalized == "action.create_staff_task":
             unit_id = target_unit_id or payload.get("unit_id")
             self._validate_target_unit(unit_id)
             date_raw = payload.get("date")
@@ -1202,7 +1334,12 @@ class SmartBuildingService:
             self.db.add(task)
             self.db.commit()
             self.db.refresh(task)
-            return {"entity": "staff_task", "id": task.id, "status": task.status}
+            return {
+                "entity": "staff_task",
+                "id": task.id,
+                "status": task.status,
+                "correlation_id": correlation_id,
+            }
 
         raise HTTPException(status_code=400, detail="Azione non supportata")
 
@@ -1222,10 +1359,22 @@ class SmartBuildingService:
         if not actions:
             raise HTTPException(status_code=400, detail="Scena senza azioni attive")
 
+        correlation_id = self._make_correlation_id()
+        trigger_type = normalize_rule_trigger_type("manual")
+        trigger_source = normalize_trigger_source("manual.api")
+        trigger_snapshot = self._make_trigger_snapshot(
+            trigger_type=trigger_type,
+            trigger_source=trigger_source,
+            context=context or {},
+        )
         execution = self._create_execution(
             scene_id=scene.id,
             rule_id=None,
-            trigger_type="manual",
+            trigger_type=trigger_type,
+            trigger_source=trigger_source,
+            trigger_snapshot=trigger_snapshot,
+            correlation_id=correlation_id,
+            dedup_key=None,
             requested_by=requested_by,
             context=context,
         )
@@ -1240,6 +1389,7 @@ class SmartBuildingService:
                     target_unit_id=action.target_unit_id,
                     payload=payload,
                     requested_by=requested_by,
+                    correlation_id=correlation_id,
                 )
                 results.append({"action_id": action.id, "action_type": action.action_type, "outcome": outcome})
             except HTTPException as exc:
@@ -1254,12 +1404,42 @@ class SmartBuildingService:
         rule = self.get_automation_rule_or_404(rule_id)
         if not rule.is_active:
             raise HTTPException(status_code=400, detail="Regola disattivata")
-        trigger_type = self._validate_rule_trigger_type(payload.trigger_type)
+        runtime_trigger = self._validate_rule_trigger_type(payload.trigger_type)
+        configured_trigger = self._validate_rule_trigger_type(rule.trigger_type)
+        trigger_source = normalize_trigger_source(payload.trigger_source)
+
+        if runtime_trigger != configured_trigger and runtime_trigger != "manual":
+            raise HTTPException(status_code=400, detail="Trigger runtime non compatibile con la regola")
+        effective_trigger = configured_trigger if runtime_trigger == "manual" else runtime_trigger
+
+        correlation_id = self._make_correlation_id(payload.correlation_id)
+        snapshot = self._make_trigger_snapshot(
+            trigger_type=effective_trigger,
+            trigger_source=trigger_source,
+            context=payload.context,
+        )
+
+        dedup_key = None
+        if is_automatic_trigger_source(trigger_source) and effective_trigger != "manual":
+            dedup_key = self._make_dedup_key(
+                rule_id=rule.id,
+                trigger_type=effective_trigger,
+                trigger_source=trigger_source,
+                snapshot=snapshot,
+                occurred_at=datetime.now(timezone.utc),
+            )
+            existing = self._find_recent_execution_by_dedup_key(dedup_key)
+            if existing is not None:
+                return existing
 
         execution = self._create_execution(
             scene_id=None,
             rule_id=rule.id,
-            trigger_type=trigger_type,
+            trigger_type=effective_trigger,
+            trigger_source=trigger_source,
+            trigger_snapshot=snapshot,
+            correlation_id=correlation_id,
+            dedup_key=dedup_key,
             requested_by=requested_by,
             context=payload.context,
         )
@@ -1272,6 +1452,7 @@ class SmartBuildingService:
                 target_unit_id=rule.target_unit_id,
                 payload=self._safe_json_loads(rule.payload_json),
                 requested_by=requested_by,
+                correlation_id=correlation_id,
             )
             results.append({"rule_id": rule.id, "action_type": rule.action_type, "outcome": outcome})
         except HTTPException as exc:
@@ -1338,7 +1519,7 @@ class SmartBuildingService:
         self.create_device_event(
             device_id=device_id,
             payload=DeviceEventCreate(
-                event_type="provider_sync",
+                event_type="provider.sync",
                 severity="info",
                 source=provider.provider_name,
                 payload_json=state.raw_payload_json,
