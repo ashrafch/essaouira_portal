@@ -214,6 +214,11 @@ function Sidebar() {
         { to: "/smart-automation", label: "Automazioni smart", badge: null },
       ],
     },
+    {
+      id: "admin",
+      title: "Admin",
+      items: [{ to: "/admin-control", label: "Admin & Config", badge: null }],
+    },
   ];
 
   // carico badge ogni volta che cambio pagina

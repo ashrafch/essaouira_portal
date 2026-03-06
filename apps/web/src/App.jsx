@@ -25,6 +25,7 @@ const SmartDevices = lazy(() => import("./pages/SmartDevices.jsx"));
 const SmartAlerts = lazy(() => import("./pages/SmartAlerts.jsx"));
 const SmartAutomation = lazy(() => import("./pages/SmartAutomation.jsx"));
 const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
+const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
 
 function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
@@ -49,6 +50,7 @@ const ROUTE_COMPONENTS = {
   smartAlerts: SmartAlerts,
   smartAutomation: SmartAutomation,
   smartUnitDetail: SmartUnitDetail,
+  adminControl: AdminControl,
 };
 
 function App() {
