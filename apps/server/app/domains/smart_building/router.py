@@ -46,7 +46,8 @@ def _service(request: Request, db: Session) -> SmartBuildingService:
     tenant_id = getattr(request.state, "tenant_id", None)
     if not tenant_id:
         raise HTTPException(status_code=401, detail="Tenant context missing")
-    return SmartBuildingService(db=db, tenant_id=tenant_id)
+    role = getattr(request.state, "role", "owner")
+    return SmartBuildingService(db=db, tenant_id=tenant_id, role=role)
 
 
 @router.get("/overview", response_model=SmartOverviewOut)

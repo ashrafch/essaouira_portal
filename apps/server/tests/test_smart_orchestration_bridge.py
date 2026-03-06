@@ -245,3 +245,56 @@ def test_alert_raised_reaction_triggers_rule_action():
         maintenance = client.get("/maintenance", headers=headers)
         assert maintenance.status_code == 200
         assert any(t["title"] == "Auto maintenance from smart alert" for t in maintenance.json())
+
+
+def test_manual_checkin_task_completion_does_not_trigger_booking_checked_in_rule():
+    with TestClient(app) as client:
+        headers = _headers()
+        unit_id = _first_unit_id(client, headers)
+        booking_id = _create_booking(client, headers, unit_id, day_offset=320)
+
+        rule = client.post(
+            "/smart/automation-rules",
+            headers=headers,
+            json={
+                "name": "Only auto checkin task completion",
+                "trigger_type": "booking.checked_in",
+                "action_type": "create_alert",
+                "target_unit_id": unit_id,
+                "payload": {
+                    "alert_type": "automation_alert",
+                    "severity": "warning",
+                    "title": "Must not trigger from manual checkin task",
+                },
+                "is_active": True,
+            },
+        )
+        assert rule.status_code == 200
+        rule_id = rule.json()["id"]
+
+        manual_task = client.post(
+            "/staff-tasks",
+            headers=headers,
+            json={
+                "date": (date.today() + timedelta(days=321)).isoformat(),
+                "time": "18:30",
+                "task_type": "checkin",
+                "assignee_name": "Manual operator",
+                "estimated_hours": 0.5,
+                "status": "planned",
+                "notes": "manual checkin note",
+                "cost": 0,
+                "currency": "EUR",
+                "booking_id": booking_id,
+                "unit_id": unit_id,
+            },
+        )
+        assert manual_task.status_code == 200
+        task = manual_task.json()
+
+        completed = _update_task_status(client, headers, task, "done", "manual checkin completed")
+        assert completed.status_code == 200
+
+        execs = client.get(f"/smart/automation-executions?rule_id={rule_id}", headers=headers)
+        assert execs.status_code == 200
+        assert len(execs.json()) == 0

@@ -37,4 +37,6 @@ async def authentication(request: Request, call_next):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     request.state.user = payload.get("sub")
+    request.state.role = payload.get("role", "owner")
+    request.state.tenant_id = payload.get("tenant_id", "default")
     return await call_next(request)

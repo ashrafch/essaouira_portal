@@ -15,12 +15,14 @@ def authenticate_user(username: str, password: str) -> bool:
     return username == settings.admin_username and password == settings.admin_password
 
 
-def create_access_token(subject: str) -> str:
+def create_access_token(subject: str, role: str = "owner", tenant_id: str = "default") -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.auth_access_token_minutes
     )
     payload = {
         "sub": subject,
+        "role": role,
+        "tenant_id": tenant_id,
         "exp": expires_at,
         "type": "access",
     }

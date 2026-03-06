@@ -66,12 +66,32 @@ AUTOMATION_DEDUP_WINDOW = timedelta(minutes=5)
 
 
 class SmartBuildingService:
-    def __init__(self, db: Session, tenant_id: str):
+    def __init__(self, db: Session, tenant_id: str, role: str = "owner"):
         self.db = db
         self.tenant_id = tenant_id
+        self.role = (role or "owner").strip().lower()
+
+    def _scoped_query(self, model):
+        return self.db.query(model).filter(model.tenant_id == self.tenant_id)
+
+    def _require_write_access(self) -> None:
+        if self.role in {"operator", "viewer"}:
+            raise HTTPException(status_code=403, detail="Permesso insufficiente per modifiche smart")
+
+    def _ensure_unit_visible(self, unit_id: int) -> Unit:
+        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
+        if unit is None:
+            raise HTTPException(status_code=404, detail="Unita non trovata")
+        if self.tenant_id != "default":
+            has_device_binding = (
+                self._scoped_query(Device).filter(Device.unit_id == unit_id).first()
+            )
+            if has_device_binding is None:
+                raise HTTPException(status_code=404, detail="Unita non trovata")
+        return unit
 
     def list_devices(self) -> list[Device]:
-        return self.db.query(Device).order_by(Device.id.asc()).all()
+        return self._scoped_query(Device).order_by(Device.id.asc()).all()
 
     def _safe_json_dumps(self, value: dict | None) -> str | None:
         if value is None:
@@ -136,12 +156,10 @@ class SmartBuildingService:
         return base.replace(tzinfo=timezone.utc)
 
     def get_unit_smart_detail(self, unit_id: int, events_limit: int = 50) -> dict[str, object]:
-        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
-        if unit is None:
-            raise HTTPException(status_code=404, detail="Unita non trovata")
+        unit = self._ensure_unit_visible(unit_id)
 
         devices = (
-            self.db.query(Device)
+            self._scoped_query(Device)
             .filter(Device.unit_id == unit_id)
             .order_by(Device.name.asc(), Device.id.asc())
             .all()
@@ -151,26 +169,26 @@ class SmartBuildingService:
         states: list[DeviceState] = []
         if device_ids:
             states = (
-                self.db.query(DeviceState)
+                self._scoped_query(DeviceState)
                 .filter(DeviceState.device_id.in_(device_ids))
                 .order_by(DeviceState.device_id.asc())
                 .all()
             )
 
         open_alerts = (
-            self.db.query(Alert)
+            self._scoped_query(Alert)
             .filter(Alert.unit_id == unit_id, Alert.status == "open")
             .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
             .all()
         )
         resolved_alerts = (
-            self.db.query(Alert)
+            self._scoped_query(Alert)
             .filter(Alert.unit_id == unit_id, Alert.status != "open")
             .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
             .all()
         )
 
-        events_query = self.db.query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
+        events_query = self._scoped_query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
         events_query = events_query.filter(
             or_(
                 DeviceEvent.unit_id == unit_id,
@@ -213,16 +231,14 @@ class SmartBuildingService:
     def get_unit_timeline(
         self, unit_id: int, limit: int = 50, before: datetime | None = None
     ) -> dict[str, object]:
-        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
-        if unit is None:
-            raise HTTPException(status_code=404, detail="Unita non trovata")
+        unit = self._ensure_unit_visible(unit_id)
 
         safe_limit = max(1, min(limit, 200))
         scan_limit = max(60, min(safe_limit * 6, 600))
         before_utc = self._as_utc_datetime(before)
         items: list[dict[str, object]] = []
 
-        smart_events_query = self.db.query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
+        smart_events_query = self._scoped_query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
         smart_events_query = smart_events_query.filter(
             or_(
                 DeviceEvent.unit_id == unit_id,
@@ -250,7 +266,7 @@ class SmartBuildingService:
             )
 
         alerts = (
-            self.db.query(Alert)
+            self._scoped_query(Alert)
             .filter(Alert.unit_id == unit_id)
             .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
             .limit(scan_limit)
@@ -279,7 +295,7 @@ class SmartBuildingService:
             )
 
         commands = (
-            self.db.query(DeviceCommand)
+            self._scoped_query(DeviceCommand)
             .filter(DeviceCommand.unit_id == unit_id)
             .order_by(DeviceCommand.requested_at.desc(), DeviceCommand.id.desc())
             .limit(scan_limit)
@@ -441,14 +457,14 @@ class SmartBuildingService:
         }
 
     def get_device_or_404(self, device_id: int) -> Device:
-        device = self.db.query(Device).filter(Device.id == device_id).first()
+        device = self._scoped_query(Device).filter(Device.id == device_id).first()
         if device is None:
             raise HTTPException(status_code=404, detail="Device non trovato")
         return device
 
     def get_device_by_provider_external(self, provider: str, external_id: str) -> Device | None:
         return (
-            self.db.query(Device)
+            self._scoped_query(Device)
             .filter(Device.provider == provider, Device.external_id == external_id)
             .first()
         )
@@ -456,7 +472,7 @@ class SmartBuildingService:
     def get_device_command_or_404(self, device_id: int, command_id: int) -> DeviceCommand:
         self.get_device_or_404(device_id)
         command = (
-            self.db.query(DeviceCommand)
+            self._scoped_query(DeviceCommand)
             .filter(DeviceCommand.id == command_id, DeviceCommand.device_id == device_id)
             .first()
         )
@@ -516,8 +532,9 @@ class SmartBuildingService:
         return unit.id if unit else None
 
     def create_device(self, payload: DeviceCreate) -> Device:
+        self._require_write_access()
         existing = (
-            self.db.query(Device)
+            self._scoped_query(Device)
             .filter(
                 Device.provider == payload.provider,
                 Device.external_id == payload.external_id,
@@ -526,13 +543,14 @@ class SmartBuildingService:
         )
         if existing:
             raise HTTPException(status_code=400, detail="Device gia presente per provider/external_id")
-        device = Device(**payload.model_dump())
+        device = Device(tenant_id=self.tenant_id, **payload.model_dump())
         self.db.add(device)
         self.db.commit()
         self.db.refresh(device)
         return device
 
     def update_device(self, device_id: int, payload: DeviceUpdate) -> Device:
+        self._require_write_access()
         device = self.get_device_or_404(device_id)
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(device, key, value)
@@ -542,17 +560,18 @@ class SmartBuildingService:
 
     def get_device_state(self, device_id: int) -> DeviceState:
         self.get_device_or_404(device_id)
-        state = self.db.query(DeviceState).filter(DeviceState.device_id == device_id).first()
+        state = self._scoped_query(DeviceState).filter(DeviceState.device_id == device_id).first()
         if state is None:
             raise HTTPException(status_code=404, detail="Device state non trovato")
         return state
 
     def upsert_device_state(self, device_id: int, payload: DeviceStateUpdate) -> DeviceState:
+        self._require_write_access()
         device = self.get_device_or_404(device_id)
-        state = self.db.query(DeviceState).filter(DeviceState.device_id == device_id).first()
+        state = self._scoped_query(DeviceState).filter(DeviceState.device_id == device_id).first()
         values = payload.model_dump()
         if state is None:
-            state = DeviceState(device_id=device_id, **values)
+            state = DeviceState(tenant_id=self.tenant_id, device_id=device_id, **values)
             self.db.add(state)
         else:
             for key, value in values.items():
@@ -563,6 +582,7 @@ class SmartBuildingService:
         return state
 
     def sync_catalog_from_provider(self, provider_name: str | None = None) -> dict[str, int | str]:
+        self._require_write_access()
         provider = get_provider(provider_name)
         if not getattr(provider, "supports_catalog_sync", False):
             raise HTTPException(status_code=400, detail="Provider does not support catalog sync")
@@ -575,6 +595,7 @@ class SmartBuildingService:
             device = self.get_device_by_provider_external(provider.provider_name, snapshot.external_id)
             if device is None:
                 device = Device(
+                    tenant_id=self.tenant_id,
                     provider=provider.provider_name,
                     external_id=snapshot.external_id,
                     name=snapshot.name,
@@ -650,6 +671,7 @@ class SmartBuildingService:
     def ingest_provider_webhook(
         self, provider_name: str, payload: dict, username: str | None = None
     ) -> dict[str, object]:
+        self._require_write_access()
         provider = get_provider(provider_name)
         if not getattr(provider, "supports_webhook_ingest", False):
             return {
@@ -709,9 +731,11 @@ class SmartBuildingService:
         }
 
     def create_device_event(self, device_id: int, payload: DeviceEventCreate) -> DeviceEvent:
+        self._require_write_access()
         device = self.get_device_or_404(device_id)
         event_type = normalize_event_type(payload.event_type)
         event = DeviceEvent(
+            tenant_id=self.tenant_id,
             device_id=device_id,
             unit_id=device.unit_id,
             event_type=event_type,
@@ -725,13 +749,13 @@ class SmartBuildingService:
         return event
 
     def list_device_events(self, device_id: int | None = None, limit: int = 100) -> list[DeviceEvent]:
-        query = self.db.query(DeviceEvent).order_by(DeviceEvent.occurred_at.desc())
+        query = self._scoped_query(DeviceEvent).order_by(DeviceEvent.occurred_at.desc())
         if device_id is not None:
             query = query.filter(DeviceEvent.device_id == device_id)
         return query.limit(max(1, min(limit, 500))).all()
 
     def list_alerts(self, status: str | None = None) -> list[Alert]:
-        query = self.db.query(Alert).order_by(Alert.last_seen_at.desc())
+        query = self._scoped_query(Alert).order_by(Alert.last_seen_at.desc())
         if status:
             query = query.filter(Alert.status == status)
         return query.all()
@@ -740,7 +764,7 @@ class SmartBuildingService:
         self, device_id: int, status: str | None = None, limit: int = 50
     ) -> list[DeviceCommand]:
         self.get_device_or_404(device_id)
-        query = self.db.query(DeviceCommand).filter(DeviceCommand.device_id == device_id)
+        query = self._scoped_query(DeviceCommand).filter(DeviceCommand.device_id == device_id)
         if status:
             normalized = status.strip().lower()
             if normalized not in SUPPORTED_COMMAND_STATUSES:
@@ -756,6 +780,7 @@ class SmartBuildingService:
         requested_by: str | None = None,
         correlation_id: str | None = None,
     ) -> DeviceCommand:
+        self._require_write_access()
         device = self.get_device_or_404(device_id)
         try:
             command_type = normalize_command_type(payload.command_type)
@@ -774,6 +799,7 @@ class SmartBuildingService:
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(seconds=payload.ttl_seconds or 300)
         command = DeviceCommand(
+            tenant_id=self.tenant_id,
             device_id=device.id,
             unit_id=device.unit_id,
             provider=device.provider,
@@ -908,10 +934,12 @@ class SmartBuildingService:
         trigger_source: str = "api.smart",
         requested_by: str | None = None,
     ) -> Alert:
+        self._require_write_access()
         if payload.device_id is not None:
             self.get_device_or_404(payload.device_id)
         normalized_alert_type = normalize_alert_type(payload.alert_type)
         alert = Alert(
+            tenant_id=self.tenant_id,
             unit_id=payload.unit_id,
             device_id=payload.device_id,
             alert_type=normalized_alert_type,
@@ -940,7 +968,8 @@ class SmartBuildingService:
         return alert
 
     def acknowledge_alert(self, alert_id: int, username: str) -> Alert:
-        alert = self.db.query(Alert).filter(Alert.id == alert_id).first()
+        self._require_write_access()
+        alert = self._scoped_query(Alert).filter(Alert.id == alert_id).first()
         if alert is None:
             raise HTTPException(status_code=404, detail="Alert non trovato")
         alert.status = "acknowledged"
@@ -951,16 +980,18 @@ class SmartBuildingService:
         return alert
 
     def list_scenes(self) -> list[Scene]:
-        return self.db.query(Scene).order_by(Scene.name.asc(), Scene.id.asc()).all()
+        return self._scoped_query(Scene).order_by(Scene.name.asc(), Scene.id.asc()).all()
 
     def get_scene_or_404(self, scene_id: int) -> Scene:
-        scene = self.db.query(Scene).filter(Scene.id == scene_id).first()
+        scene = self._scoped_query(Scene).filter(Scene.id == scene_id).first()
         if scene is None:
             raise HTTPException(status_code=404, detail="Scena non trovata")
         return scene
 
     def create_scene(self, payload: SceneCreate) -> Scene:
+        self._require_write_access()
         scene = Scene(
+            tenant_id=self.tenant_id,
             name=payload.name.strip(),
             description=payload.description,
             is_active=payload.is_active,
@@ -971,6 +1002,7 @@ class SmartBuildingService:
         return scene
 
     def update_scene(self, scene_id: int, payload: SceneUpdate) -> Scene:
+        self._require_write_access()
         scene = self.get_scene_or_404(scene_id)
         for key, value in payload.model_dump(exclude_unset=True).items():
             if key == "name" and value is not None:
@@ -984,13 +1016,14 @@ class SmartBuildingService:
     def list_scene_actions(self, scene_id: int) -> list[SceneAction]:
         self.get_scene_or_404(scene_id)
         return (
-            self.db.query(SceneAction)
+            self._scoped_query(SceneAction)
             .filter(SceneAction.scene_id == scene_id)
             .order_by(SceneAction.position.asc(), SceneAction.id.asc())
             .all()
         )
 
     def create_scene_action(self, scene_id: int, payload: SceneActionCreate) -> SceneAction:
+        self._require_write_access()
         scene = self.get_scene_or_404(scene_id)
         action_type = self._validate_scene_action_type(payload.action_type)
         target_device_id = payload.target_device_id
@@ -998,6 +1031,7 @@ class SmartBuildingService:
             self.get_device_or_404(target_device_id)
         target_unit_id = self._validate_target_unit(payload.target_unit_id)
         action = SceneAction(
+            tenant_id=self.tenant_id,
             scene_id=scene.id,
             position=payload.position,
             action_type=action_type,
@@ -1014,9 +1048,10 @@ class SmartBuildingService:
     def update_scene_action(
         self, scene_id: int, action_id: int, payload: SceneActionUpdate
     ) -> SceneAction:
+        self._require_write_access()
         self.get_scene_or_404(scene_id)
         action = (
-            self.db.query(SceneAction)
+            self._scoped_query(SceneAction)
             .filter(SceneAction.id == action_id, SceneAction.scene_id == scene_id)
             .first()
         )
@@ -1041,9 +1076,10 @@ class SmartBuildingService:
         return action
 
     def delete_scene_action(self, scene_id: int, action_id: int) -> None:
+        self._require_write_access()
         self.get_scene_or_404(scene_id)
         action = (
-            self.db.query(SceneAction)
+            self._scoped_query(SceneAction)
             .filter(SceneAction.id == action_id, SceneAction.scene_id == scene_id)
             .first()
         )
@@ -1053,15 +1089,16 @@ class SmartBuildingService:
         self.db.commit()
 
     def list_automation_rules(self) -> list[AutomationRule]:
-        return self.db.query(AutomationRule).order_by(AutomationRule.name.asc(), AutomationRule.id.asc()).all()
+        return self._scoped_query(AutomationRule).order_by(AutomationRule.name.asc(), AutomationRule.id.asc()).all()
 
     def get_automation_rule_or_404(self, rule_id: int) -> AutomationRule:
-        rule = self.db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+        rule = self._scoped_query(AutomationRule).filter(AutomationRule.id == rule_id).first()
         if rule is None:
             raise HTTPException(status_code=404, detail="Regola automazione non trovata")
         return rule
 
     def create_automation_rule(self, payload: AutomationRuleCreate) -> AutomationRule:
+        self._require_write_access()
         trigger_type = self._validate_rule_trigger_type(payload.trigger_type)
         action_type = self._validate_rule_action_type(payload.action_type)
         target_device_id = payload.target_device_id
@@ -1069,6 +1106,7 @@ class SmartBuildingService:
             self.get_device_or_404(target_device_id)
         target_unit_id = self._validate_target_unit(payload.target_unit_id)
         rule = AutomationRule(
+            tenant_id=self.tenant_id,
             name=payload.name.strip(),
             description=payload.description,
             trigger_type=trigger_type,
@@ -1096,7 +1134,7 @@ class SmartBuildingService:
         normalized_trigger = self._validate_rule_trigger_type(trigger_type)
         normalized_source = normalize_trigger_source(trigger_source)
         rules = (
-            self.db.query(AutomationRule)
+            self._scoped_query(AutomationRule)
             .filter(
                 AutomationRule.trigger_type == normalized_trigger,
                 AutomationRule.is_active.is_(True),
@@ -1120,6 +1158,7 @@ class SmartBuildingService:
         return executions
 
     def update_automation_rule(self, rule_id: int, payload: AutomationRuleUpdate) -> AutomationRule:
+        self._require_write_access()
         rule = self.get_automation_rule_or_404(rule_id)
         values = payload.model_dump(exclude_unset=True)
         if "trigger_type" in values and values["trigger_type"] is not None:
@@ -1145,7 +1184,7 @@ class SmartBuildingService:
     def list_automation_executions(
         self, limit: int = 50, scene_id: int | None = None, rule_id: int | None = None
     ) -> list[AutomationExecution]:
-        query = self.db.query(AutomationExecution)
+        query = self._scoped_query(AutomationExecution)
         if scene_id is not None:
             query = query.filter(AutomationExecution.scene_id == scene_id)
         if rule_id is not None:
@@ -1203,7 +1242,7 @@ class SmartBuildingService:
     def _find_recent_execution_by_dedup_key(self, dedup_key: str) -> AutomationExecution | None:
         threshold = datetime.now(timezone.utc) - AUTOMATION_DEDUP_WINDOW
         return (
-            self.db.query(AutomationExecution)
+            self._scoped_query(AutomationExecution)
             .filter(
                 AutomationExecution.dedup_key == dedup_key,
                 AutomationExecution.started_at >= threshold,
@@ -1226,6 +1265,7 @@ class SmartBuildingService:
         context: dict | None,
     ) -> AutomationExecution:
         execution = AutomationExecution(
+            tenant_id=self.tenant_id,
             scene_id=scene_id,
             rule_id=rule_id,
             trigger_type=trigger_type,
@@ -1405,12 +1445,13 @@ class SmartBuildingService:
     def run_scene(
         self, scene_id: int, requested_by: str | None = None, context: dict | None = None
     ) -> AutomationExecution:
+        self._require_write_access()
         scene = self.get_scene_or_404(scene_id)
         if not scene.is_active:
             raise HTTPException(status_code=400, detail="Scena disattivata")
 
         actions = (
-            self.db.query(SceneAction)
+            self._scoped_query(SceneAction)
             .filter(SceneAction.scene_id == scene_id, SceneAction.is_active.is_(True))
             .order_by(SceneAction.position.asc(), SceneAction.id.asc())
             .all()
@@ -1460,6 +1501,7 @@ class SmartBuildingService:
     def trigger_automation_rule(
         self, rule_id: int, payload: RuleTriggerRequest, requested_by: str | None = None
     ) -> AutomationExecution:
+        self._require_write_access()
         rule = self.get_automation_rule_or_404(rule_id)
         if not rule.is_active:
             raise HTTPException(status_code=400, detail="Regola disattivata")
@@ -1521,28 +1563,28 @@ class SmartBuildingService:
         return self._finalize_execution(execution, results=results, failures=failures, reference_updated=rule)
 
     def smart_overview(self) -> dict[str, int]:
-        total_devices = self.db.query(func.count(Device.id)).scalar() or 0
+        total_devices = self._scoped_query(Device).with_entities(func.count(Device.id)).scalar() or 0
         online_devices = (
-            self.db.query(func.count(DeviceState.id))
+            self._scoped_query(DeviceState).with_entities(func.count(DeviceState.id))
             .filter(DeviceState.online.is_(True))
             .scalar()
             or 0
         )
         open_alerts = (
-            self.db.query(func.count(Alert.id))
+            self._scoped_query(Alert).with_entities(func.count(Alert.id))
             .filter(Alert.status == "open")
             .scalar()
             or 0
         )
         critical_alerts = (
-            self.db.query(func.count(Alert.id))
+            self._scoped_query(Alert).with_entities(func.count(Alert.id))
             .filter(Alert.status == "open", Alert.severity == "critical")
             .scalar()
             or 0
         )
         threshold = datetime.now(timezone.utc) - timedelta(hours=12)
         recently_seen_devices = (
-            self.db.query(func.count(Device.id))
+            self._scoped_query(Device).with_entities(func.count(Device.id))
             .filter(Device.last_seen_at.is_not(None), Device.last_seen_at >= threshold)
             .scalar()
             or 0
