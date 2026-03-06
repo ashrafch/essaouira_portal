@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.domains.smart_building.providers.factory import get_provider
@@ -20,6 +20,81 @@ class SmartBuildingService:
 
     def list_devices(self) -> list[Device]:
         return self.db.query(Device).order_by(Device.id.asc()).all()
+
+    def get_unit_smart_detail(self, unit_id: int, events_limit: int = 50) -> dict[str, object]:
+        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
+        if unit is None:
+            raise HTTPException(status_code=404, detail="Unita non trovata")
+
+        devices = (
+            self.db.query(Device)
+            .filter(Device.unit_id == unit_id)
+            .order_by(Device.name.asc(), Device.id.asc())
+            .all()
+        )
+        device_ids = [d.id for d in devices]
+
+        states: list[DeviceState] = []
+        if device_ids:
+            states = (
+                self.db.query(DeviceState)
+                .filter(DeviceState.device_id.in_(device_ids))
+                .order_by(DeviceState.device_id.asc())
+                .all()
+            )
+
+        open_alerts = (
+            self.db.query(Alert)
+            .filter(Alert.unit_id == unit_id, Alert.status == "open")
+            .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
+            .all()
+        )
+        resolved_alerts = (
+            self.db.query(Alert)
+            .filter(Alert.unit_id == unit_id, Alert.status != "open")
+            .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
+            .all()
+        )
+
+        events_query = self.db.query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
+        events_query = events_query.filter(
+            or_(
+                DeviceEvent.unit_id == unit_id,
+                and_(DeviceEvent.unit_id.is_(None), Device.unit_id == unit_id),
+            )
+        ).order_by(DeviceEvent.occurred_at.desc(), DeviceEvent.id.desc())
+        events = events_query.limit(max(1, min(events_limit, 200))).all()
+
+        state_by_device = {state.device_id: state for state in states}
+        online_devices = 0
+        offline_devices = 0
+        for device in devices:
+            device_state = state_by_device.get(device.id)
+            online = device_state.online if device_state else None
+            if online is True:
+                online_devices += 1
+            elif online is False:
+                offline_devices += 1
+
+        total_devices = len(devices)
+        unknown_state_devices = max(total_devices - online_devices - offline_devices, 0)
+
+        return {
+            "unit": unit,
+            "summary": {
+                "total_devices": total_devices,
+                "online_devices": online_devices,
+                "offline_devices": offline_devices,
+                "unknown_state_devices": unknown_state_devices,
+                "open_alerts": len(open_alerts),
+                "resolved_alerts": len(resolved_alerts),
+            },
+            "devices": devices,
+            "states": states,
+            "alerts_open": open_alerts,
+            "alerts_resolved": resolved_alerts,
+            "events_recent": events,
+        }
 
     def provider_debug(self, provider_name: str | None = None) -> dict[str, object]:
         provider = get_provider(provider_name)

@@ -403,6 +403,10 @@ export function getSmartOverview() {
   return apiGet("/smart/overview");
 }
 
+export function getSmartUnitDetail(unitId, params = {}) {
+  return apiGet(`/smart/units/${unitId}`, params);
+}
+
 export function getDevices() {
   return apiGet("/smart/devices");
 }

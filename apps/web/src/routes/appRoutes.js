@@ -15,6 +15,7 @@ export const APP_ROUTES = [
   { path: "/expenses", key: "expenses" },
   { path: "/admin-control", key: "adminControl" },
   { path: "/smart-overview", key: "smartOverview" },
+  { path: "/smart-units/:id", key: "smartUnitDetail" },
   { path: "/devices", key: "devices" },
   { path: "/alerts", key: "alerts" },
 ];

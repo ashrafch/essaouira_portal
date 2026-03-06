@@ -16,6 +16,7 @@ from app.domains.smart_building.schemas import (
     ProviderSyncOut,
     ProviderWebhookIn,
     ProviderWebhookOut,
+    SmartUnitDetailOut,
     SmartOverviewOut,
 )
 from app.domains.smart_building.service import SmartBuildingService
@@ -34,6 +35,16 @@ def _service(request: Request, db: Session) -> SmartBuildingService:
 @router.get("/overview", response_model=SmartOverviewOut)
 def get_smart_overview(request: Request, db: Session = Depends(get_db)):
     return _service(request, db).smart_overview()
+
+
+@router.get("/units/{unit_id}", response_model=SmartUnitDetailOut)
+def get_smart_unit_detail(
+    unit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    events_limit: int = Query(default=50, ge=1, le=200),
+):
+    return _service(request, db).get_unit_smart_detail(unit_id=unit_id, events_limit=events_limit)
 
 
 @router.get("/providers/debug", response_model=ProviderDebugOut)

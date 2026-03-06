@@ -23,6 +23,7 @@ const Expenses = lazy(() => import("./pages/Expenses.jsx"));
 const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 const SmartOverview = lazy(() => import("./pages/SmartOverview.jsx"));
+const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
 const Devices = lazy(() => import("./pages/Devices.jsx"));
 const Alerts = lazy(() => import("./pages/Alerts.jsx"));
 
@@ -59,6 +60,7 @@ const ROUTE_COMPONENTS = {
   expenses: Expenses,
   adminControl: AdminControl,
   smartOverview: SmartOverview,
+  smartUnitDetail: SmartUnitDetail,
   devices: Devices,
   alerts: Alerts,
 };

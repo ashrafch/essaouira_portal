@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import PageInfoHelp from "../components/PageInfoHelp";
 import useIsMobile from "../hooks/useIsMobile";
 import { getDeviceState, getDevices, getSmartAlerts, getSmartOverview, getUnits } from "../services/api";
@@ -67,7 +68,15 @@ function SmartOverview() {
     devices.forEach((d) => {
       const key = d.unit_id || 0;
       if (!grouped[key]) {
-        grouped[key] = { unit_id: d.unit_id, name: d.unit_id ? unitMap[d.unit_id]?.name || `Unit #${d.unit_id}` : "Aree comuni", total: 0, online: 0, offline: 0, unknown: 0, open_alerts: 0 };
+        grouped[key] = {
+          unit_id: d.unit_id,
+          name: d.unit_id ? unitMap[d.unit_id]?.name || `Unit #${d.unit_id}` : "Aree comuni",
+          total: 0,
+          online: 0,
+          offline: 0,
+          unknown: 0,
+          open_alerts: 0,
+        };
       }
       grouped[key].total += 1;
       const online = stateMap[d.id]?.online;
@@ -80,7 +89,15 @@ function SmartOverview() {
       if (a.status !== "open") return;
       const key = a.unit_id || 0;
       if (!grouped[key]) {
-        grouped[key] = { unit_id: a.unit_id, name: a.unit_id ? unitMap[a.unit_id]?.name || `Unit #${a.unit_id}` : "Aree comuni", total: 0, online: 0, offline: 0, unknown: 0, open_alerts: 0 };
+        grouped[key] = {
+          unit_id: a.unit_id,
+          name: a.unit_id ? unitMap[a.unit_id]?.name || `Unit #${a.unit_id}` : "Aree comuni",
+          total: 0,
+          online: 0,
+          offline: 0,
+          unknown: 0,
+          open_alerts: 0,
+        };
       }
       grouped[key].open_alerts += 1;
     });
@@ -155,7 +172,7 @@ function SmartOverview() {
 
       {!loading && !error ? (
         summaryByUnit.length === 0 ? (
-          <div style={card}>Nessun device configurato. Vai su Device Inventory e lancia \"Sync provider\".</div>
+          <div style={card}>Nessun device configurato. Vai su Device Inventory e lancia "Sync provider".</div>
         ) : (
           <div style={card}>
             <h3 style={{ marginTop: 0, marginBottom: 10, fontSize: 15 }}>Stato smart per unita</h3>
@@ -164,12 +181,32 @@ function SmartOverview() {
                 {summaryByUnit.map((u) => (
                   <div key={`${u.unit_id || 0}-${u.name}`} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#fff" }}>
                     <div style={{ fontWeight: 700 }}>{u.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>device: {u.total} · alert aperti: {u.open_alerts}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>device: {u.total} - alert aperti: {u.open_alerts}</div>
                     <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
                       <span style={{ ...pill("#dcfce7", "#166534", "#86efac"), fontWeight: 600 }}>online {u.online}</span>
                       <span style={{ ...pill("#fee2e2", "#991b1b", "#fca5a5"), fontWeight: 600 }}>offline {u.offline}</span>
                       <span style={{ ...pill("#e2e8f0", "#334155", "#cbd5e1"), fontWeight: 600 }}>unknown {u.unknown}</span>
                     </div>
+                    {u.unit_id ? (
+                      <div style={{ marginTop: 8 }}>
+                        <Link
+                          to={`/smart-units/${u.unit_id}`}
+                          style={{
+                            display: "inline-flex",
+                            textDecoration: "none",
+                            borderRadius: 999,
+                            border: "1px solid #d1d5db",
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#0f172a",
+                            background: "#fff",
+                          }}
+                        >
+                          Apri dettaglio unita
+                        </Link>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -184,6 +221,7 @@ function SmartOverview() {
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Offline</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Unknown</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Alert open</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Dettaglio</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -195,6 +233,28 @@ function SmartOverview() {
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px", color: "#b91c1c", fontWeight: 600 }}>{u.offline}</td>
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px", color: "#334155", fontWeight: 600 }}>{u.unknown}</td>
                         <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px", color: u.open_alerts > 0 ? "#b91c1c" : "#334155", fontWeight: 700 }}>{u.open_alerts}</td>
+                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>
+                          {u.unit_id ? (
+                            <Link
+                              to={`/smart-units/${u.unit_id}`}
+                              style={{
+                                display: "inline-flex",
+                                textDecoration: "none",
+                                borderRadius: 999,
+                                border: "1px solid #d1d5db",
+                                padding: "3px 9px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#0f172a",
+                                background: "#fff",
+                              }}
+                            >
+                              Apri
+                            </Link>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "#94a3b8" }}>n/a</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -155,3 +155,33 @@ class ProviderWebhookOut(BaseModel):
     accepted: bool
     reason: str | None = None
     event_id: int | None = None
+
+
+class SmartUnitOut(BaseModel):
+    id: int
+    name: str
+    size_m2: int | None = None
+    capacity: int | None = None
+    base_nightly_rate: Decimal | None = None
+    currency: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SmartUnitSummaryOut(BaseModel):
+    total_devices: int
+    online_devices: int
+    offline_devices: int
+    unknown_state_devices: int
+    open_alerts: int
+    resolved_alerts: int
+
+
+class SmartUnitDetailOut(BaseModel):
+    unit: SmartUnitOut
+    summary: SmartUnitSummaryOut
+    devices: list[DeviceOut]
+    states: list[DeviceStateOut]
+    alerts_open: list[AlertOut]
+    alerts_resolved: list[AlertOut]
+    events_recent: list[DeviceEventOut]
