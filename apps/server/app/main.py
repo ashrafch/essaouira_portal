@@ -5,7 +5,7 @@ from datetime import date, timedelta, time, datetime
 from typing import Optional, Dict, List
 from enum import Enum
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -18,6 +18,9 @@ from app.bootstrap import initialize_schema_and_seed
 from app.core.auth import authenticate_user, create_access_token
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tenant import normalize_tenant_id, reset_current_tenant_id, set_current_tenant_id
+from app.domains.smart_building.router import router as smart_building_router
+from app.domains.smart_building.service import SmartBuildingService
 from app.main_types import StaffRole
 from app.models.unit import Unit
 from app.models.booking import Booking
@@ -1421,6 +1424,54 @@ class StaffTaskOut(StaffTaskBase):
         from_attributes = True
 
 
+TERMINAL_TASK_STATUSES = {"done", "completed"}
+
+
+def _normalize_task_status(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _trigger_smart_reaction_on_staff_task_completion(
+    request: Request,
+    db: Session,
+    *,
+    old_status: str | None,
+    task: StaffTask,
+) -> None:
+    old_normalized = _normalize_task_status(old_status)
+    new_normalized = _normalize_task_status(task.status)
+    if new_normalized not in TERMINAL_TASK_STATUSES:
+        return
+    if old_normalized in TERMINAL_TASK_STATUSES:
+        return
+
+    task_type = (task.task_type or "").strip().lower()
+    if task_type == "checkin":
+        trigger_type = "booking.checked_in"
+    elif task_type == "checkout":
+        trigger_type = "booking.checked_out"
+    else:
+        return
+
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if not tenant_id:
+        return
+
+    service = SmartBuildingService(db=db, tenant_id=tenant_id)
+    service.trigger_rules_for_business_event(
+        trigger_type=trigger_type,
+        trigger_source="auto.ops.staff_task",
+        context={
+            "task_id": task.id,
+            "booking_id": task.booking_id,
+            "unit_id": task.unit_id,
+            "task_type": task.task_type,
+            "task_date": str(task.date) if task.date else None,
+        },
+        requested_by=getattr(request.state, "user", None) or "system",
+    )
+
+
 @app.get("/staff-tasks", response_model=list[StaffTaskOut])
 def list_staff_tasks(
     db: Session = Depends(get_db),
@@ -1518,11 +1569,15 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
 
 @app.put("/staff-tasks/{task_id}", response_model=StaffTaskOut)
 def update_staff_task(
-    task_id: int, payload: StaffTaskUpdate, db: Session = Depends(get_db)
+    task_id: int,
+    payload: StaffTaskUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
 ):
     task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task staff non trovato")
+    old_status = task.status
 
     if payload.booking_id is not None:
         booking = db.query(Booking).filter(Booking.id == payload.booking_id).first()
@@ -1556,6 +1611,12 @@ def update_staff_task(
 
     db.commit()
     db.refresh(task)
+    _trigger_smart_reaction_on_staff_task_completion(
+        request,
+        db,
+        old_status=old_status,
+        task=task,
+    )
 
     return {
         "id": task.id,
