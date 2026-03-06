@@ -61,7 +61,7 @@ function AdminControl() {
       const [staffCfg, pricingCfg, members, usersRes] = await Promise.all([
         getStaffDefaults(),
         getPricingDefaults(),
-        getStaffMembers(),
+        getStaffMembers({}),
         getUsers(),
       ]);
       setStaffDefaults({
@@ -473,6 +473,9 @@ function AdminControl() {
 
           <section style={cardStyle({ gridColumn: "1 / -1" })}>
             <h3 style={{ marginTop: 0 }}>Profili staff attuali</h3>
+            <div style={{ marginBottom: 8 }}>
+              <button type="button" onClick={loadData}>Aggiorna dati staff</button>
+            </div>
             {staffMembers.length === 0 ? (
               <p style={{ color: "#6b7280" }}>Nessun membro staff.</p>
             ) : (
@@ -480,14 +483,21 @@ function AdminControl() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>ID</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Nome</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Ruolo</th>
                       <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Attivo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {staffMembers.map((m) => (
+                    {[...staffMembers]
+                      .sort((a, b) => {
+                        if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+                        return (a.name || "").localeCompare(b.name || "");
+                      })
+                      .map((m) => (
                       <tr key={m.id}>
+                        <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.id}</td>
                         <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.name}</td>
                         <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.role || "-"}</td>
                         <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.is_active ? "si" : "no"}</td>

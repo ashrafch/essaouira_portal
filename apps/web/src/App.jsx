@@ -26,6 +26,7 @@ const SmartAlerts = lazy(() => import("./pages/SmartAlerts.jsx"));
 const SmartAutomation = lazy(() => import("./pages/SmartAutomation.jsx"));
 const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
 const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
+const Forbidden = lazy(() => import("./pages/Forbidden.jsx"));
 
 function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
@@ -61,7 +62,7 @@ function App() {
         <Route
           path="/bookings/:bookingId/document"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["owner", "manager", "operator", "viewer"]}>
               <BookingDocument />
             </ProtectedRoute>
           }
@@ -75,9 +76,20 @@ function App() {
         >
           {APP_ROUTES.map((route) => {
             const Component = ROUTE_COMPONENTS[route.key];
-            return <Route key={route.path} path={route.path} element={<Component />} />;
+            return (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute allowedRoles={route.allowedRoles}>
+                    <Component />
+                  </ProtectedRoute>
+                }
+              />
+            );
           })}
         </Route>
+        <Route path="/forbidden" element={<Forbidden />} />
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { canAccessRoute, getRole } from "../config/rbac";
 import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
 
 const wrapper = {
@@ -125,6 +126,7 @@ function makeLinkStyle({ level }) {
 
 function Sidebar() {
   const location = useLocation();
+  const role = getRole();
   const [openSections, setOpenSections] = useState({
     bookings: false,
     property: false,
@@ -149,12 +151,13 @@ function Sidebar() {
       id: "bookings",
       title: "Prenotazioni",
       items: [
-        { to: "/calendar", label: "Calendario", badge: "staysToday" },
-        { to: "/bookings", label: "Lista prenotazioni", badge: null },
+        { to: "/calendar", label: "Calendario", badge: "staysToday", routeKey: "calendar" },
+        { to: "/bookings", label: "Lista prenotazioni", badge: null, routeKey: "bookings" },
         {
           to: "/operations",
           label: "Arrivi & Partenze",
           badge: "arrivalsDepartures",
+          routeKey: "operations",
         },
       ],
     },
@@ -162,13 +165,14 @@ function Sidebar() {
       id: "property",
       title: "Proprietà",
       items: [
-        { to: "/units", label: "Appartamenti", badge: null },
-        { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null },
-        { to: "/expenses", label: "Spese Generali", badge: null },
+        { to: "/units", label: "Appartamenti", badge: null, routeKey: "units" },
+        { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null, routeKey: "pricing" },
+        { to: "/expenses", label: "Spese Generali", badge: null, routeKey: "expenses" },
         {
           to: "/business",
           label: "Business (Ricavi & Costi)",
           badge: null,
+          routeKey: "business",
         },
       ],
     },
@@ -180,16 +184,19 @@ function Sidebar() {
           to: "/staff-planner",
           label: "Planner staff",
           badge: "staffTasksToday",
+          routeKey: "staffPlanner",
         },
         {
           to: "/staff",
           label: "Task staff & pulizie",
           badge: "staffTasksToday",
+          routeKey: "staff",
         },
         {
           to: "/staff-anagrafica",
           label: "Anagrafica staff",
           badge: null,
+          routeKey: "staffDirectory",
         },
       ],
     },
@@ -201,6 +208,7 @@ function Sidebar() {
           to: "/maintenance",
           label: "Manutenzioni",
           badge: "openTickets",
+          routeKey: "maintenance",
         },
       ],
     },
@@ -208,18 +216,24 @@ function Sidebar() {
       id: "smart",
       title: "Smart Building",
       items: [
-        { to: "/smart-overview", label: "Smart overview", badge: null },
-        { to: "/smart-devices", label: "Dispositivi", badge: null },
-        { to: "/smart-alerts", label: "Alert smart", badge: null },
-        { to: "/smart-automation", label: "Automazioni smart", badge: null },
+        { to: "/smart-overview", label: "Smart overview", badge: null, routeKey: "smartOverview" },
+        { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices" },
+        { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts" },
+        { to: "/smart-automation", label: "Automazioni smart", badge: null, routeKey: "smartAutomation" },
       ],
     },
     {
       id: "admin",
       title: "Admin",
-      items: [{ to: "/admin-control", label: "Admin & Config", badge: null }],
+      items: [{ to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl" }],
     },
   ];
+  const routeFilteredSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessRoute(item.routeKey, role)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // carico badge ogni volta che cambio pagina
   useEffect(() => {
@@ -281,7 +295,7 @@ function Sidebar() {
     const path = location.pathname;
     setOpenSections((prev) => {
       const next = { ...prev };
-      for (const section of sections) {
+      for (const section of routeFilteredSections) {
         if (section.items.some((item) => path.startsWith(item.to))) {
           next[section.id] = true;
         }
@@ -289,7 +303,7 @@ function Sidebar() {
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, role]);
 
   function toggleSection(id) {
     setOpenSections((prev) => ({
@@ -347,7 +361,7 @@ function Sidebar() {
         </NavLink>
 
         {/* SEZIONI COLLASSABILI */}
-        {sections.map((section) => {
+        {routeFilteredSections.map((section) => {
           const isOpen = openSections[section.id];
           const path = location.pathname;
           const hasActiveChild = section.items.some((item) =>
@@ -407,7 +421,7 @@ function Sidebar() {
       </div>
 
       <div style={footer}>
-        <div>Owner dashboard</div>
+        <div>{role} dashboard</div>
         <div>v0.1 · local dev</div>
       </div>
     </div>

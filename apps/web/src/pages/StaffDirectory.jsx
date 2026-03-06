@@ -1,149 +1,109 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getStaffMembers,
   createStaffMember,
   updateStaffMember,
-  deactivateStaffMember, // usato come "elimina definitiva"
+  deactivateStaffMember,
 } from "../services/api";
 
-const COLOR_SWATCHES = [
-  "#0f766e", // verde owner / housekeeping
-  "#2563eb", // blu manutenzione
-  "#f97316", // arancio operations
-  "#a855f7", // viola amministrazione
-  "#dc2626", // rosso esterno / fornitore
-  "#16a34a", // altro verde
-];
-
-// 👇 RUOLI DEFINITIVI (devono combaciare con l'enum lato backend)
+const COLOR_SWATCHES = ["#0f766e", "#2563eb", "#f97316", "#a855f7", "#dc2626", "#16a34a"];
 const STAFF_ROLES = [
   { value: "housekeeping", label: "Housekeeping (Pulizie)" },
   { value: "kitchen", label: "Cucina / Colazioni" },
   { value: "reception_day", label: "Reception (Giorno)" },
   { value: "reception_night", label: "Reception (Notte)" },
-  { value: "manager", label: "Amministratore / Manager" },
+  { value: "manager", label: "Manager" },
 ];
 
-function getRoleLabel(roleValue) {
-  if (!roleValue) return "—";
+function roleLabel(roleValue) {
+  if (!roleValue) return "-";
   const found = STAFF_ROLES.find((r) => r.value === roleValue);
-  return found ? found.label : roleValue; // se in futuro aggiungi un ruolo nuovo
+  return found ? found.label : roleValue;
+}
+
+function sortMembers(list) {
+  return [...list].sort((a, b) => {
+    if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function StaffDirectory() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // false = mostra solo attivi (active_only=true)
-  // true  = mostra anche disattivi (no filtro)
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [showInactive, setShowInactive] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
-  const [role, setRole] = useState("");           // 👈 ora è uno dei value di STAFF_ROLES
+  const [role, setRole] = useState("");
   const [hourlyCost, setHourlyCost] = useState("");
   const [colorHex, setColorHex] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [saving, setSaving] = useState(false);
+
+  async function loadMembers({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+    setError("");
+    try {
+      const params = !showInactive ? { active_only: "true" } : {};
+      const data = await getStaffMembers(params);
+      setMembers(sortMembers(data || []));
+    } catch (err) {
+      setError(err.message || "Errore caricando lo staff.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = {};
-        // se NON voglio vedere i disattivi → chiedo solo attivi
-        if (!showInactive) {
-          params.active_only = "true";
-        }
-        const data = await getStaffMembers(params);
-
-        // ordino: prima attivi, poi disattivi, poi per nome
-        data.sort((a, b) => {
-          if (a.is_active !== b.is_active) {
-            return a.is_active ? -1 : 1;
-          }
-          return a.name.localeCompare(b.name);
-        });
-
-        setMembers(data);
-      } catch (err) {
-        setError(err.message || "Errore caricando lo staff.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
 
   function resetForm() {
     setEditingId(null);
     setName("");
-    setRole("");       // 👈 nessun ruolo selezionato
+    setRole("");
     setHourlyCost("");
     setColorHex("");
     setIsActive(true);
   }
 
-  function startEdit(m) {
-    setEditingId(m.id);
-    setName(m.name || "");
-    setRole(m.role || ""); // 👈 deve già essere uno dei value validi
-    setHourlyCost(
-      m.hourly_cost === null || m.hourly_cost === undefined
-        ? ""
-        : m.hourly_cost
-    );
-    setColorHex(m.color_hex || "");
-    setIsActive(m.is_active);
+  function startEdit(member) {
+    setEditingId(member.id);
+    setName(member.name || "");
+    setRole(member.role || "");
+    setHourlyCost(member.hourly_cost == null ? "" : String(member.hourly_cost));
+    setColorHex(member.color_hex || "");
+    setIsActive(Boolean(member.is_active));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!name.trim()) {
-      alert("Il nome è obbligatorio");
+      window.alert("Il nome e' obbligatorio");
       return;
     }
     setSaving(true);
     try {
       const payload = {
         name: name.trim(),
-        role: role || null, // 👈 se non selezioni nulla, va a NULL lato backend
+        role: role || null,
         color_hex: colorHex || null,
-        hourly_cost:
-          hourlyCost === "" || hourlyCost == null
-            ? null
-            : Number(hourlyCost),
+        hourly_cost: hourlyCost === "" ? null : Number(hourlyCost),
         is_active: isActive,
       };
 
       if (editingId) {
-        const updated = await updateStaffMember(editingId, payload);
-        setMembers((prev) =>
-          prev
-            .map((m) => (m.id === updated.id ? updated : m))
-            .sort((a, b) => {
-              if (a.is_active !== b.is_active) {
-                return a.is_active ? -1 : 1;
-              }
-              return a.name.localeCompare(b.name);
-            })
-        );
+        await updateStaffMember(editingId, payload);
       } else {
-        const created = await createStaffMember(payload);
-        setMembers((prev) =>
-          [...prev, created].sort((a, b) => {
-            if (a.is_active !== b.is_active) {
-              return a.is_active ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          })
-        );
+        await createStaffMember(payload);
       }
+      await loadMembers({ silent: true });
       resetForm();
     } catch (err) {
-      alert("Errore salvando membro staff: " + err.message);
+      window.alert("Errore salvando membro staff: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -151,47 +111,25 @@ function StaffDirectory() {
 
   async function handleToggleActive(member) {
     try {
-      const updated = await updateStaffMember(member.id, {
-        is_active: !member.is_active,
-      });
-      setMembers((prev) =>
-        prev
-          .map((m) => (m.id === updated.id ? updated : m))
-          .sort((a, b) => {
-            if (a.is_active !== b.is_active) {
-              return a.is_active ? -1 : 1;
-            }
-            return a.name.localeCompare(b.name);
-          })
-      );
+      await updateStaffMember(member.id, { is_active: !member.is_active });
+      await loadMembers({ silent: true });
     } catch (err) {
-      alert("Errore aggiornando stato: " + err.message);
+      window.alert("Errore aggiornando stato: " + err.message);
     }
   }
 
   async function handleDelete(id) {
-    if (
-      !window.confirm(
-        "Eliminare definitivamente questo membro? L'operazione non è reversibile."
-      )
-    )
-      return;
+    if (!window.confirm("Eliminare definitivamente questo membro?")) return;
     try {
-      await deactivateStaffMember(id); // DELETE /staff-members/{id}
-      setMembers((prev) => prev.filter((m) => m.id !== id));
+      await deactivateStaffMember(id);
+      await loadMembers({ silent: true });
     } catch (err) {
-      alert("Errore eliminando membro: " + err.message);
+      window.alert("Errore eliminando membro: " + err.message);
     }
   }
 
-  const activeCount = members.filter((m) => m.is_active).length;
+  const activeCount = useMemo(() => members.filter((m) => m.is_active).length, [members]);
   const inactiveCount = members.length - activeCount;
-
-  const page = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  };
 
   const card = {
     background: "white",
@@ -201,19 +139,6 @@ function StaffDirectory() {
     border: "1px solid #e5e7eb",
   };
 
-  const field = {
-    marginBottom: 8,
-    display: "flex",
-    flexDirection: "column",
-    gap: 3,
-  };
-
-  const label = {
-    fontSize: 11,
-    fontWeight: 500,
-    color: "#374151",
-  };
-
   const input = {
     borderRadius: 8,
     border: "1px solid #d1d5db",
@@ -221,255 +146,67 @@ function StaffDirectory() {
     fontSize: 13,
   };
 
-  const buttonPrimary = {
-    borderRadius: 999,
-    border: "none",
-    padding: "7px 12px",
-    fontSize: 12,
-    fontWeight: 600,
-    backgroundColor: "#0f766e",
-    color: "white",
-    cursor: "pointer",
-  };
-
-  const buttonSecondary = {
-    borderRadius: 999,
-    border: "1px solid #d1d5db",
-    padding: "6px 10px",
-    fontSize: 11,
-    fontWeight: 500,
-    backgroundColor: "white",
-    color: "#374151",
-    cursor: "pointer",
-  };
-
-  const table = {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 13,
-  };
-
-  const th = {
-    textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
-    padding: "6px 6px",
-    color: "#6b7280",
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: "0.03em",
-  };
-
-  const tdBase = {
-    padding: "6px 6px",
-    borderBottom: "1px solid #f3f4f6",
-    verticalAlign: "middle",
-  };
-
-  const colorSwatchBase = {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    border: "1px solid rgba(0,0,0,0.15)",
-    cursor: "pointer",
-  };
-
   return (
-    <div style={page}>
-      {/* Header + KPI */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          gap: 12,
-        }}
-      >
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Gestisci i membri dello staff della struttura. I ruoli sono
-            standardizzati (housekeeping, reception, cucina, manager) per gli
-            automatismi sulle task.
+          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0 }}>
+            Gestisci membri staff e stato attivo/disattivo. I disattivi non compaiono nei planner operativi.
           </p>
         </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            fontSize: 11,
-          }}
-        >
-          <div
-            style={{
-              padding: "6px 10px",
-              borderRadius: 999,
-              backgroundColor: "#ecfdf5",
-              color: "#166534",
-              border: "1px solid #bbf7d0",
-              minWidth: 80,
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 10, textTransform: "uppercase" }}>
-              Attivi
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{activeCount}</div>
-          </div>
-          <div
-            style={{
-              padding: "6px 10px",
-              borderRadius: 999,
-              backgroundColor: "#f9fafb",
-              color: "#6b7280",
-              border: "1px solid #e5e7eb",
-              minWidth: 80,
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 10, textTransform: "uppercase" }}>
-              Disattivi
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
-              {inactiveCount}
-            </div>
-          </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#166534", background: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: 999, padding: "6px 10px" }}>Attivi: {activeCount}</span>
+          <span style={{ fontSize: 12, color: "#6b7280", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 999, padding: "6px 10px" }}>Disattivi: {inactiveCount}</span>
         </div>
       </div>
 
-      {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+      {error && <p style={{ color: "#b91c1c", fontSize: 12 }}>{error}</p>}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(260px, 320px) 1fr",
-          gap: 12,
-          alignItems: "flex-start",
-        }}
-      >
-        {/* FORM */}
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
         <div style={card}>
-          <h2 style={{ fontSize: 14, marginBottom: 8 }}>
-            {editingId ? "Modifica membro" : "Nuovo membro"}
-          </h2>
+          <h2 style={{ marginTop: 0, fontSize: 15 }}>{editingId ? "Modifica membro" : "Nuovo membro"}</h2>
           <form onSubmit={handleSubmit}>
-            <div style={field}>
-              <label style={label}>Nome completo</label>
-              <input
-                style={input}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Es. Fatima El A."
-              />
-            </div>
-            <div style={field}>
-              <label style={label}>Ruolo</label>
-              <select
-                style={input}
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label>Nome completo</label>
+              <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Es. Fatima El A." />
+
+              <label>Ruolo</label>
+              <select style={input} value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="">Nessun ruolo</option>
                 {STAFF_ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
+                  <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
-              <span style={{ fontSize: 11, color: "#6b7280" }}>
-                Usa uno di questi ruoli per far funzionare bene gli automatismi
-                (pulizie, check-in, colazioni, ecc.).
-              </span>
-            </div>
-            <div style={field}>
-              <label style={label}>Costo orario indicativo (€)</label>
-              <input
-                style={input}
-                type="number"
-                min="0"
-                step="0.5"
-                value={hourlyCost}
-                onChange={(e) => setHourlyCost(e.target.value)}
-                placeholder="Es. 5"
-              />
-              <span style={{ fontSize: 11, color: "#6b7280" }}>
-                Usato solo per analisi interne (Business), opzionale.
-              </span>
-            </div>
-            <div style={field}>
-              <label style={label}>Colore identificativo</label>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
+
+              <label>Costo orario (EUR)</label>
+              <input style={input} type="number" min="0" step="0.5" value={hourlyCost} onChange={(e) => setHourlyCost(e.target.value)} />
+
+              <label>Colore</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {COLOR_SWATCHES.map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => setColorHex(c)}
-                    style={{
-                      ...colorSwatchBase,
-                      backgroundColor: c,
-                      boxShadow:
-                        colorHex === c ? "0 0 0 2px #0f766e" : "none",
-                    }}
+                    style={{ width: 20, height: 20, borderRadius: 999, border: colorHex === c ? "2px solid #0f766e" : "1px solid rgba(0,0,0,0.2)", background: c, cursor: "pointer" }}
                   />
                 ))}
-                <input
-                  style={{ ...input, maxWidth: 110, fontSize: 12 }}
-                  value={colorHex}
-                  onChange={(e) => setColorHex(e.target.value)}
-                  placeholder="#0f766e"
-                />
+                <input style={{ ...input, maxWidth: 110 }} value={colorHex} onChange={(e) => setColorHex(e.target.value)} placeholder="#0f766e" />
               </div>
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 10,
-                  color: "#9ca3af",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                }}
-              >
-                <span>Es. </span>
-                <span>verde = housekeeping</span>
-                <span>blu = manutenzione</span>
-                <span>arancio = operations</span>
-                <span>viola = amministrazione</span>
-              </div>
-            </div>
-            <div style={field}>
-              <label style={label}>
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  style={{ marginRight: 6 }}
-                />
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
                 Attivo
               </label>
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button type="submit" style={buttonPrimary} disabled={saving}>
-                {saving
-                  ? "Salvataggio..."
-                  : editingId
-                  ? "Salva modifiche"
-                  : "Aggiungi membro"}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button type="submit" disabled={saving} style={{ border: "none", borderRadius: 999, padding: "8px 12px", background: "#0f766e", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+                {saving ? "Salvataggio..." : editingId ? "Salva modifiche" : "Aggiungi membro"}
               </button>
               {editingId && (
-                <button
-                  type="button"
-                  style={buttonSecondary}
-                  onClick={resetForm}
-                >
+                <button type="button" onClick={resetForm} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "8px 12px", background: "#fff" }}>
                   Annulla
                 </button>
               )}
@@ -477,153 +214,63 @@ function StaffDirectory() {
           </form>
         </div>
 
-        {/* LISTA */}
         <div style={card}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: 6,
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: 14, marginBottom: 2 }}>Lista staff</h2>
-              <p style={{ fontSize: 11, color: "#9ca3af" }}>
-                I membri disattivi non compariranno nel planner staff.
-              </p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+            <h2 style={{ margin: 0, fontSize: 15 }}>Lista staff</h2>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label style={{ fontSize: 12, color: "#4b5563", display: "inline-flex", gap: 6, alignItems: "center" }}>
+                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+                Mostra disattivi
+              </label>
+              <button type="button" onClick={() => loadMembers()} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "6px 10px", background: "#fff", fontSize: 12 }}>
+                Aggiorna
+              </button>
             </div>
-            <label
-              style={{
-                fontSize: 11,
-                color: "#6b7280",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-              />
-              Mostra anche disattivi
-            </label>
           </div>
 
           {loading ? (
             <p style={{ fontSize: 13 }}>Caricamento staff...</p>
           ) : members.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#6b7280" }}>
-              Nessun membro staff registrato.
-            </p>
+            <p style={{ fontSize: 13, color: "#6b7280" }}>Nessun membro staff registrato.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table style={table}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={th}>Nome</th>
-                    <th style={th}>Ruolo</th>
-                    <th style={th}>Costo orario</th>
-                    <th style={th}>Stato</th>
-                    <th style={th}>Azioni</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Nome</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Ruolo</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Costo/h</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Stato</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m, idx) => {
-                    const rowStyle = {
-                      backgroundColor: idx % 2 === 0 ? "#ffffff" : "#f9fafb",
-                    };
-                    return (
-                      <tr key={m.id} style={rowStyle}>
-                        <td style={tdBase}>
-                          <div
-                            style={{
-                              fontWeight: 500,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            {m.color_hex && (
-                              <span
-                                style={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: "999px",
-                                  backgroundColor: m.color_hex,
-                                  border: "1px solid rgba(0,0,0,0.15)",
-                                }}
-                              />
-                            )}
-                            {m.name}
-                          </div>
-                        </td>
-                        <td style={tdBase}>{getRoleLabel(m.role)}</td>
-                        <td style={tdBase}>
-                          {m.hourly_cost != null
-                            ? `€ ${m.hourly_cost.toFixed(2)}`
-                            : "—"}
-                        </td>
-                        <td style={tdBase}>
-                          <span
-                            style={{
-                              borderRadius: 999,
-                              padding: "2px 8px",
-                              fontSize: 11,
-                              backgroundColor: m.is_active
-                                ? "#dcfce7"
-                                : "#f3f4f6",
-                              color: m.is_active ? "#166534" : "#6b7280",
-                            }}
-                          >
-                            {m.is_active ? "Attivo" : "Disattivo"}
-                          </span>
-                        </td>
-                        <td style={{ ...tdBase, whiteSpace: "nowrap" }}>
-                          <button
-                            type="button"
-                            style={{
-                              ...buttonSecondary,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                            }}
-                            onClick={() => startEdit(m)}
-                          >
-                            Modifica
-                          </button>{" "}
-                          <button
-                            type="button"
-                            style={{
-                              ...buttonSecondary,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              borderColor: m.is_active
-                                ? "#fee2e2"
-                                : "#bfdbfe",
-                              color: m.is_active ? "#b91c1c" : "#1d4ed8",
-                            }}
-                            onClick={() => handleToggleActive(m)}
-                          >
-                            {m.is_active ? "Disattiva" : "Riattiva"}
-                          </button>{" "}
-                          <button
-                            type="button"
-                            style={{
-                              ...buttonSecondary,
-                              padding: "4px 8px",
-                              fontSize: 11,
-                              borderColor: "#fecaca",
-                              color: "#b91c1c",
-                            }}
-                            onClick={() => handleDelete(m.id)}
-                          >
-                            Elimina
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {members.map((m) => (
+                    <tr key={m.id}>
+                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>
+                        <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                          {m.color_hex ? <span style={{ width: 10, height: 10, borderRadius: 999, background: m.color_hex }} /> : null}
+                          {m.name}
+                        </div>
+                      </td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>{roleLabel(m.role)}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>{m.hourly_cost != null ? `EUR ${Number(m.hourly_cost).toFixed(2)}` : "-"}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>
+                        <span style={{ borderRadius: 999, padding: "2px 8px", fontSize: 11, background: m.is_active ? "#dcfce7" : "#f3f4f6", color: m.is_active ? "#166534" : "#6b7280" }}>
+                          {m.is_active ? "Attivo" : "Disattivo"}
+                        </span>
+                      </td>
+                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6", whiteSpace: "nowrap" }}>
+                        <button type="button" onClick={() => startEdit(m)} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 8px", background: "#fff", fontSize: 12 }}>Modifica</button>{" "}
+                        <button type="button" onClick={() => handleToggleActive(m)} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 8px", background: "#fff", fontSize: 12 }}>
+                          {m.is_active ? "Disattiva" : "Riattiva"}
+                        </button>{" "}
+                        <button type="button" onClick={() => handleDelete(m.id)} style={{ borderRadius: 999, border: "1px solid #fecaca", color: "#b91c1c", padding: "4px 8px", background: "#fff", fontSize: 12 }}>
+                          Elimina
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

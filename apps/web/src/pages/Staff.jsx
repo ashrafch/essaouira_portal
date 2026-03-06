@@ -87,6 +87,10 @@ function Staff() {
   const [currency, setCurrency] = useState("EUR");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [staffPage, setStaffPage] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1600
+  );
 
   // quick-create su cella
   const [quickCreateTarget, setQuickCreateTarget] = useState(null); 
@@ -263,6 +267,40 @@ function Staff() {
   }, [filteredTasks, defAssignee, staffMembers]);
 
   const assigneeOptions = assignees;
+  const staffColumnsPerPage = useMemo(() => {
+    if (viewportWidth <= 900) return 1;
+    if (viewportWidth <= 1300) return 2;
+    return 3;
+  }, [viewportWidth]);
+
+  const totalStaffPages = useMemo(
+    () => Math.max(1, Math.ceil((assignees.length || 1) / staffColumnsPerPage)),
+    [assignees.length, staffColumnsPerPage]
+  );
+
+  useEffect(() => {
+    setStaffPage((prev) => Math.min(prev, totalStaffPages - 1));
+  }, [totalStaffPages]);
+
+  useEffect(() => {
+    if (mode === "day" && staffPage !== 0) {
+      setStaffPage(0);
+    }
+  }, [mode, staffPage]);
+
+  const visibleAssignees = useMemo(() => {
+    if (mode === "day") return assignees;
+    const start = staffPage * staffColumnsPerPage;
+    return assignees.slice(start, start + staffColumnsPerPage);
+  }, [assignees, mode, staffPage, staffColumnsPerPage]);
+
+  useEffect(() => {
+    function onResize() {
+      setViewportWidth(window.innerWidth);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const staffColorMap = useMemo(() => {
     const map = {};
@@ -666,13 +704,14 @@ function Staff() {
   });
 
   const boardWrapper = {
-    overflowX: "auto",
+    overflowX: "hidden",
+    width: "100%",
   };
 
   const board = {
-    minWidth: assignees.length ? assignees.length * 220 + 140 : 360,
+    minWidth: "100%",
     display: "grid",
-    gridTemplateColumns: `140px repeat(${assignees.length || 1}, minmax(200px, 1fr))`,
+    gridTemplateColumns: `130px repeat(${visibleAssignees.length || 1}, minmax(0, 1fr))`,
     borderCollapse: "collapse",
     fontSize: 12,
   };
@@ -701,6 +740,7 @@ function Staff() {
     borderBottom: "1px solid #f3f4f6",
     borderRight: "1px solid #f3f4f6",
     verticalAlign: "top",
+    minWidth: 0,
   };
 
   const miniTaskCard = (status) => ({
@@ -1124,6 +1164,38 @@ function Staff() {
                 )}`}
           </div>
 
+          {mode === "week" && assignees.length > staffColumnsPerPage && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <button
+                type="button"
+                style={smallButton}
+                onClick={() => setStaffPage((p) => Math.max(0, p - 1))}
+                disabled={staffPage === 0}
+              >
+                Staff precedenti
+              </button>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                Pagina staff {staffPage + 1}/{totalStaffPages}
+              </span>
+              <button
+                type="button"
+                style={smallButton}
+                onClick={() => setStaffPage((p) => Math.min(totalStaffPages - 1, p + 1))}
+                disabled={staffPage >= totalStaffPages - 1}
+              >
+                Staff successivi
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <p style={{ fontSize: 13 }}>Caricamento task staff...</p>
           ) : filteredTasks.length === 0 ? (
@@ -1135,7 +1207,7 @@ function Staff() {
               <div style={board}>
                 {/* header: colonna giorni + colonne per assignee */}
                 <div style={boardHeaderCell}>Giorno</div>
-                {assignees.map((ass) => {
+                {visibleAssignees.map((ass) => {
                   const color = staffColorMap[ass];
                   return (
                     <div key={ass} style={boardHeaderCell}>
@@ -1173,7 +1245,7 @@ function Staff() {
                       <div style={{ fontSize: 10, color: "#6b7280" }}>{d}</div>
                     </div>
                     {/* celle per ogni assignee */}
-                    {assignees.map((ass) => {
+                    {visibleAssignees.map((ass) => {
                       const list = tasksByAssigneeAndDay[ass]?.[d] || [];
                       const isQuick =
                         quickCreateTarget &&
