@@ -1,4 +1,9 @@
-from app.domains.smart_building.providers.base import ProviderStateSnapshot, SmartDeviceProvider
+from app.domains.smart_building.providers.base import (
+    ProviderCommandRequest,
+    ProviderCommandResult,
+    ProviderStateSnapshot,
+    SmartDeviceProvider,
+)
 
 
 class HomeAssistantProvider(SmartDeviceProvider):
@@ -7,6 +12,7 @@ class HomeAssistantProvider(SmartDeviceProvider):
     provider_name = "home_assistant"
     supports_catalog_sync = False
     supports_webhook_ingest = True
+    supports_command_execution = False
 
     def pull_state(self, external_id: str) -> ProviderStateSnapshot:
         raise NotImplementedError("Home Assistant integration is not implemented yet.")
@@ -16,3 +22,6 @@ class HomeAssistantProvider(SmartDeviceProvider):
 
     def parse_webhook(self, payload: dict):
         raise NotImplementedError("Home Assistant webhook parsing is not implemented yet.")
+
+    def execute_command(self, request: ProviderCommandRequest) -> ProviderCommandResult:
+        raise NotImplementedError("Home Assistant command execution is not implemented yet.")

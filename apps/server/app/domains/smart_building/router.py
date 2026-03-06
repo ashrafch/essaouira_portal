@@ -5,6 +5,8 @@ from app.db import get_db
 from app.domains.smart_building.schemas import (
     AlertCreate,
     AlertOut,
+    DeviceCommandCreate,
+    DeviceCommandOut,
     DeviceCreate,
     DeviceEventCreate,
     DeviceEventOut,
@@ -120,6 +122,40 @@ def update_device_state(
 @router.post("/devices/{device_id}/simulate-sync", response_model=DeviceStateOut)
 def simulate_device_sync(device_id: int, request: Request, db: Session = Depends(get_db)):
     return _service(request, db).simulate_sync(device_id)
+
+
+@router.get("/devices/{device_id}/commands", response_model=list[DeviceCommandOut])
+def list_device_commands(
+    device_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    return _service(request, db).list_device_commands(device_id=device_id, status=status, limit=limit)
+
+
+@router.post("/devices/{device_id}/commands", response_model=DeviceCommandOut)
+def create_device_command(
+    device_id: int,
+    payload: DeviceCommandCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).create_device_command(
+        device_id=device_id, payload=payload, requested_by=username
+    )
+
+
+@router.get("/devices/{device_id}/commands/{command_id}", response_model=DeviceCommandOut)
+def get_device_command(
+    device_id: int,
+    command_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).get_device_command_or_404(device_id=device_id, command_id=command_id)
 
 
 @router.get("/events", response_model=list[DeviceEventOut])

@@ -42,6 +42,7 @@ class Device(TenantScopedMixin, Base):
     state = relationship("DeviceState", back_populates="device", uselist=False, cascade="all, delete-orphan")
     events = relationship("DeviceEvent", back_populates="device", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="device", cascade="all, delete-orphan")
+    commands = relationship("DeviceCommand", back_populates="device", cascade="all, delete-orphan")
 
 
 class DeviceState(TenantScopedMixin, Base):
@@ -101,3 +102,28 @@ class Alert(TenantScopedMixin, Base):
 
     unit = relationship("Unit")
     device = relationship("Device", back_populates="alerts")
+
+
+class DeviceCommand(TenantScopedMixin, Base):
+    __tablename__ = "device_commands"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    provider = Column(String(64), nullable=False, default="mock")
+    command_type = Column(String(64), nullable=False)
+    payload_json = Column(Text, nullable=True)
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    requested_by = Column(String(128), nullable=True)
+    requested_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    executed_at = Column(DateTime(timezone=True), nullable=True)
+    failed_at = Column(DateTime(timezone=True), nullable=True)
+    expired_at = Column(DateTime(timezone=True), nullable=True)
+    provider_ref = Column(String(128), nullable=True)
+    error_message = Column(Text, nullable=True)
+    result_json = Column(Text, nullable=True)
+
+    unit = relationship("Unit")
+    device = relationship("Device", back_populates="commands")

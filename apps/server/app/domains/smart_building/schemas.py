@@ -137,6 +137,7 @@ class ProviderDebugOut(BaseModel):
     provider_name: str
     supports_catalog_sync: bool
     supports_webhook_ingest: bool
+    supports_command_execution: bool
 
 
 class ProviderSyncOut(BaseModel):
@@ -185,3 +186,32 @@ class SmartUnitDetailOut(BaseModel):
     alerts_open: list[AlertOut]
     alerts_resolved: list[AlertOut]
     events_recent: list[DeviceEventOut]
+
+
+class DeviceCommandCreate(BaseModel):
+    command_type: str = Field(..., max_length=64)
+    payload: dict = Field(default_factory=dict)
+    ttl_seconds: int | None = Field(default=300, ge=30, le=86400)
+
+
+class DeviceCommandOut(BaseModel):
+    id: int
+    tenant_id: str
+    device_id: int
+    unit_id: int | None = None
+    provider: str
+    command_type: str
+    payload_json: str | None = None
+    status: str
+    requested_by: str | None = None
+    requested_at: datetime | None = None
+    expires_at: datetime | None = None
+    accepted_at: datetime | None = None
+    executed_at: datetime | None = None
+    failed_at: datetime | None = None
+    expired_at: datetime | None = None
+    provider_ref: str | None = None
+    error_message: str | None = None
+    result_json: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)

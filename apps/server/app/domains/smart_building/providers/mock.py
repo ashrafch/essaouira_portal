@@ -4,6 +4,8 @@ import random
 from datetime import datetime, timezone
 
 from app.domains.smart_building.providers.base import (
+    ProviderCommandRequest,
+    ProviderCommandResult,
     ProviderDeviceSnapshot,
     ProviderStateSnapshot,
     ProviderWebhookEvent,
@@ -15,6 +17,7 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
     provider_name = "mock"
     supports_catalog_sync = True
     supports_webhook_ingest = True
+    supports_command_execution = True
 
     _mock_catalog = [
         {"external_id": "mock-unit-a-temp-1", "name": "Unit A Temp Sensor", "category": "temperature_humidity_sensor", "zone_name": "Unit A - Living", "unit_hint": "unit a"},
@@ -84,4 +87,77 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
             severity=severity,
             payload=event_payload,
             occurred_at=datetime.now(timezone.utc),
+        )
+
+    def execute_command(self, request: ProviderCommandRequest) -> ProviderCommandResult:
+        command_type = request.command_type
+        payload = request.payload or {}
+        provider_ref = f"mock-cmd-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+
+        if command_type in {"power_on", "power_off"}:
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"power_state": "on" if command_type == "power_on" else "off"},
+            )
+
+        if command_type == "climate_set_mode":
+            mode = str(payload.get("mode", "")).strip().lower()
+            if mode not in {"off", "heat", "cool", "eco", "auto"}:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Unsupported climate mode",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"mode": mode},
+            )
+
+        if command_type == "climate_set_setpoint":
+            try:
+                setpoint_c = float(payload.get("setpoint_c"))
+            except (TypeError, ValueError):
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid setpoint_c",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"setpoint_c": setpoint_c},
+            )
+
+        if command_type == "lock_set_state":
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"lock", "unlock"}:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid lock target",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="accepted",
+                provider_ref=provider_ref,
+                executed=False,
+                result_payload={"target": target, "note": "mock placeholder for future lock hardware"},
+            )
+
+        return ProviderCommandResult(
+            accepted=False,
+            lifecycle_status="failed",
+            provider_ref=provider_ref,
+            error_message=f"Unsupported command type '{command_type}'",
         )

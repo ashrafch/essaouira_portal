@@ -439,6 +439,18 @@ export function acknowledgeSmartAlert(alertId) {
   return apiPut(`/smart/alerts/${alertId}/acknowledge`, {});
 }
 
+export function getDeviceCommands(deviceId, params = {}) {
+  return apiGet(`/smart/devices/${deviceId}/commands`, params);
+}
+
+export function getDeviceCommand(deviceId, commandId) {
+  return apiGet(`/smart/devices/${deviceId}/commands/${commandId}`);
+}
+
+export function createDeviceCommand(deviceId, payload) {
+  return apiPost(`/smart/devices/${deviceId}/commands`, payload);
+}
+
 export function getPlatformTenants() {
   return apiGet("/platform/tenants");
 }

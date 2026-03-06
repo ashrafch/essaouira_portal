@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import PageInfoHelp from "../components/PageInfoHelp";
 import useIsMobile from "../hooks/useIsMobile";
 import {
+  createDeviceCommand,
+  getDeviceCommands,
   getDeviceState,
   getDevices,
   getSmartProviderDebug,
@@ -29,15 +31,48 @@ function pill(bg, color, border = "transparent") {
   };
 }
 
+function getCommandPresets(category) {
+  const normalized = (category || "").trim().toLowerCase();
+  if (["smart_relay", "smart_light", "smart_plug", "relay", "light"].includes(normalized)) {
+    return [
+      { label: "ON", commandType: "power_on", payload: {} },
+      { label: "OFF", commandType: "power_off", payload: {} },
+    ];
+  }
+  if (["climate_controller", "thermostat", "hvac_controller"].includes(normalized)) {
+    return [
+      { label: "Eco", commandType: "climate_set_mode", payload: { mode: "eco" } },
+      { label: "22 C", commandType: "climate_set_setpoint", payload: { setpoint_c: 22 } },
+    ];
+  }
+  if (["smart_lock", "lock_controller"].includes(normalized)) {
+    return [
+      { label: "Lock", commandType: "lock_set_state", payload: { target: "lock" } },
+      { label: "Unlock", commandType: "lock_set_state", payload: { target: "unlock" } },
+    ];
+  }
+  return [];
+}
+
+function commandStatusStyle(status) {
+  if (status === "executed") return pill("#dcfce7", "#166534", "#86efac");
+  if (status === "accepted") return pill("#ecfeff", "#0e7490", "#a5f3fc");
+  if (status === "pending") return pill("#f8fafc", "#334155", "#cbd5e1");
+  if (status === "expired") return pill("#fef9c3", "#854d0e", "#fde68a");
+  return pill("#fee2e2", "#991b1b", "#fca5a5");
+}
+
 function Devices() {
   const isMobile = useIsMobile(900);
   const [devices, setDevices] = useState([]);
   const [stateMap, setStateMap] = useState({});
+  const [lastCommandMap, setLastCommandMap] = useState({});
   const [providerDebug, setProviderDebug] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [syncingProvider, setSyncingProvider] = useState(false);
   const [syncingDeviceId, setSyncingDeviceId] = useState(null);
+  const [commandingDeviceId, setCommandingDeviceId] = useState(null);
   const [query, setQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -51,7 +86,7 @@ function Devices() {
       setDevices(deviceList || []);
       setProviderDebug(debug || null);
 
-      const pairs = await Promise.all(
+      const statePairs = await Promise.all(
         (deviceList || []).map(async (d) => {
           try {
             const state = await getDeviceState(d.id);
@@ -61,15 +96,43 @@ function Devices() {
           }
         })
       );
-      const next = {};
-      pairs.forEach(([id, state]) => {
-        next[id] = state;
+      const nextStateMap = {};
+      statePairs.forEach(([id, state]) => {
+        nextStateMap[id] = state;
       });
-      setStateMap(next);
+      setStateMap(nextStateMap);
+
+      const commandPairs = await Promise.all(
+        (deviceList || []).map(async (d) => {
+          try {
+            const list = await getDeviceCommands(d.id, { limit: 1 });
+            return [d.id, Array.isArray(list) && list.length > 0 ? list[0] : null];
+          } catch {
+            return [d.id, null];
+          }
+        })
+      );
+      const nextCommandMap = {};
+      commandPairs.forEach(([id, command]) => {
+        nextCommandMap[id] = command;
+      });
+      setLastCommandMap(nextCommandMap);
     } catch (err) {
       setError(err.message || "Errore caricando device inventory");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshDeviceCommand(deviceId) {
+    try {
+      const list = await getDeviceCommands(deviceId, { limit: 1 });
+      setLastCommandMap((prev) => ({
+        ...prev,
+        [deviceId]: Array.isArray(list) && list.length > 0 ? list[0] : null,
+      }));
+    } catch {
+      setLastCommandMap((prev) => ({ ...prev, [deviceId]: null }));
     }
   }
 
@@ -129,6 +192,21 @@ function Devices() {
     }
   }
 
+  async function handleSendCommand(device, preset) {
+    setCommandingDeviceId(device.id);
+    try {
+      await createDeviceCommand(device.id, {
+        command_type: preset.commandType,
+        payload: preset.payload,
+      });
+      await refreshDeviceCommand(device.id);
+    } catch (err) {
+      alert(`Errore comando: ${err.message}`);
+    } finally {
+      setCommandingDeviceId(null);
+    }
+  }
+
   const card = {
     background: "linear-gradient(180deg,#fff 0%,#f8fafc 100%)",
     borderRadius: 16,
@@ -151,8 +229,9 @@ function Devices() {
           </p>
         </div>
         <PageInfoHelp title="Come usare Devices">
-          <p>Usa \"Sync provider\" per importare catalogo mock e aggiornare stati iniziali.</p>
-          <p>Usa \"Simula sync\" su una riga per aggiornare solo quel device.</p>
+          <p>Usa "Sync provider" per importare catalogo mock e aggiornare stati iniziali.</p>
+          <p>Usa "Simula sync" su una riga per aggiornare solo quel device.</p>
+          <p>I comandi sono disponibili solo per categorie supportate (relay/light, climate, lock placeholder).</p>
         </PageInfoHelp>
       </div>
 
@@ -231,7 +310,7 @@ function Devices() {
         </div>
         {providerDebug ? (
           <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
-            Provider `{providerDebug.provider_name}` · catalog sync: {String(providerDebug.supports_catalog_sync)} · webhook ingest: {String(providerDebug.supports_webhook_ingest)}
+            Provider `{providerDebug.provider_name}` - catalog sync: {String(providerDebug.supports_catalog_sync)} - webhook ingest: {String(providerDebug.supports_webhook_ingest)} - commandi: {String(providerDebug.supports_command_execution)}
           </div>
         ) : null}
       </div>
@@ -249,6 +328,8 @@ function Devices() {
             {filtered.map((d) => {
               const st = stateMap[d.id];
               const online = st?.online;
+              const presets = getCommandPresets(d.category);
+              const lastCommand = lastCommandMap[d.id];
               return (
                 <div key={d.id} style={card}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -267,9 +348,9 @@ function Devices() {
                     <span style={pill("#ecfeff", "#0e7490", "#a5f3fc")}>battery {d.battery_level ?? "n/d"}%</span>
                   </div>
                   <div style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>
-                    zona: {d.zone_name || "n/d"} · last seen: {toDateTime(d.last_seen_at)}
+                    zona: {d.zone_name || "n/d"} - last seen: {toDateTime(d.last_seen_at)}
                   </div>
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
                     <button
                       type="button"
                       onClick={() => handleDeviceSync(d.id)}
@@ -278,7 +359,25 @@ function Devices() {
                     >
                       {syncingDeviceId === d.id ? "Sync..." : "Simula sync"}
                     </button>
+                    {presets.map((preset) => (
+                      <button
+                        key={`${d.id}-${preset.commandType}-${preset.label}`}
+                        type="button"
+                        disabled={commandingDeviceId === d.id}
+                        onClick={() => handleSendCommand(d, preset)}
+                        style={{ borderRadius: 999, border: "1px solid #0f766e", padding: "5px 10px", fontSize: 12, background: "#f0fdfa", color: "#115e59", cursor: "pointer" }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
+                  {lastCommand ? (
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={commandStatusStyle(lastCommand.status)}>{lastCommand.status}</span>
+                      <span>{lastCommand.command_type}</span>
+                      <span>{toDateTime(lastCommand.requested_at)}</span>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -293,13 +392,16 @@ function Devices() {
                   <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Badges</th>
                   <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Zona</th>
                   <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Last seen</th>
-                  <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Azione</th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Comandi</th>
+                  <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Ultimo comando</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((d) => {
                   const st = stateMap[d.id];
                   const online = st?.online;
+                  const presets = getCommandPresets(d.category);
+                  const lastCommand = lastCommandMap[d.id];
                   return (
                     <tr key={d.id}>
                       <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>
@@ -322,14 +424,39 @@ function Devices() {
                       <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>{d.zone_name || "n/d"}</td>
                       <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>{toDateTime(d.last_seen_at)}</td>
                       <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>
-                        <button
-                          type="button"
-                          onClick={() => handleDeviceSync(d.id)}
-                          disabled={syncingDeviceId === d.id}
-                          style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 10px", fontSize: 12, background: "white", cursor: "pointer" }}
-                        >
-                          {syncingDeviceId === d.id ? "Sync..." : "Simula sync"}
-                        </button>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleDeviceSync(d.id)}
+                            disabled={syncingDeviceId === d.id}
+                            style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 10px", fontSize: 12, background: "white", cursor: "pointer" }}
+                          >
+                            {syncingDeviceId === d.id ? "Sync..." : "Sync"}
+                          </button>
+                          {presets.map((preset) => (
+                            <button
+                              key={`${d.id}-${preset.commandType}-${preset.label}`}
+                              type="button"
+                              disabled={commandingDeviceId === d.id}
+                              onClick={() => handleSendCommand(d, preset)}
+                              style={{ borderRadius: 999, border: "1px solid #0f766e", padding: "4px 10px", fontSize: 12, background: "#f0fdfa", color: "#115e59", cursor: "pointer" }}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                          {presets.length === 0 ? <span style={{ fontSize: 12, color: "#94a3b8" }}>n/a</span> : null}
+                        </div>
+                      </td>
+                      <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>
+                        {lastCommand ? (
+                          <div style={{ display: "grid", gap: 4 }}>
+                            <span style={commandStatusStyle(lastCommand.status)}>{lastCommand.status}</span>
+                            <span style={{ fontSize: 12, color: "#334155" }}>{lastCommand.command_type}</span>
+                            <span style={{ fontSize: 11, color: "#64748b" }}>{toDateTime(lastCommand.requested_at)}</span>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#94a3b8" }}>nessuno</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -344,4 +471,3 @@ function Devices() {
 }
 
 export default Devices;
-

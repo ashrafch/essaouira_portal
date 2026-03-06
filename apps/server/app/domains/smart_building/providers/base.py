@@ -44,12 +44,33 @@ class ProviderWebhookEvent:
     occurred_at: datetime | None = None
 
 
+@dataclass
+class ProviderCommandRequest:
+    external_id: str
+    command_type: str
+    payload: dict[str, Any] | None = None
+    requested_by: str | None = None
+    tenant_id: str | None = None
+
+
+@dataclass
+class ProviderCommandResult:
+    accepted: bool
+    lifecycle_status: str
+    provider_ref: str | None = None
+    result_payload: dict[str, Any] | None = None
+    error_message: str | None = None
+    executed: bool = False
+    expired: bool = False
+
+
 class SmartDeviceProvider:
     """Provider contract for future integrations (HA/MQTT/etc.)."""
 
     provider_name: str = "unknown"
     supports_catalog_sync: bool = False
     supports_webhook_ingest: bool = False
+    supports_command_execution: bool = False
 
     def pull_state(self, external_id: str) -> ProviderStateSnapshot:
         raise NotImplementedError
@@ -58,4 +79,7 @@ class SmartDeviceProvider:
         raise NotImplementedError
 
     def parse_webhook(self, payload: dict[str, Any]) -> ProviderWebhookEvent | None:
+        raise NotImplementedError
+
+    def execute_command(self, request: ProviderCommandRequest) -> ProviderCommandResult:
         raise NotImplementedError

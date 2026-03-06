@@ -127,6 +127,7 @@ Distribution & Revenue (Fase 3):
 
 Smart Building Foundation (Nuova fase):
 - overview smart: `GET /smart/overview`
+- dettaglio unita smart: `GET /smart/units/{unit_id}`
 - inventory device: `GET/POST/PUT /smart/devices...`
 - stato device: `GET/PUT /smart/devices/{id}/state`
 - eventi device: `GET /smart/events`, `POST /smart/devices/{id}/events`
@@ -135,6 +136,10 @@ Smart Building Foundation (Nuova fase):
 - debug provider contract: `GET /smart/providers/debug?provider=mock`
 - import catalogo provider: `POST /smart/providers/sync?provider=mock`
 - webhook ingestion placeholder: `POST /smart/providers/{provider}/webhook`
+- command lifecycle: `GET /smart/devices/{id}/commands`, `GET /smart/devices/{id}/commands/{command_id}`
+- trigger command: `POST /smart/devices/{id}/commands`
+- command status: `pending|accepted|executed|failed|expired`
+- command scope iniziale: relay/light on-off, climate mode/setpoint, smart lock placeholder
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
