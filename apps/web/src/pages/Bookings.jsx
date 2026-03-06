@@ -7,6 +7,7 @@ import {
   updateBooking,
   deleteBooking,
 } from "../services/api";
+import FeedbackMessage from "../components/FeedbackMessage";
 
 function formatDate(d) {
   if (!d) return "";
@@ -42,6 +43,8 @@ function Bookings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [feedback, setFeedback] = useState({ type: "info", message: "" });
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [formMode, setFormMode] = useState("create"); // "create" | "edit"
   const [editingId, setEditingId] = useState(null);
@@ -107,12 +110,14 @@ function Bookings() {
       setEditingId(null);
       setCheckinDate(d);
       setCheckoutDate(d);
+      setIsModalOpen(true);
     }
 
     if (state.editBookingId && bookings.length > 0) {
       const b = bookings.find((bk) => bk.id === state.editBookingId);
       if (b) {
         loadBookingIntoForm(b);
+        setIsModalOpen(true);
       }
     }
   }, [location.state, bookings]);
@@ -235,6 +240,11 @@ function Bookings() {
     }
   }
 
+  function openCreateModal() {
+    resetForm();
+    setIsModalOpen(true);
+  }
+
   function loadBookingIntoForm(b) {
     setFormMode("edit");
     setEditingId(b.id);
@@ -289,7 +299,10 @@ function Bookings() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!unitId || !guestName || !checkinDate || !checkoutDate) {
-      alert("Unità, ospite, check-in e check-out sono obbligatori.");
+      setFeedback({
+        type: "error",
+        message: "Unità, ospite, check-in e check-out sono obbligatori.",
+      });
       return;
     }
 
@@ -325,13 +338,16 @@ function Bookings() {
       if (formMode === "edit" && editingId != null) {
         saved = await updateBooking(editingId, payload);
         setBookings((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
+        setFeedback({ type: "success", message: "Prenotazione aggiornata." });
       } else {
         saved = await createBooking(payload);
         setBookings((prev) => [...prev, saved]);
+        setFeedback({ type: "success", message: "Prenotazione creata." });
       }
       resetForm();
+      setIsModalOpen(false);
     } catch (err) {
-      setError(err.message);
+      setFeedback({ type: "error", message: err.message });
     } finally {
       setSaving(false);
     }
@@ -346,8 +362,12 @@ function Bookings() {
       if (editingId === id) {
         resetForm();
       }
+      setFeedback({ type: "success", message: "Prenotazione eliminata." });
     } catch (err) {
-      alert("Errore eliminando la prenotazione: " + err.message);
+      setFeedback({
+        type: "error",
+        message: "Errore eliminando la prenotazione: " + err.message,
+      });
     }
   }
 
@@ -355,7 +375,7 @@ function Bookings() {
 
   const container = {
     display: "grid",
-    gridTemplateColumns: "minmax(260px, 340px) 1fr",
+    gridTemplateColumns: "1fr",
     gap: 16,
     alignItems: "flex-start",
   };
@@ -569,13 +589,43 @@ function Bookings() {
       {error && (
         <p style={{ color: "red", fontSize: 12, marginBottom: 8 }}>{error}</p>
       )}
+      <FeedbackMessage
+        message={feedback.message}
+        type={feedback.type}
+        onClose={() => setFeedback({ type: "info", message: "" })}
+      />
+
+      {isModalOpen && (
+        <div
+          onClick={() => setIsModalOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            zIndex: 1100,
+          }}
+        />
+      )}
 
       {loading ? (
         <p>Caricamento prenotazioni...</p>
       ) : (
         <div style={container}>
           {/* FORM */}
-          <div style={card}>
+          <div
+            style={{
+              ...card,
+              display: isModalOpen ? "block" : "none",
+              position: "fixed",
+              zIndex: 1200,
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "min(860px, calc(100vw - 24px))",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
             <h2 style={{ fontSize: 14, marginBottom: 10 }}>
               {formMode === "create"
                 ? "Nuova prenotazione"
@@ -1002,15 +1052,16 @@ function Bookings() {
                     ? "Crea prenotazione"
                     : "Salva modifiche"}
                 </button>
-                {formMode === "edit" && (
-                  <button
-                    type="button"
-                    style={buttonSecondary}
-                    onClick={resetForm}
-                  >
-                    Annulla modifica
-                  </button>
-                )}
+                <button
+                  type="button"
+                  style={buttonSecondary}
+                  onClick={() => {
+                    resetForm();
+                    setIsModalOpen(false);
+                  }}
+                >
+                  Annulla
+                </button>
               </div>
             </form>
           </div>
@@ -1035,6 +1086,13 @@ function Bookings() {
                   flexWrap: "wrap",
                 }}
               >
+                <button
+                  type="button"
+                  style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12 }}
+                  onClick={openCreateModal}
+                >
+                  + Nuova prenotazione
+                </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontSize: 11, color: "#6b7280" }}>Unità</span>
                   <select
@@ -1188,7 +1246,10 @@ function Bookings() {
                                 padding: "4px 10px",
                                 fontSize: 12,
                               }}
-                              onClick={() => loadBookingIntoForm(b)}
+                              onClick={() => {
+                                loadBookingIntoForm(b);
+                                setIsModalOpen(true);
+                              }}
                             >
                               Modifica
                             </button>{" "}
