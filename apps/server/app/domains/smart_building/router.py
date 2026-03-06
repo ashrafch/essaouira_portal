@@ -213,7 +213,13 @@ def list_alerts(
 
 @router.post("/alerts", response_model=AlertOut)
 def create_alert(payload: AlertCreate, request: Request, db: Session = Depends(get_db)):
-    return _service(request, db).create_alert(payload)
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).create_alert(
+        payload,
+        trigger_rules=True,
+        trigger_source="api.smart",
+        requested_by=username,
+    )
 
 
 @router.put("/alerts/{alert_id}/acknowledge", response_model=AlertOut)

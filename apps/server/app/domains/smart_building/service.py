@@ -899,7 +899,15 @@ class SmartBuildingService:
         )
         return command
 
-    def create_alert(self, payload: AlertCreate, correlation_id: str | None = None) -> Alert:
+    def create_alert(
+        self,
+        payload: AlertCreate,
+        correlation_id: str | None = None,
+        *,
+        trigger_rules: bool = True,
+        trigger_source: str = "api.smart",
+        requested_by: str | None = None,
+    ) -> Alert:
         if payload.device_id is not None:
             self.get_device_or_404(payload.device_id)
         normalized_alert_type = normalize_alert_type(payload.alert_type)
@@ -916,6 +924,19 @@ class SmartBuildingService:
         self.db.add(alert)
         self.db.commit()
         self.db.refresh(alert)
+        if trigger_rules:
+            self.trigger_rules_for_business_event(
+                trigger_type="alert.raised",
+                trigger_source=trigger_source,
+                context={
+                    "alert_id": alert.id,
+                    "unit_id": alert.unit_id,
+                    "device_id": alert.device_id,
+                    "alert_type": alert.alert_type,
+                },
+                requested_by=requested_by,
+                correlation_id=correlation_id,
+            )
         return alert
 
     def acknowledge_alert(self, alert_id: int, username: str) -> Alert:
@@ -1062,6 +1083,41 @@ class SmartBuildingService:
         self.db.commit()
         self.db.refresh(rule)
         return rule
+
+    def trigger_rules_for_business_event(
+        self,
+        *,
+        trigger_type: str,
+        trigger_source: str,
+        context: dict | None,
+        requested_by: str | None = None,
+        correlation_id: str | None = None,
+    ) -> list[AutomationExecution]:
+        normalized_trigger = self._validate_rule_trigger_type(trigger_type)
+        normalized_source = normalize_trigger_source(trigger_source)
+        rules = (
+            self.db.query(AutomationRule)
+            .filter(
+                AutomationRule.trigger_type == normalized_trigger,
+                AutomationRule.is_active.is_(True),
+            )
+            .order_by(AutomationRule.id.asc())
+            .all()
+        )
+        executions: list[AutomationExecution] = []
+        for rule in rules:
+            execution = self.trigger_automation_rule(
+                rule.id,
+                RuleTriggerRequest(
+                    trigger_type=normalized_trigger,
+                    trigger_source=normalized_source,
+                    correlation_id=correlation_id,
+                    context=context or {},
+                ),
+                requested_by=requested_by,
+            )
+            executions.append(execution)
+        return executions
 
     def update_automation_rule(self, rule_id: int, payload: AutomationRuleUpdate) -> AutomationRule:
         rule = self.get_automation_rule_or_404(rule_id)
@@ -1273,6 +1329,9 @@ class SmartBuildingService:
                     description=payload.get("description"),
                 ),
                 correlation_id=correlation_id,
+                trigger_rules=False,
+                trigger_source="auto.automation",
+                requested_by=requested_by,
             )
             return {
                 "entity": "alert",
@@ -1534,6 +1593,9 @@ class SmartBuildingService:
                     severity="critical",
                     title=f"Leak rilevata da {device.name}",
                     description="Evento simulato dal provider mock",
-                )
+                ),
+                trigger_rules=True,
+                trigger_source="auto.provider",
+                requested_by="system",
             )
         return state
