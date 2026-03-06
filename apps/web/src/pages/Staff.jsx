@@ -11,6 +11,7 @@ import {
   getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
 import { getCurrentRole } from "../services/auth";
+import FeedbackMessage from "../components/FeedbackMessage";
 
 function formatDate(d) {
   if (!d) return "";
@@ -59,6 +60,8 @@ function Staff() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [feedback, setFeedback] = useState({ type: "info", message: "" });
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
   const [unitFilter, setUnitFilter] = useState("all");
   const [taskTypeFilter, setTaskTypeFilter] = useState("all");
@@ -386,7 +389,10 @@ function Staff() {
         prev.map((t) => (t.id === updated.id ? updated : t))
       );
     } catch (err) {
-      alert("Errore salvando il task: " + err.message);
+      setFeedback({
+        type: "error",
+        message: "Errore salvando il task: " + err.message,
+      });
     } finally {
       setSavingTaskId(null);
     }
@@ -443,14 +449,14 @@ function Staff() {
   // ---- QUICK CREATE ----
 
   function openQuickCreate(date, assignee) {
-    setQuickCreateTarget({ date, assignee });
-    setQuickType("cleaning");
-    setQuickUnitId("");
-    setQuickCost(defCost || "");
-    setQuickHours(defHours || "");
-    setQuickNotes("");
-    setQuickRole("");
-    setQuickAssignee(assignee === "Non assegnato" ? "" : assignee);
+    resetForm();
+    setDate(date);
+    setTaskType("cleaning");
+    setAssigneeName(assignee === "Non assegnato" ? "" : assignee);
+    setCost(defCost || "");
+    setEstimatedHours(defHours || "");
+    setCurrency(defCurrency || "EUR");
+    setIsTaskModalOpen(true);
   }
 
   function closeQuickCreate() {
@@ -462,6 +468,7 @@ function Staff() {
     setQuickNotes("");
     setQuickRole("");
     setQuickAssignee("");
+    setIsTaskModalOpen(false);
   }
 
   const quickAvailableAssignees = useMemo(() => {
@@ -501,7 +508,10 @@ function Staff() {
       setTasks((prev) => [...prev, created]);
       closeQuickCreate();
     } catch (err) {
-      alert("Errore creando il task: " + err.message);
+      setFeedback({
+        type: "error",
+        message: "Errore creando il task: " + err.message,
+      });
     } finally {
       setCreatingTask(false);
     }
@@ -523,6 +533,16 @@ function Staff() {
     setNotes("");
   }
 
+  function openCreateTaskModal() {
+    resetForm();
+    setDate(selectedDate);
+    setAssigneeName(defAssignee || "");
+    setCost(defCost || "");
+    setEstimatedHours(defHours || "");
+    setCurrency(defCurrency || "EUR");
+    setIsTaskModalOpen(true);
+  }
+
   function loadTaskIntoForm(t) {
     setFormMode("edit");
     setEditingId(t.id);
@@ -538,12 +558,16 @@ function Staff() {
     setCost(t.cost != null ? String(t.cost) : "");
     setCurrency(t.currency || "EUR");
     setNotes(t.notes || "");
+    setIsTaskModalOpen(true);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!date || !taskType) {
-      alert("La data e il tipo di task sono obbligatori.");
+      setFeedback({
+        type: "error",
+        message: "La data e il tipo di task sono obbligatori.",
+      });
       return;
     }
 
@@ -568,13 +592,16 @@ function Staff() {
       if (formMode === "edit" && editingId != null) {
         saved = await updateStaffTask(editingId, payload);
         setTasks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
+        setFeedback({ type: "success", message: "Task aggiornato." });
       } else {
         saved = await createStaffTask(payload);
         setTasks((prev) => [...prev, saved]);
+        setFeedback({ type: "success", message: "Task creato." });
       }
       resetForm();
+      setIsTaskModalOpen(false);
     } catch (err) {
-      setError(err.message);
+      setFeedback({ type: "error", message: err.message || "Errore salvataggio task" });
     } finally {
       setSaving(false);
     }
@@ -586,8 +613,12 @@ function Staff() {
       await deleteStaffTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
       if (editingId === id) resetForm();
+      setFeedback({ type: "success", message: "Task eliminato." });
     } catch (err) {
-      alert("Errore eliminando il task: " + err.message);
+      setFeedback({
+        type: "error",
+        message: "Errore eliminando il task: " + err.message,
+      });
     }
   }
 
@@ -1009,12 +1040,35 @@ function Staff() {
             <div style={{ fontSize: 11, color: "#6b7280" }}>
               Task nel periodo: <strong>{kpi.total}</strong>
             </div>
+            <button
+              type="button"
+              style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12 }}
+              onClick={openCreateTaskModal}
+            >
+              + Nuovo task
+            </button>
           </div>
         </div>
       </div>
 
       {error && (
         <p style={{ color: "red", fontSize: 12, marginBottom: 4 }}>{error}</p>
+      )}
+      <FeedbackMessage
+        message={feedback.message}
+        type={feedback.type}
+        onClose={() => setFeedback({ type: "info", message: "" })}
+      />
+      {isTaskModalOpen && (
+        <div
+          onClick={() => setIsTaskModalOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            zIndex: 1100,
+          }}
+        />
       )}
 
       <div style={layout}>
@@ -1328,6 +1382,7 @@ function Staff() {
                                   <select
                                     style={inputInline}
                                     value={t.assignee_name || "Non assegnato"}
+                                    disabled
                                     onChange={(e) =>
                                       handleChangeAssignee(
                                         t,
@@ -1366,6 +1421,7 @@ function Staff() {
                                     <input
                                       type="number"
                                       step="0.01"
+                                      disabled
                                       value={
                                         t.cost === null ||
                                         t.cost === undefined
@@ -1395,6 +1451,7 @@ function Staff() {
                                     <input
                                       type="number"
                                       step="0.25"
+                                      disabled
                                       value={
                                         t.estimated_hours === null ||
                                         t.estimated_hours ===
@@ -1415,10 +1472,10 @@ function Staff() {
                                   <button
                                     type="button"
                                     style={pillStatus(t.status)}
+                                    disabled
                                     onClick={() =>
                                       handleToggleStatus(t)
                                     }
-                                    disabled={isSaving}
                                   >
                                     {isSaving
                                       ? "..."
@@ -1427,6 +1484,18 @@ function Staff() {
                                       : "Da fare"}
                                   </button>
                                 </div>
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...buttonSecondary,
+                                    marginTop: 4,
+                                    fontSize: 11,
+                                    padding: "4px 8px",
+                                  }}
+                                  onClick={() => loadTaskIntoForm(t)}
+                                >
+                                  Modifica
+                                </button>
                               </div>
                             );
                           })}
@@ -1653,7 +1722,20 @@ function Staff() {
         </div>
 
         {/* Form Task Singolo in fondo alla pagina */}
-        <div style={{ gridColumn: "1 / -1", ...card }}>
+        <div
+          style={{
+            ...card,
+            display: isTaskModalOpen ? "block" : "none",
+            position: "fixed",
+            zIndex: 1200,
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "min(860px, calc(100vw - 24px))",
+            maxHeight: "90vh",
+            overflowY: "auto",
+          }}
+        >
           <h2 style={{ fontSize: 14, marginBottom: 10 }}>
             {formMode === "create"
               ? "Nuovo task staff (dettagliato)"
@@ -1806,9 +1888,24 @@ function Staff() {
                 <button
                   type="button"
                   style={buttonSecondary}
-                  onClick={resetForm}
+                  onClick={() => {
+                    resetForm();
+                    setIsTaskModalOpen(false);
+                  }}
                 >
                   Annulla modifica
+                </button>
+              )}
+              {formMode === "create" && (
+                <button
+                  type="button"
+                  style={buttonSecondary}
+                  onClick={() => {
+                    resetForm();
+                    setIsTaskModalOpen(false);
+                  }}
+                >
+                  Chiudi
                 </button>
               )}
             </div>
