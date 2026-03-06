@@ -76,6 +76,19 @@ button {
   transition: background-color 0.2s ease;
 }
 
+/* Fix globale: bottoni con sfondo chiaro non devono ereditare testo bianco */
+button[style*="background: #fff"],
+button[style*="background:#fff"],
+button[style*="background: white"],
+button[style*="background:white"],
+button[style*="background-color: #fff"],
+button[style*="background-color:#fff"],
+button[style*="background-color: white"],
+button[style*="background-color:white"],
+button[style*="background-color: rgb(255, 255, 255)"] {
+  color: #374151;
+}
+
 button:hover {
   background-color: #0d5f57;
 }
