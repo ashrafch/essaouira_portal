@@ -132,3 +132,26 @@ class SmartOverviewOut(BaseModel):
     critical_alerts: int
     recently_seen_devices: int
 
+
+class ProviderDebugOut(BaseModel):
+    provider_name: str
+    supports_catalog_sync: bool
+    supports_webhook_ingest: bool
+
+
+class ProviderSyncOut(BaseModel):
+    provider_name: str
+    imported_devices: int
+    updated_devices: int
+    synced_states: int
+
+
+class ProviderWebhookIn(BaseModel):
+    payload: dict
+
+
+class ProviderWebhookOut(BaseModel):
+    provider_name: str
+    accepted: bool
+    reason: str | None = None
+    event_id: int | None = None

@@ -132,6 +132,9 @@ Smart Building Foundation (Nuova fase):
 - eventi device: `GET /smart/events`, `POST /smart/devices/{id}/events`
 - alert smart: `GET/POST /smart/alerts`, `PUT /smart/alerts/{id}/acknowledge`
 - simulazione provider: `POST /smart/devices/{id}/simulate-sync` (mock, nessuna integrazione hardware reale)
+- debug provider contract: `GET /smart/providers/debug?provider=mock`
+- import catalogo provider: `POST /smart/providers/sync?provider=mock`
+- webhook ingestion placeholder: `POST /smart/providers/{provider}/webhook`
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)

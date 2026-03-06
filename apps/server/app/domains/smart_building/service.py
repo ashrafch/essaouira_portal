@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.domains.smart_building.providers.factory import get_provider
 from app.domains.smart_building.schemas import AlertCreate, DeviceCreate, DeviceEventCreate, DeviceStateUpdate, DeviceUpdate
+from app.models.unit import Unit
 from app.models.smart_building import Alert, Device, DeviceEvent, DeviceState
 
 
@@ -20,11 +21,40 @@ class SmartBuildingService:
     def list_devices(self) -> list[Device]:
         return self.db.query(Device).order_by(Device.id.asc()).all()
 
+    def provider_debug(self, provider_name: str | None = None) -> dict[str, object]:
+        provider = get_provider(provider_name)
+        return {
+            "provider_name": provider.provider_name,
+            "supports_catalog_sync": bool(getattr(provider, "supports_catalog_sync", False)),
+            "supports_webhook_ingest": bool(getattr(provider, "supports_webhook_ingest", False)),
+        }
+
     def get_device_or_404(self, device_id: int) -> Device:
         device = self.db.query(Device).filter(Device.id == device_id).first()
         if device is None:
             raise HTTPException(status_code=404, detail="Device non trovato")
         return device
+
+    def get_device_by_provider_external(self, provider: str, external_id: str) -> Device | None:
+        return (
+            self.db.query(Device)
+            .filter(Device.provider == provider, Device.external_id == external_id)
+            .first()
+        )
+
+    def _resolve_unit_id_from_hint(self, unit_hint: str | None) -> int | None:
+        if not unit_hint:
+            return None
+        normalized = unit_hint.strip().lower()
+        if not normalized:
+            return None
+        unit = (
+            self.db.query(Unit)
+            .filter(func.lower(Unit.name).like(f"%{normalized}%"))
+            .order_by(Unit.id.asc())
+            .first()
+        )
+        return unit.id if unit else None
 
     def create_device(self, payload: DeviceCreate) -> Device:
         existing = (
@@ -72,6 +102,152 @@ class SmartBuildingService:
         self.db.commit()
         self.db.refresh(state)
         return state
+
+    def sync_catalog_from_provider(self, provider_name: str | None = None) -> dict[str, int | str]:
+        provider = get_provider(provider_name)
+        if not getattr(provider, "supports_catalog_sync", False):
+            raise HTTPException(status_code=400, detail="Provider does not support catalog sync")
+
+        imported_devices = 0
+        updated_devices = 0
+        synced_states = 0
+
+        for snapshot in provider.list_devices(self.tenant_id):
+            device = self.get_device_by_provider_external(provider.provider_name, snapshot.external_id)
+            if device is None:
+                device = Device(
+                    provider=provider.provider_name,
+                    external_id=snapshot.external_id,
+                    name=snapshot.name,
+                    category=snapshot.category,
+                    model=snapshot.model,
+                    manufacturer=snapshot.manufacturer,
+                    zone_name=snapshot.zone_name,
+                    unit_id=self._resolve_unit_id_from_hint(snapshot.unit_hint),
+                    is_active=snapshot.is_active,
+                    health_status=snapshot.health_status,
+                    battery_level=snapshot.battery_level,
+                )
+                self.db.add(device)
+                self.db.flush()
+                imported_devices += 1
+            else:
+                device.name = snapshot.name
+                device.category = snapshot.category
+                device.model = snapshot.model
+                device.manufacturer = snapshot.manufacturer
+                device.zone_name = snapshot.zone_name
+                if snapshot.unit_hint:
+                    resolved_unit_id = self._resolve_unit_id_from_hint(snapshot.unit_hint)
+                    if resolved_unit_id is not None:
+                        device.unit_id = resolved_unit_id
+                device.is_active = snapshot.is_active
+                device.health_status = snapshot.health_status
+                if snapshot.battery_level is not None:
+                    device.battery_level = snapshot.battery_level
+                updated_devices += 1
+
+            if snapshot.state is not None:
+                self.upsert_device_state(
+                    device.id,
+                    DeviceStateUpdate(
+                        online=snapshot.state.online,
+                        power_state=snapshot.state.power_state,
+                        motion_detected=snapshot.state.motion_detected,
+                        contact_open=snapshot.state.contact_open,
+                        leak_detected=snapshot.state.leak_detected,
+                        temperature_c=snapshot.state.temperature_c,
+                        humidity_pct=snapshot.state.humidity_pct,
+                        energy_w=snapshot.state.energy_w,
+                        signal_rssi=snapshot.state.signal_rssi,
+                        raw_payload_json=json.dumps(snapshot.state.raw_payload or {}, ensure_ascii=True),
+                    ),
+                )
+                synced_states += 1
+
+            self.create_device_event(
+                device_id=device.id,
+                payload=DeviceEventCreate(
+                    event_type="provider_catalog_sync",
+                    severity="info",
+                    source=provider.provider_name,
+                    payload_json=json.dumps(
+                        {
+                            "external_id": snapshot.external_id,
+                            "unit_hint": snapshot.unit_hint,
+                        },
+                        ensure_ascii=True,
+                    ),
+                ),
+            )
+
+        return {
+            "provider_name": provider.provider_name,
+            "imported_devices": imported_devices,
+            "updated_devices": updated_devices,
+            "synced_states": synced_states,
+        }
+
+    def ingest_provider_webhook(
+        self, provider_name: str, payload: dict, username: str | None = None
+    ) -> dict[str, object]:
+        provider = get_provider(provider_name)
+        if not getattr(provider, "supports_webhook_ingest", False):
+            return {
+                "provider_name": provider.provider_name,
+                "accepted": False,
+                "reason": "provider does not support webhook ingest",
+                "event_id": None,
+            }
+
+        try:
+            parsed = provider.parse_webhook(payload)
+        except NotImplementedError:
+            return {
+                "provider_name": provider.provider_name,
+                "accepted": False,
+                "reason": "provider webhook parsing not implemented",
+                "event_id": None,
+            }
+
+        if parsed is None:
+            return {
+                "provider_name": provider.provider_name,
+                "accepted": False,
+                "reason": "invalid payload",
+                "event_id": None,
+            }
+
+        device = self.get_device_by_provider_external(provider.provider_name, parsed.external_id)
+        if device is None:
+            return {
+                "provider_name": provider.provider_name,
+                "accepted": False,
+                "reason": "device not found for external_id",
+                "event_id": None,
+            }
+
+        event = self.create_device_event(
+            device_id=device.id,
+            payload=DeviceEventCreate(
+                event_type=parsed.event_type,
+                severity=parsed.severity,
+                source=provider.provider_name,
+                payload_json=json.dumps(
+                    {
+                        "payload": parsed.payload or {},
+                        "ingested_by": username or "system",
+                    },
+                    ensure_ascii=True,
+                ),
+            ),
+        )
+        return {
+            "provider_name": provider.provider_name,
+            "accepted": True,
+            "reason": None,
+            "event_id": event.id,
+        }
 
     def create_device_event(self, device_id: int, payload: DeviceEventCreate) -> DeviceEvent:
         device = self.get_device_or_404(device_id)
@@ -204,4 +380,3 @@ class SmartBuildingService:
                 )
             )
         return state
-

@@ -12,6 +12,10 @@ from app.domains.smart_building.schemas import (
     DeviceStateOut,
     DeviceStateUpdate,
     DeviceUpdate,
+    ProviderDebugOut,
+    ProviderSyncOut,
+    ProviderWebhookIn,
+    ProviderWebhookOut,
     SmartOverviewOut,
 )
 from app.domains.smart_building.service import SmartBuildingService
@@ -30,6 +34,39 @@ def _service(request: Request, db: Session) -> SmartBuildingService:
 @router.get("/overview", response_model=SmartOverviewOut)
 def get_smart_overview(request: Request, db: Session = Depends(get_db)):
     return _service(request, db).smart_overview()
+
+
+@router.get("/providers/debug", response_model=ProviderDebugOut)
+def provider_debug(
+    request: Request,
+    db: Session = Depends(get_db),
+    provider: str | None = Query(default=None),
+):
+    return _service(request, db).provider_debug(provider)
+
+
+@router.post("/providers/sync", response_model=ProviderSyncOut)
+def provider_catalog_sync(
+    request: Request,
+    db: Session = Depends(get_db),
+    provider: str | None = Query(default=None),
+):
+    return _service(request, db).sync_catalog_from_provider(provider)
+
+
+@router.post("/providers/{provider}/webhook", response_model=ProviderWebhookOut)
+def provider_webhook_ingest(
+    provider: str,
+    body: ProviderWebhookIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = getattr(request.state, "user", None)
+    return _service(request, db).ingest_provider_webhook(
+        provider_name=provider,
+        payload=body.payload,
+        username=username,
+    )
 
 
 @router.get("/devices", response_model=list[DeviceOut])
@@ -110,4 +147,3 @@ def create_alert(payload: AlertCreate, request: Request, db: Session = Depends(g
 def acknowledge_alert(alert_id: int, request: Request, db: Session = Depends(get_db)):
     username = getattr(request.state, "user", None) or "system"
     return _service(request, db).acknowledge_alert(alert_id=alert_id, username=username)
-
