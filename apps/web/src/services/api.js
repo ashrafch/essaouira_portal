@@ -455,6 +455,46 @@ export function createDeviceCommand(deviceId, payload) {
   return apiPost(`/smart/devices/${deviceId}/commands`, payload);
 }
 
+export function getScenes() {
+  return apiGet("/smart/scenes");
+}
+
+export function createScene(payload) {
+  return apiPost("/smart/scenes", payload);
+}
+
+export function updateScene(sceneId, payload) {
+  return apiPut(`/smart/scenes/${sceneId}`, payload);
+}
+
+export function getSceneActions(sceneId) {
+  return apiGet(`/smart/scenes/${sceneId}/actions`);
+}
+
+export function createSceneAction(sceneId, payload) {
+  return apiPost(`/smart/scenes/${sceneId}/actions`, payload);
+}
+
+export function runScene(sceneId, payload = { context: {} }) {
+  return apiPost(`/smart/scenes/${sceneId}/run`, payload);
+}
+
+export function getAutomationRules() {
+  return apiGet("/smart/automation-rules");
+}
+
+export function createAutomationRule(payload) {
+  return apiPost("/smart/automation-rules", payload);
+}
+
+export function triggerAutomationRule(ruleId, payload = { trigger_type: "manual", context: {} }) {
+  return apiPost(`/smart/automation-rules/${ruleId}/trigger`, payload);
+}
+
+export function getAutomationExecutions(params = {}) {
+  return apiGet("/smart/automation-executions", params);
+}
+
 export function getPlatformTenants() {
   return apiGet("/platform/tenants");
 }

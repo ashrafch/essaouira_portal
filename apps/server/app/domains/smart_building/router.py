@@ -7,6 +7,10 @@ from app.db import get_db
 from app.domains.smart_building.schemas import (
     AlertCreate,
     AlertOut,
+    AutomationExecutionOut,
+    AutomationRuleCreate,
+    AutomationRuleOut,
+    AutomationRuleUpdate,
     DeviceCommandCreate,
     DeviceCommandOut,
     DeviceCreate,
@@ -20,6 +24,14 @@ from app.domains.smart_building.schemas import (
     ProviderSyncOut,
     ProviderWebhookIn,
     ProviderWebhookOut,
+    RuleTriggerRequest,
+    SceneActionCreate,
+    SceneActionOut,
+    SceneActionUpdate,
+    SceneCreate,
+    SceneOut,
+    SceneRunRequest,
+    SceneUpdate,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
@@ -208,3 +220,123 @@ def create_alert(payload: AlertCreate, request: Request, db: Session = Depends(g
 def acknowledge_alert(alert_id: int, request: Request, db: Session = Depends(get_db)):
     username = getattr(request.state, "user", None) or "system"
     return _service(request, db).acknowledge_alert(alert_id=alert_id, username=username)
+
+
+@router.get("/scenes", response_model=list[SceneOut])
+def list_scenes(request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).list_scenes()
+
+
+@router.post("/scenes", response_model=SceneOut)
+def create_scene(payload: SceneCreate, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).create_scene(payload)
+
+
+@router.get("/scenes/{scene_id}", response_model=SceneOut)
+def get_scene(scene_id: int, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).get_scene_or_404(scene_id)
+
+
+@router.put("/scenes/{scene_id}", response_model=SceneOut)
+def update_scene(
+    scene_id: int, payload: SceneUpdate, request: Request, db: Session = Depends(get_db)
+):
+    return _service(request, db).update_scene(scene_id=scene_id, payload=payload)
+
+
+@router.get("/scenes/{scene_id}/actions", response_model=list[SceneActionOut])
+def list_scene_actions(scene_id: int, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).list_scene_actions(scene_id=scene_id)
+
+
+@router.post("/scenes/{scene_id}/actions", response_model=SceneActionOut)
+def create_scene_action(
+    scene_id: int, payload: SceneActionCreate, request: Request, db: Session = Depends(get_db)
+):
+    return _service(request, db).create_scene_action(scene_id=scene_id, payload=payload)
+
+
+@router.put("/scenes/{scene_id}/actions/{action_id}", response_model=SceneActionOut)
+def update_scene_action(
+    scene_id: int,
+    action_id: int,
+    payload: SceneActionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).update_scene_action(
+        scene_id=scene_id, action_id=action_id, payload=payload
+    )
+
+
+@router.delete("/scenes/{scene_id}/actions/{action_id}", status_code=204)
+def delete_scene_action(scene_id: int, action_id: int, request: Request, db: Session = Depends(get_db)):
+    _service(request, db).delete_scene_action(scene_id=scene_id, action_id=action_id)
+    return None
+
+
+@router.post("/scenes/{scene_id}/run", response_model=AutomationExecutionOut)
+def run_scene(
+    scene_id: int, payload: SceneRunRequest, request: Request, db: Session = Depends(get_db)
+):
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).run_scene(
+        scene_id=scene_id, requested_by=username, context=payload.context
+    )
+
+
+@router.get("/automation-rules", response_model=list[AutomationRuleOut])
+def list_automation_rules(request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).list_automation_rules()
+
+
+@router.post("/automation-rules", response_model=AutomationRuleOut)
+def create_automation_rule(
+    payload: AutomationRuleCreate, request: Request, db: Session = Depends(get_db)
+):
+    return _service(request, db).create_automation_rule(payload)
+
+
+@router.get("/automation-rules/{rule_id}", response_model=AutomationRuleOut)
+def get_automation_rule(rule_id: int, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).get_automation_rule_or_404(rule_id)
+
+
+@router.put("/automation-rules/{rule_id}", response_model=AutomationRuleOut)
+def update_automation_rule(
+    rule_id: int,
+    payload: AutomationRuleUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).update_automation_rule(rule_id=rule_id, payload=payload)
+
+
+@router.post("/automation-rules/{rule_id}/trigger", response_model=AutomationExecutionOut)
+def trigger_automation_rule(
+    rule_id: int,
+    payload: RuleTriggerRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).trigger_automation_rule(
+        rule_id=rule_id,
+        payload=payload,
+        requested_by=username,
+    )
+
+
+@router.get("/automation-executions", response_model=list[AutomationExecutionOut])
+def list_automation_executions(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    scene_id: int | None = Query(default=None),
+    rule_id: int | None = Query(default=None),
+):
+    return _service(request, db).list_automation_executions(
+        limit=limit,
+        scene_id=scene_id,
+        rule_id=rule_id,
+    )

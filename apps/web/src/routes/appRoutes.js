@@ -18,4 +18,6 @@ export const APP_ROUTES = [
   { path: "/smart-units/:id", key: "smartUnitDetail" },
   { path: "/devices", key: "devices" },
   { path: "/alerts", key: "alerts" },
+  { path: "/scenes", key: "scenes" },
+  { path: "/automation-rules", key: "automationRules" },
 ];

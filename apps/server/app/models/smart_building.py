@@ -43,6 +43,8 @@ class Device(TenantScopedMixin, Base):
     events = relationship("DeviceEvent", back_populates="device", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="device", cascade="all, delete-orphan")
     commands = relationship("DeviceCommand", back_populates="device", cascade="all, delete-orphan")
+    scene_actions = relationship("SceneAction", back_populates="target_device")
+    automation_rules = relationship("AutomationRule", back_populates="target_device")
 
 
 class DeviceState(TenantScopedMixin, Base):
@@ -127,3 +129,81 @@ class DeviceCommand(TenantScopedMixin, Base):
 
     unit = relationship("Unit")
     device = relationship("Device", back_populates="commands")
+
+
+class Scene(TenantScopedMixin, Base):
+    __tablename__ = "scenes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    actions = relationship("SceneAction", back_populates="scene", cascade="all, delete-orphan")
+    executions = relationship("AutomationExecution", back_populates="scene")
+
+
+class SceneAction(TenantScopedMixin, Base):
+    __tablename__ = "scene_actions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "scene_id", "position", name="uq_scene_actions_tenant_scene_position"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    scene_id = Column(Integer, ForeignKey("scenes.id"), nullable=False, index=True)
+    position = Column(Integer, nullable=False, default=1)
+    action_type = Column(String(64), nullable=False)
+    target_device_id = Column(Integer, ForeignKey("devices.id"), nullable=True)
+    target_unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    payload_json = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    scene = relationship("Scene", back_populates="actions")
+    target_device = relationship("Device", back_populates="scene_actions")
+    target_unit = relationship("Unit")
+
+
+class AutomationRule(TenantScopedMixin, Base):
+    __tablename__ = "automation_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(128), nullable=False)
+    description = Column(Text, nullable=True)
+    trigger_type = Column(String(64), nullable=False, default="manual", index=True)
+    trigger_filter_json = Column(Text, nullable=True)
+    action_type = Column(String(64), nullable=False)
+    target_device_id = Column(Integer, ForeignKey("devices.id"), nullable=True)
+    target_unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    payload_json = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    target_device = relationship("Device", back_populates="automation_rules")
+    target_unit = relationship("Unit")
+    executions = relationship("AutomationExecution", back_populates="rule")
+
+
+class AutomationExecution(TenantScopedMixin, Base):
+    __tablename__ = "automation_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scene_id = Column(Integer, ForeignKey("scenes.id"), nullable=True, index=True)
+    rule_id = Column(Integer, ForeignKey("automation_rules.id"), nullable=True, index=True)
+    trigger_type = Column(String(64), nullable=False, default="manual")
+    status = Column(String(16), nullable=False, default="running", index=True)
+    requested_by = Column(String(128), nullable=True)
+    context_json = Column(Text, nullable=True)
+    result_json = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+    scene = relationship("Scene", back_populates="executions")
+    rule = relationship("AutomationRule", back_populates="executions")

@@ -241,3 +241,140 @@ class SmartUnitTimelineOut(BaseModel):
     limit: int
     has_more: bool
     next_before: datetime | None = None
+
+
+class SceneBase(BaseModel):
+    name: str = Field(..., max_length=128)
+    description: str | None = None
+    is_active: bool = True
+
+
+class SceneCreate(SceneBase):
+    pass
+
+
+class SceneUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=128)
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class SceneOut(SceneBase):
+    id: int
+    tenant_id: str
+    last_run_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SceneActionBase(BaseModel):
+    position: int = Field(default=1, ge=1, le=999)
+    action_type: str = Field(..., max_length=64)
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload: dict = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class SceneActionCreate(SceneActionBase):
+    pass
+
+
+class SceneActionUpdate(BaseModel):
+    position: int | None = Field(default=None, ge=1, le=999)
+    action_type: str | None = Field(default=None, max_length=64)
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload: dict | None = None
+    is_active: bool | None = None
+
+
+class SceneActionOut(BaseModel):
+    id: int
+    tenant_id: str
+    scene_id: int
+    position: int
+    action_type: str
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload_json: str | None = None
+    is_active: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AutomationRuleBase(BaseModel):
+    name: str = Field(..., max_length=128)
+    description: str | None = None
+    trigger_type: str = Field(default="manual", max_length=64)
+    trigger_filter: dict = Field(default_factory=dict)
+    action_type: str = Field(..., max_length=64)
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload: dict = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class AutomationRuleCreate(AutomationRuleBase):
+    pass
+
+
+class AutomationRuleUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=128)
+    description: str | None = None
+    trigger_type: str | None = Field(default=None, max_length=64)
+    trigger_filter: dict | None = None
+    action_type: str | None = Field(default=None, max_length=64)
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload: dict | None = None
+    is_active: bool | None = None
+
+
+class AutomationRuleOut(BaseModel):
+    id: int
+    tenant_id: str
+    name: str
+    description: str | None = None
+    trigger_type: str
+    trigger_filter_json: str | None = None
+    action_type: str
+    target_device_id: int | None = None
+    target_unit_id: int | None = None
+    payload_json: str | None = None
+    is_active: bool
+    last_run_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SceneRunRequest(BaseModel):
+    context: dict = Field(default_factory=dict)
+
+
+class RuleTriggerRequest(BaseModel):
+    trigger_type: str = Field(default="manual", max_length=64)
+    context: dict = Field(default_factory=dict)
+
+
+class AutomationExecutionOut(BaseModel):
+    id: int
+    tenant_id: str
+    scene_id: int | None = None
+    rule_id: int | None = None
+    trigger_type: str
+    status: str
+    requested_by: str | None = None
+    context_json: str | None = None
+    result_json: str | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)

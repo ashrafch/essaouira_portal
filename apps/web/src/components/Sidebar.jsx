@@ -208,6 +208,8 @@ function Sidebar({ onNavigate = null }) {
         { to: "/smart-overview", label: "Smart overview", badge: null },
         { to: "/devices", label: "Device inventory", badge: null },
         { to: "/alerts", label: "Smart alerts", badge: null },
+        { to: "/scenes", label: "Scenes", badge: null },
+        { to: "/automation-rules", label: "Automation rules", badge: null },
       ],
     },
     {

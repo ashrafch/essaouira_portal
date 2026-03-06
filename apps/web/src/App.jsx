@@ -26,6 +26,8 @@ const SmartOverview = lazy(() => import("./pages/SmartOverview.jsx"));
 const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
 const Devices = lazy(() => import("./pages/Devices.jsx"));
 const Alerts = lazy(() => import("./pages/Alerts.jsx"));
+const Scenes = lazy(() => import("./pages/Scenes.jsx"));
+const AutomationRules = lazy(() => import("./pages/AutomationRules.jsx"));
 
 function PageFallback() {
   return (
@@ -63,6 +65,8 @@ const ROUTE_COMPONENTS = {
   smartUnitDetail: SmartUnitDetail,
   devices: Devices,
   alerts: Alerts,
+  scenes: Scenes,
+  automationRules: AutomationRules,
 };
 
 function App() {

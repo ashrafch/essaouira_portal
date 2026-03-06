@@ -11,23 +11,44 @@ from app.domains.smart_building.providers.factory import get_provider
 from app.domains.smart_building.providers.base import ProviderCommandRequest
 from app.domains.smart_building.schemas import (
     AlertCreate,
+    AutomationRuleCreate,
+    AutomationRuleUpdate,
     DeviceCommandCreate,
     DeviceCreate,
     DeviceEventCreate,
     DeviceStateUpdate,
     DeviceUpdate,
+    RuleTriggerRequest,
+    SceneActionCreate,
+    SceneActionUpdate,
+    SceneCreate,
+    SceneUpdate,
 )
 from app.models.booking import Booking
 from app.models.maintenance import MaintenanceTicket
 from app.models.staff_task import StaffTask
 from app.models.unit import Unit
-from app.models.smart_building import Alert, Device, DeviceCommand, DeviceEvent, DeviceState
+from app.models.smart_building import (
+    Alert,
+    AutomationExecution,
+    AutomationRule,
+    Device,
+    DeviceCommand,
+    DeviceEvent,
+    DeviceState,
+    Scene,
+    SceneAction,
+)
 
 
 SUPPORTED_COMMAND_STATUSES = {"pending", "accepted", "executed", "failed", "expired"}
 POWER_CATEGORIES = {"smart_relay", "smart_light", "smart_plug", "relay", "light"}
 CLIMATE_CATEGORIES = {"climate_controller", "thermostat", "hvac_controller"}
 LOCK_CATEGORIES = {"smart_lock", "lock_controller"}
+SCENE_ACTION_TYPES = {"device_command", "create_alert", "create_maintenance_ticket", "create_staff_task"}
+RULE_TRIGGER_TYPES = {"booking_checked_in", "booking_checked_out", "alert_raised", "manual"}
+RULE_ACTION_TYPES = {"device_command", "create_alert", "create_maintenance_ticket", "create_staff_task"}
+AUTOMATION_EXECUTION_STATUSES = {"running", "executed", "failed", "partial"}
 
 
 class SmartBuildingService:
@@ -37,6 +58,46 @@ class SmartBuildingService:
 
     def list_devices(self) -> list[Device]:
         return self.db.query(Device).order_by(Device.id.asc()).all()
+
+    def _safe_json_dumps(self, value: dict | None) -> str | None:
+        if value is None:
+            return None
+        return json.dumps(value, ensure_ascii=True)
+
+    def _safe_json_loads(self, value: str | None) -> dict:
+        if not value:
+            return {}
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _validate_scene_action_type(self, action_type: str) -> str:
+        normalized = (action_type or "").strip().lower()
+        if normalized not in SCENE_ACTION_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo azione scena non supportato")
+        return normalized
+
+    def _validate_rule_trigger_type(self, trigger_type: str) -> str:
+        normalized = (trigger_type or "").strip().lower()
+        if normalized not in RULE_TRIGGER_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo trigger regola non supportato")
+        return normalized
+
+    def _validate_rule_action_type(self, action_type: str) -> str:
+        normalized = (action_type or "").strip().lower()
+        if normalized not in RULE_ACTION_TYPES:
+            raise HTTPException(status_code=400, detail="Tipo azione regola non supportato")
+        return normalized
+
+    def _validate_target_unit(self, target_unit_id: int | None) -> int | None:
+        if target_unit_id is None:
+            return None
+        exists = self.db.query(Unit).filter(Unit.id == target_unit_id).first()
+        if exists is None:
+            raise HTTPException(status_code=400, detail="Unita target non trovata")
+        return target_unit_id
 
     def _as_utc_datetime(self, value: datetime | None) -> datetime | None:
         if value is None:
@@ -822,6 +883,402 @@ class SmartBuildingService:
         self.db.commit()
         self.db.refresh(alert)
         return alert
+
+    def list_scenes(self) -> list[Scene]:
+        return self.db.query(Scene).order_by(Scene.name.asc(), Scene.id.asc()).all()
+
+    def get_scene_or_404(self, scene_id: int) -> Scene:
+        scene = self.db.query(Scene).filter(Scene.id == scene_id).first()
+        if scene is None:
+            raise HTTPException(status_code=404, detail="Scena non trovata")
+        return scene
+
+    def create_scene(self, payload: SceneCreate) -> Scene:
+        scene = Scene(
+            name=payload.name.strip(),
+            description=payload.description,
+            is_active=payload.is_active,
+        )
+        self.db.add(scene)
+        self.db.commit()
+        self.db.refresh(scene)
+        return scene
+
+    def update_scene(self, scene_id: int, payload: SceneUpdate) -> Scene:
+        scene = self.get_scene_or_404(scene_id)
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            if key == "name" and value is not None:
+                setattr(scene, key, value.strip())
+            else:
+                setattr(scene, key, value)
+        self.db.commit()
+        self.db.refresh(scene)
+        return scene
+
+    def list_scene_actions(self, scene_id: int) -> list[SceneAction]:
+        self.get_scene_or_404(scene_id)
+        return (
+            self.db.query(SceneAction)
+            .filter(SceneAction.scene_id == scene_id)
+            .order_by(SceneAction.position.asc(), SceneAction.id.asc())
+            .all()
+        )
+
+    def create_scene_action(self, scene_id: int, payload: SceneActionCreate) -> SceneAction:
+        scene = self.get_scene_or_404(scene_id)
+        action_type = self._validate_scene_action_type(payload.action_type)
+        target_device_id = payload.target_device_id
+        if target_device_id is not None:
+            self.get_device_or_404(target_device_id)
+        target_unit_id = self._validate_target_unit(payload.target_unit_id)
+        action = SceneAction(
+            scene_id=scene.id,
+            position=payload.position,
+            action_type=action_type,
+            target_device_id=target_device_id,
+            target_unit_id=target_unit_id,
+            payload_json=self._safe_json_dumps(payload.payload),
+            is_active=payload.is_active,
+        )
+        self.db.add(action)
+        self.db.commit()
+        self.db.refresh(action)
+        return action
+
+    def update_scene_action(
+        self, scene_id: int, action_id: int, payload: SceneActionUpdate
+    ) -> SceneAction:
+        self.get_scene_or_404(scene_id)
+        action = (
+            self.db.query(SceneAction)
+            .filter(SceneAction.id == action_id, SceneAction.scene_id == scene_id)
+            .first()
+        )
+        if action is None:
+            raise HTTPException(status_code=404, detail="Azione scena non trovata")
+
+        values = payload.model_dump(exclude_unset=True)
+        if "action_type" in values and values["action_type"] is not None:
+            values["action_type"] = self._validate_scene_action_type(values["action_type"])
+        if "target_device_id" in values and values["target_device_id"] is not None:
+            self.get_device_or_404(values["target_device_id"])
+        if "target_unit_id" in values:
+            values["target_unit_id"] = self._validate_target_unit(values["target_unit_id"])
+        if "payload" in values:
+            values["payload_json"] = self._safe_json_dumps(values.pop("payload"))
+
+        for key, value in values.items():
+            setattr(action, key, value)
+
+        self.db.commit()
+        self.db.refresh(action)
+        return action
+
+    def delete_scene_action(self, scene_id: int, action_id: int) -> None:
+        self.get_scene_or_404(scene_id)
+        action = (
+            self.db.query(SceneAction)
+            .filter(SceneAction.id == action_id, SceneAction.scene_id == scene_id)
+            .first()
+        )
+        if action is None:
+            raise HTTPException(status_code=404, detail="Azione scena non trovata")
+        self.db.delete(action)
+        self.db.commit()
+
+    def list_automation_rules(self) -> list[AutomationRule]:
+        return self.db.query(AutomationRule).order_by(AutomationRule.name.asc(), AutomationRule.id.asc()).all()
+
+    def get_automation_rule_or_404(self, rule_id: int) -> AutomationRule:
+        rule = self.db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+        if rule is None:
+            raise HTTPException(status_code=404, detail="Regola automazione non trovata")
+        return rule
+
+    def create_automation_rule(self, payload: AutomationRuleCreate) -> AutomationRule:
+        trigger_type = self._validate_rule_trigger_type(payload.trigger_type)
+        action_type = self._validate_rule_action_type(payload.action_type)
+        target_device_id = payload.target_device_id
+        if target_device_id is not None:
+            self.get_device_or_404(target_device_id)
+        target_unit_id = self._validate_target_unit(payload.target_unit_id)
+        rule = AutomationRule(
+            name=payload.name.strip(),
+            description=payload.description,
+            trigger_type=trigger_type,
+            trigger_filter_json=self._safe_json_dumps(payload.trigger_filter),
+            action_type=action_type,
+            target_device_id=target_device_id,
+            target_unit_id=target_unit_id,
+            payload_json=self._safe_json_dumps(payload.payload),
+            is_active=payload.is_active,
+        )
+        self.db.add(rule)
+        self.db.commit()
+        self.db.refresh(rule)
+        return rule
+
+    def update_automation_rule(self, rule_id: int, payload: AutomationRuleUpdate) -> AutomationRule:
+        rule = self.get_automation_rule_or_404(rule_id)
+        values = payload.model_dump(exclude_unset=True)
+        if "trigger_type" in values and values["trigger_type"] is not None:
+            values["trigger_type"] = self._validate_rule_trigger_type(values["trigger_type"])
+        if "action_type" in values and values["action_type"] is not None:
+            values["action_type"] = self._validate_rule_action_type(values["action_type"])
+        if "target_device_id" in values and values["target_device_id"] is not None:
+            self.get_device_or_404(values["target_device_id"])
+        if "target_unit_id" in values:
+            values["target_unit_id"] = self._validate_target_unit(values["target_unit_id"])
+        if "trigger_filter" in values:
+            values["trigger_filter_json"] = self._safe_json_dumps(values.pop("trigger_filter"))
+        if "payload" in values:
+            values["payload_json"] = self._safe_json_dumps(values.pop("payload"))
+        if "name" in values and values["name"] is not None:
+            values["name"] = values["name"].strip()
+        for key, value in values.items():
+            setattr(rule, key, value)
+        self.db.commit()
+        self.db.refresh(rule)
+        return rule
+
+    def list_automation_executions(
+        self, limit: int = 50, scene_id: int | None = None, rule_id: int | None = None
+    ) -> list[AutomationExecution]:
+        query = self.db.query(AutomationExecution)
+        if scene_id is not None:
+            query = query.filter(AutomationExecution.scene_id == scene_id)
+        if rule_id is not None:
+            query = query.filter(AutomationExecution.rule_id == rule_id)
+        query = query.order_by(AutomationExecution.started_at.desc(), AutomationExecution.id.desc())
+        return query.limit(max(1, min(limit, 200))).all()
+
+    def _create_execution(
+        self,
+        *,
+        scene_id: int | None,
+        rule_id: int | None,
+        trigger_type: str,
+        requested_by: str | None,
+        context: dict | None,
+    ) -> AutomationExecution:
+        execution = AutomationExecution(
+            scene_id=scene_id,
+            rule_id=rule_id,
+            trigger_type=trigger_type,
+            status="running",
+            requested_by=requested_by or "system",
+            context_json=self._safe_json_dumps(context or {}),
+        )
+        self.db.add(execution)
+        self.db.commit()
+        self.db.refresh(execution)
+        return execution
+
+    def _finalize_execution(
+        self,
+        execution: AutomationExecution,
+        *,
+        results: list[dict],
+        failures: list[dict],
+        reference_updated=None,
+    ) -> AutomationExecution:
+        now = datetime.now(timezone.utc)
+        if failures and results:
+            status = "partial"
+        elif failures:
+            status = "failed"
+        else:
+            status = "executed"
+        if status not in AUTOMATION_EXECUTION_STATUSES:
+            status = "failed"
+
+        execution.status = status
+        execution.result_json = self._safe_json_dumps(
+            {
+                "results": results,
+                "failures": failures,
+                "result_count": len(results),
+                "failure_count": len(failures),
+            }
+        )
+        execution.error_message = failures[0].get("error") if failures else None
+        execution.finished_at = now
+        if reference_updated is not None:
+            reference_updated.last_run_at = now
+        self.db.commit()
+        self.db.refresh(execution)
+        return execution
+
+    def _execute_action(
+        self,
+        *,
+        action_type: str,
+        target_device_id: int | None,
+        target_unit_id: int | None,
+        payload: dict,
+        requested_by: str | None,
+    ) -> dict:
+        normalized = (action_type or "").strip().lower()
+        if normalized == "device_command":
+            if target_device_id is None:
+                raise HTTPException(status_code=400, detail="device_command richiede target_device_id")
+            command_type = str(payload.get("command_type", "")).strip().lower()
+            command_payload = payload.get("payload", {}) if isinstance(payload.get("payload", {}), dict) else {}
+            ttl_seconds = payload.get("ttl_seconds", 300)
+            command = self.create_device_command(
+                target_device_id,
+                DeviceCommandCreate(
+                    command_type=command_type,
+                    payload=command_payload,
+                    ttl_seconds=ttl_seconds,
+                ),
+                requested_by=requested_by,
+            )
+            return {
+                "entity": "device_command",
+                "id": command.id,
+                "status": command.status,
+                "device_id": command.device_id,
+            }
+
+        if normalized == "create_alert":
+            alert = self.create_alert(
+                AlertCreate(
+                    unit_id=target_unit_id or payload.get("unit_id"),
+                    device_id=target_device_id or payload.get("device_id"),
+                    alert_type=str(payload.get("alert_type") or "automation_alert"),
+                    severity=str(payload.get("severity") or "warning"),
+                    title=str(payload.get("title") or "Automation alert"),
+                    description=payload.get("description"),
+                )
+            )
+            return {"entity": "alert", "id": alert.id, "status": alert.status}
+
+        if normalized == "create_maintenance_ticket":
+            unit_id = target_unit_id or payload.get("unit_id")
+            self._validate_target_unit(unit_id)
+            ticket = MaintenanceTicket(
+                title=str(payload.get("title") or "Automation maintenance ticket"),
+                description=payload.get("description"),
+                unit_id=unit_id,
+                status=str(payload.get("status") or "todo"),
+                priority=str(payload.get("priority") or "medium"),
+                ticket_type=str(payload.get("ticket_type") or "repair"),
+                currency=str(payload.get("currency") or "EUR"),
+            )
+            self.db.add(ticket)
+            self.db.commit()
+            self.db.refresh(ticket)
+            return {"entity": "maintenance_ticket", "id": ticket.id, "status": ticket.status}
+
+        if normalized == "create_staff_task":
+            unit_id = target_unit_id or payload.get("unit_id")
+            self._validate_target_unit(unit_id)
+            date_raw = payload.get("date")
+            task_date = date.today()
+            if isinstance(date_raw, str) and date_raw.strip():
+                try:
+                    task_date = date.fromisoformat(date_raw.strip())
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail="Formato data task non valido") from exc
+            time_raw = payload.get("time")
+            task_time = None
+            if isinstance(time_raw, str) and time_raw.strip():
+                try:
+                    task_time = time.fromisoformat(time_raw.strip())
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail="Formato ora task non valido") from exc
+            task = StaffTask(
+                unit_id=unit_id,
+                date=task_date,
+                time=task_time,
+                task_type=str(payload.get("task_type") or "automation"),
+                assignee_name=payload.get("assignee_name"),
+                status=str(payload.get("status") or "planned"),
+                notes=payload.get("notes"),
+                cost=payload.get("cost"),
+                currency=str(payload.get("currency") or "EUR"),
+            )
+            self.db.add(task)
+            self.db.commit()
+            self.db.refresh(task)
+            return {"entity": "staff_task", "id": task.id, "status": task.status}
+
+        raise HTTPException(status_code=400, detail="Azione non supportata")
+
+    def run_scene(
+        self, scene_id: int, requested_by: str | None = None, context: dict | None = None
+    ) -> AutomationExecution:
+        scene = self.get_scene_or_404(scene_id)
+        if not scene.is_active:
+            raise HTTPException(status_code=400, detail="Scena disattivata")
+
+        actions = (
+            self.db.query(SceneAction)
+            .filter(SceneAction.scene_id == scene_id, SceneAction.is_active.is_(True))
+            .order_by(SceneAction.position.asc(), SceneAction.id.asc())
+            .all()
+        )
+        if not actions:
+            raise HTTPException(status_code=400, detail="Scena senza azioni attive")
+
+        execution = self._create_execution(
+            scene_id=scene.id,
+            rule_id=None,
+            trigger_type="manual",
+            requested_by=requested_by,
+            context=context,
+        )
+        results: list[dict] = []
+        failures: list[dict] = []
+        for action in actions:
+            payload = self._safe_json_loads(action.payload_json)
+            try:
+                outcome = self._execute_action(
+                    action_type=action.action_type,
+                    target_device_id=action.target_device_id,
+                    target_unit_id=action.target_unit_id,
+                    payload=payload,
+                    requested_by=requested_by,
+                )
+                results.append({"action_id": action.id, "action_type": action.action_type, "outcome": outcome})
+            except HTTPException as exc:
+                failures.append({"action_id": action.id, "error": exc.detail})
+            except Exception as exc:  # pragma: no cover - fallback guardrail
+                failures.append({"action_id": action.id, "error": str(exc)})
+        return self._finalize_execution(execution, results=results, failures=failures, reference_updated=scene)
+
+    def trigger_automation_rule(
+        self, rule_id: int, payload: RuleTriggerRequest, requested_by: str | None = None
+    ) -> AutomationExecution:
+        rule = self.get_automation_rule_or_404(rule_id)
+        if not rule.is_active:
+            raise HTTPException(status_code=400, detail="Regola disattivata")
+        trigger_type = self._validate_rule_trigger_type(payload.trigger_type)
+
+        execution = self._create_execution(
+            scene_id=None,
+            rule_id=rule.id,
+            trigger_type=trigger_type,
+            requested_by=requested_by,
+            context=payload.context,
+        )
+        results: list[dict] = []
+        failures: list[dict] = []
+        try:
+            outcome = self._execute_action(
+                action_type=rule.action_type,
+                target_device_id=rule.target_device_id,
+                target_unit_id=rule.target_unit_id,
+                payload=self._safe_json_loads(rule.payload_json),
+                requested_by=requested_by,
+            )
+            results.append({"rule_id": rule.id, "action_type": rule.action_type, "outcome": outcome})
+        except HTTPException as exc:
+            failures.append({"rule_id": rule.id, "error": exc.detail})
+        except Exception as exc:  # pragma: no cover - fallback guardrail
+            failures.append({"rule_id": rule.id, "error": str(exc)})
+        return self._finalize_execution(execution, results=results, failures=failures, reference_updated=rule)
 
     def smart_overview(self) -> dict[str, int]:
         total_devices = self.db.query(func.count(Device.id)).scalar() or 0
