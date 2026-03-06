@@ -10,6 +10,7 @@ import {
   getStaffMembers,
   getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
+import { getCurrentRole } from "../services/auth";
 
 function formatDate(d) {
   if (!d) return "";
@@ -87,6 +88,9 @@ function Staff() {
   const [currency, setCurrency] = useState("EUR");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const canManageDefaults = ["owner", "manager"].includes(
+    (getCurrentRole() || "viewer").toLowerCase()
+  );
   const [staffPage, setStaffPage] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1600
@@ -1132,12 +1136,17 @@ function Staff() {
                 <button
                   type="submit"
                   style={{ ...buttonPrimary, marginTop: 8 }}
-                  disabled={defaultsSaving}
+                  disabled={defaultsSaving || !canManageDefaults}
                 >
                   {defaultsSaving
                     ? "Salvataggio..."
                     : "Salva impostazioni automatiche"}
                 </button>
+                {!canManageDefaults && (
+                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+                    Ruolo in sola operativita': puoi leggere i default ma non modificarli.
+                  </p>
+                )}
                 {defaultsMessage && (
                   <p
                     style={{
