@@ -215,3 +215,29 @@ class DeviceCommandOut(BaseModel):
     result_json: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SmartUnitTimelineItemOut(BaseModel):
+    timeline_id: str
+    category: str
+    event_type: str
+    source: str
+    severity: str
+    title: str
+    description: str | None = None
+    occurred_at: datetime
+    unit_id: int
+    device_id: int | None = None
+    alert_id: int | None = None
+    command_id: int | None = None
+    booking_id: int | None = None
+    task_id: int | None = None
+    maintenance_id: int | None = None
+
+
+class SmartUnitTimelineOut(BaseModel):
+    unit: SmartUnitOut
+    items: list[SmartUnitTimelineItemOut]
+    limit: int
+    has_more: bool
+    next_before: datetime | None = None

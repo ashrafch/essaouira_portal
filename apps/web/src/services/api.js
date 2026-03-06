@@ -407,6 +407,10 @@ export function getSmartUnitDetail(unitId, params = {}) {
   return apiGet(`/smart/units/${unitId}`, params);
 }
 
+export function getSmartUnitTimeline(unitId, params = {}) {
+  return apiGet(`/smart/units/${unitId}/timeline`, params);
+}
+
 export function getDevices() {
   return apiGet("/smart/devices");
 }

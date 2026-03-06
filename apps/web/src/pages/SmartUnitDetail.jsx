@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import PageInfoHelp from "../components/PageInfoHelp";
 import useIsMobile from "../hooks/useIsMobile";
-import { getSmartUnitDetail } from "../services/api";
+import { getSmartUnitDetail, getSmartUnitTimeline } from "../services/api";
 
 function badge(bg, color, border = "transparent") {
   return {
@@ -41,6 +41,12 @@ function SmartUnitDetail() {
   const { id } = useParams();
   const unitId = Number(id);
   const [data, setData] = useState(null);
+  const [timeline, setTimeline] = useState([]);
+  const [timelineHasMore, setTimelineHasMore] = useState(false);
+  const [timelineNextBefore, setTimelineNextBefore] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(true);
+  const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
+  const [timelineError, setTimelineError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -52,13 +58,23 @@ function SmartUnitDetail() {
     }
     setLoading(true);
     setError("");
+    setTimelineLoading(true);
+    setTimelineError("");
     try {
-      const payload = await getSmartUnitDetail(unitId, { events_limit: 30 });
+      const [payload, timelinePayload] = await Promise.all([
+        getSmartUnitDetail(unitId, { events_limit: 30 }),
+        getSmartUnitTimeline(unitId, { limit: 25 }),
+      ]);
       setData(payload || null);
+      setTimeline(timelinePayload?.items || []);
+      setTimelineHasMore(Boolean(timelinePayload?.has_more));
+      setTimelineNextBefore(timelinePayload?.next_before || null);
     } catch (err) {
       setError(err.message || "Errore caricando dettaglio smart unita");
+      setTimelineError(err.message || "Errore caricando timeline unita");
     } finally {
       setLoading(false);
+      setTimelineLoading(false);
     }
   }, [unitId]);
 
@@ -81,6 +97,24 @@ function SmartUnitDetail() {
     border: "1px solid #e2e8f0",
     boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
   };
+
+  async function loadMoreTimeline() {
+    if (!timelineHasMore || !timelineNextBefore) return;
+    setTimelineLoadingMore(true);
+    try {
+      const more = await getSmartUnitTimeline(unitId, {
+        limit: 25,
+        before: timelineNextBefore,
+      });
+      setTimeline((prev) => [...prev, ...(more?.items || [])]);
+      setTimelineHasMore(Boolean(more?.has_more));
+      setTimelineNextBefore(more?.next_before || null);
+    } catch (err) {
+      setTimelineError(err.message || "Errore caricando timeline aggiuntiva");
+    } finally {
+      setTimelineLoadingMore(false);
+    }
+  }
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -247,37 +281,70 @@ function SmartUnitDetail() {
           </div>
 
           <div style={card}>
-            <h3 style={{ marginTop: 0, marginBottom: 10, fontSize: 15 }}>Eventi recenti</h3>
-            {(data.events_recent || []).length === 0 ? (
-              <div style={{ fontSize: 13, color: "#64748b" }}>Nessun evento registrato per questa unita.</div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Quando</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Tipo</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Severita</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Source</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "6px 4px" }}>Device</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.events_recent.map((event) => (
-                      <tr key={event.id}>
-                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>{formatDateTime(event.occurred_at)}</td>
-                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px", fontWeight: 600 }}>{event.event_type}</td>
-                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>
-                          <span style={severityBadge(event.severity)}>{event.severity}</span>
-                        </td>
-                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>{event.source}</td>
-                        <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 4px" }}>#{event.device_id}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <h3 style={{ marginTop: 0, marginBottom: 10, fontSize: 15 }}>Timeline unificata unità</h3>
+            <p style={{ marginTop: 0, fontSize: 12, color: "#64748b" }}>
+              Eventi smart + operativi rilevanti (booking, task staff, manutenzione).
+            </p>
+            {timelineLoading ? (
+              <div style={{ fontSize: 13, color: "#64748b" }}>Caricamento timeline...</div>
+            ) : null}
+            {timelineError ? (
+              <div style={{ fontSize: 13, color: "#b91c1c" }}>{timelineError}</div>
+            ) : null}
+            {!timelineLoading && !timelineError && timeline.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#64748b" }}>Nessun evento timeline per questa unità.</div>
+            ) : null}
+            {!timelineLoading && !timelineError && timeline.length > 0 ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {timeline.map((item) => (
+                  <div
+                    key={item.timeline_id}
+                    style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#fff" }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 700 }}>{item.title}</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <span style={badge("#eef2ff", "#3730a3", "#c7d2fe")}>{item.category}</span>
+                        <span style={severityBadge(item.severity)}>{item.severity}</span>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#334155" }}>{item.event_type}</div>
+                    {item.description ? (
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>{item.description}</div>
+                    ) : null}
+                    <div style={{ marginTop: 6, fontSize: 11, color: "#64748b", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <span>{formatDateTime(item.occurred_at)}</span>
+                      <span>source: {item.source}</span>
+                      {item.device_id ? <span>device #{item.device_id}</span> : null}
+                      {item.alert_id ? <span>alert #{item.alert_id}</span> : null}
+                      {item.command_id ? <span>cmd #{item.command_id}</span> : null}
+                      {item.booking_id ? <span>booking #{item.booking_id}</span> : null}
+                      {item.task_id ? <span>task #{item.task_id}</span> : null}
+                      {item.maintenance_id ? <span>mnt #{item.maintenance_id}</span> : null}
+                    </div>
+                  </div>
+                ))}
+                {timelineHasMore ? (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={loadMoreTimeline}
+                      disabled={timelineLoadingMore}
+                      style={{
+                        borderRadius: 999,
+                        border: "1px solid #d1d5db",
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        background: "white",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {timelineLoadingMore ? "Caricamento..." : "Carica altri eventi"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            )}
+            ) : null}
           </div>
         </>
       ) : null}

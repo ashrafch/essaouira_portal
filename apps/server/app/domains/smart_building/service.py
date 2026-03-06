@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_
@@ -17,6 +17,9 @@ from app.domains.smart_building.schemas import (
     DeviceStateUpdate,
     DeviceUpdate,
 )
+from app.models.booking import Booking
+from app.models.maintenance import MaintenanceTicket
+from app.models.staff_task import StaffTask
 from app.models.unit import Unit
 from app.models.smart_building import Alert, Device, DeviceCommand, DeviceEvent, DeviceState
 
@@ -34,6 +37,19 @@ class SmartBuildingService:
 
     def list_devices(self) -> list[Device]:
         return self.db.query(Device).order_by(Device.id.asc()).all()
+
+    def _as_utc_datetime(self, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def _combine_date_time(self, day: date | None, at: time | None = None) -> datetime | None:
+        if day is None:
+            return None
+        base = datetime.combine(day, at or time(hour=0, minute=0, second=0))
+        return base.replace(tzinfo=timezone.utc)
 
     def get_unit_smart_detail(self, unit_id: int, events_limit: int = 50) -> dict[str, object]:
         unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
@@ -108,6 +124,227 @@ class SmartBuildingService:
             "alerts_open": open_alerts,
             "alerts_resolved": resolved_alerts,
             "events_recent": events,
+        }
+
+    def get_unit_timeline(
+        self, unit_id: int, limit: int = 50, before: datetime | None = None
+    ) -> dict[str, object]:
+        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
+        if unit is None:
+            raise HTTPException(status_code=404, detail="Unita non trovata")
+
+        safe_limit = max(1, min(limit, 200))
+        scan_limit = max(60, min(safe_limit * 6, 600))
+        before_utc = self._as_utc_datetime(before)
+        items: list[dict[str, object]] = []
+
+        smart_events_query = self.db.query(DeviceEvent).outerjoin(Device, DeviceEvent.device_id == Device.id)
+        smart_events_query = smart_events_query.filter(
+            or_(
+                DeviceEvent.unit_id == unit_id,
+                and_(DeviceEvent.unit_id.is_(None), Device.unit_id == unit_id),
+            )
+        ).order_by(DeviceEvent.occurred_at.desc(), DeviceEvent.id.desc())
+        smart_events = smart_events_query.limit(scan_limit).all()
+        for event in smart_events:
+            occurred = self._as_utc_datetime(event.occurred_at)
+            if occurred is None:
+                continue
+            items.append(
+                {
+                    "timeline_id": f"smart-event-{event.id}",
+                    "category": "smart",
+                    "event_type": event.event_type,
+                    "source": f"smart.event:{event.source}",
+                    "severity": event.severity or "info",
+                    "title": f"Device event: {event.event_type}",
+                    "description": event.payload_json,
+                    "occurred_at": occurred,
+                    "unit_id": unit_id,
+                    "device_id": event.device_id,
+                }
+            )
+
+        alerts = (
+            self.db.query(Alert)
+            .filter(Alert.unit_id == unit_id)
+            .order_by(Alert.last_seen_at.desc(), Alert.id.desc())
+            .limit(scan_limit)
+            .all()
+        )
+        for alert in alerts:
+            occurred = self._as_utc_datetime(alert.last_seen_at or alert.first_seen_at)
+            if occurred is None:
+                continue
+            status = (alert.status or "open").strip().lower()
+            severity = alert.severity or ("warning" if status == "open" else "info")
+            items.append(
+                {
+                    "timeline_id": f"smart-alert-{alert.id}",
+                    "category": "smart",
+                    "event_type": f"alert_{status}",
+                    "source": "smart.alert",
+                    "severity": severity,
+                    "title": alert.title,
+                    "description": alert.description or f"Alert {alert.alert_type} ({status})",
+                    "occurred_at": occurred,
+                    "unit_id": unit_id,
+                    "device_id": alert.device_id,
+                    "alert_id": alert.id,
+                }
+            )
+
+        commands = (
+            self.db.query(DeviceCommand)
+            .filter(DeviceCommand.unit_id == unit_id)
+            .order_by(DeviceCommand.requested_at.desc(), DeviceCommand.id.desc())
+            .limit(scan_limit)
+            .all()
+        )
+        for command in commands:
+            occurred = self._as_utc_datetime(
+                command.executed_at
+                or command.failed_at
+                or command.expired_at
+                or command.accepted_at
+                or command.requested_at
+            )
+            if occurred is None:
+                continue
+            command_status = (command.status or "pending").strip().lower()
+            items.append(
+                {
+                    "timeline_id": f"smart-command-{command.id}",
+                    "category": "smart",
+                    "event_type": f"command_{command_status}",
+                    "source": f"smart.command:{command.provider}",
+                    "severity": "warning" if command_status in {"failed", "expired"} else "info",
+                    "title": f"Command {command.command_type}",
+                    "description": command.error_message
+                    or command.result_json
+                    or f"Status: {command_status}",
+                    "occurred_at": occurred,
+                    "unit_id": unit_id,
+                    "device_id": command.device_id,
+                    "command_id": command.id,
+                }
+            )
+
+        bookings = (
+            self.db.query(Booking)
+            .filter(Booking.unit_id == unit_id)
+            .order_by(Booking.checkin_date.desc(), Booking.id.desc())
+            .limit(scan_limit)
+            .all()
+        )
+        for booking in bookings:
+            checkin_dt = self._combine_date_time(booking.checkin_date, booking.estimated_arrival_time)
+            checkout_dt = self._combine_date_time(booking.checkout_date, time(hour=11, minute=0))
+            if checkin_dt is not None:
+                items.append(
+                    {
+                        "timeline_id": f"ops-booking-checkin-{booking.id}-{booking.checkin_date.isoformat()}",
+                        "category": "pms",
+                        "event_type": "booking_checkin",
+                        "source": "pms.booking",
+                        "severity": "info",
+                        "title": f"Check-in {booking.guest_name}",
+                        "description": f"Sorgente {booking.source} - {booking.checkin_date.isoformat()}",
+                        "occurred_at": checkin_dt,
+                        "unit_id": unit_id,
+                        "booking_id": booking.id,
+                    }
+                )
+            if checkout_dt is not None:
+                items.append(
+                    {
+                        "timeline_id": f"ops-booking-checkout-{booking.id}-{booking.checkout_date.isoformat()}",
+                        "category": "pms",
+                        "event_type": "booking_checkout",
+                        "source": "pms.booking",
+                        "severity": "info",
+                        "title": f"Check-out {booking.guest_name}",
+                        "description": f"Checkout previsto {booking.checkout_date.isoformat()}",
+                        "occurred_at": checkout_dt,
+                        "unit_id": unit_id,
+                        "booking_id": booking.id,
+                    }
+                )
+
+        tasks = (
+            self.db.query(StaffTask)
+            .filter(StaffTask.unit_id == unit_id)
+            .order_by(StaffTask.date.desc(), StaffTask.id.desc())
+            .limit(scan_limit)
+            .all()
+        )
+        for task in tasks:
+            occurred = self._combine_date_time(task.date, task.time)
+            if occurred is None:
+                continue
+            status = (task.status or "planned").strip().lower()
+            items.append(
+                {
+                    "timeline_id": f"ops-task-{task.id}",
+                    "category": "ops",
+                    "event_type": f"staff_task_{status}",
+                    "source": "ops.staff_task",
+                    "severity": "info" if status in {"done", "planned"} else "warning",
+                    "title": f"Task {task.task_type}",
+                    "description": task.notes
+                    or f"Assegnato a {task.assignee_name or 'n/d'} - stato {status}",
+                    "occurred_at": occurred,
+                    "unit_id": unit_id,
+                    "booking_id": task.booking_id,
+                    "task_id": task.id,
+                }
+            )
+
+        tickets = (
+            self.db.query(MaintenanceTicket)
+            .filter(MaintenanceTicket.unit_id == unit_id)
+            .order_by(
+                MaintenanceTicket.updated_at.desc(),
+                MaintenanceTicket.created_at.desc(),
+                MaintenanceTicket.id.desc(),
+            )
+            .limit(scan_limit)
+            .all()
+        )
+        for ticket in tickets:
+            occurred = self._as_utc_datetime(ticket.updated_at or ticket.created_at)
+            if occurred is None:
+                continue
+            status = (ticket.status or "todo").strip().lower()
+            items.append(
+                {
+                    "timeline_id": f"ops-maintenance-{ticket.id}",
+                    "category": "ops",
+                    "event_type": f"maintenance_{status}",
+                    "source": "ops.maintenance",
+                    "severity": "warning" if status in {"todo", "in_progress"} else "info",
+                    "title": ticket.title,
+                    "description": ticket.description or f"Priority {ticket.priority} - status {status}",
+                    "occurred_at": occurred,
+                    "unit_id": unit_id,
+                    "maintenance_id": ticket.id,
+                }
+            )
+
+        if before_utc is not None:
+            items = [item for item in items if item["occurred_at"] < before_utc]
+
+        items.sort(key=lambda item: (item["occurred_at"], item["timeline_id"]), reverse=True)
+        has_more = len(items) > safe_limit
+        sliced = items[:safe_limit]
+        next_before = sliced[-1]["occurred_at"] if has_more and sliced else None
+
+        return {
+            "unit": unit,
+            "items": sliced,
+            "limit": safe_limit,
+            "has_more": has_more,
+            "next_before": next_before,
         }
 
     def provider_debug(self, provider_name: str | None = None) -> dict[str, object]:

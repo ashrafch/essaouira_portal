@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,7 @@ from app.domains.smart_building.schemas import (
     ProviderWebhookIn,
     ProviderWebhookOut,
     SmartUnitDetailOut,
+    SmartUnitTimelineOut,
     SmartOverviewOut,
 )
 from app.domains.smart_building.service import SmartBuildingService
@@ -47,6 +50,17 @@ def get_smart_unit_detail(
     events_limit: int = Query(default=50, ge=1, le=200),
 ):
     return _service(request, db).get_unit_smart_detail(unit_id=unit_id, events_limit=events_limit)
+
+
+@router.get("/units/{unit_id}/timeline", response_model=SmartUnitTimelineOut)
+def get_smart_unit_timeline(
+    unit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    before: datetime | None = Query(default=None),
+):
+    return _service(request, db).get_unit_timeline(unit_id=unit_id, limit=limit, before=before)
 
 
 @router.get("/providers/debug", response_model=ProviderDebugOut)

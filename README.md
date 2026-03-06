@@ -140,6 +140,7 @@ Smart Building Foundation (Nuova fase):
 - trigger command: `POST /smart/devices/{id}/commands`
 - command status: `pending|accepted|executed|failed|expired`
 - command scope iniziale: relay/light on-off, climate mode/setpoint, smart lock placeholder
+- timeline unificata unità: `GET /smart/units/{unit_id}/timeline?limit=50&before=<ISO_DATETIME>`
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)
