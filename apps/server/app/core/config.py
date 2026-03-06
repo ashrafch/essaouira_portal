@@ -16,6 +16,10 @@ class Settings:
     auth_access_token_minutes: int = int(os.getenv("AUTH_ACCESS_TOKEN_MINUTES", "720"))
     admin_username: str = os.getenv("ADMIN_USERNAME", "owner")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "owner123")
+    admin_password_hash: str = os.getenv("ADMIN_PASSWORD_HASH", "")
+    admin_role: str = os.getenv("ADMIN_ROLE", "owner")
+    admin_tenant_id: str = os.getenv("ADMIN_TENANT_ID", "default")
+    password_min_length: int = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
     auto_create_schema: bool = _as_bool(os.getenv("AUTO_CREATE_SCHEMA"), True)
     auto_seed_data: bool = _as_bool(os.getenv("AUTO_SEED_DATA"), True)
 

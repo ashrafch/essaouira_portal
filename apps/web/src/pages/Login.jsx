@@ -6,6 +6,7 @@ function Login() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [tenantId, setTenantId] = useState("default");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,7 +21,7 @@ function Login() {
     setError("");
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await login(username.trim(), password, tenantId.trim() || "default");
       navigate("/", { replace: true });
     } catch {
       setError("Credenziali non valide.");
@@ -40,6 +41,9 @@ function Login() {
 
         <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Password</label>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ marginTop: 4, marginBottom: 10 }} />
+
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Tenant</label>
+        <input value={tenantId} onChange={(e) => setTenantId(e.target.value)} required style={{ marginTop: 4, marginBottom: 10 }} />
 
         {error && <p style={{ color: "#b91c1c", fontSize: 12, marginBottom: 10 }}>{error}</p>}
 

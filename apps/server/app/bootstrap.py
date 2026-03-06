@@ -1,14 +1,56 @@
 import logging
 
+from sqlalchemy import and_
+
+from app.core.auth import hash_password
 from app.core.config import settings
+from app.core.tenant import normalize_tenant_id
 from app.db import Base, engine, get_db
 from app.models.pricing_defaults import PricingDefaults
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.unit import Unit
+from app.models.user import User
 from app.main_types import StaffRole
 
 logger = logging.getLogger("app.bootstrap")
+
+
+def _ensure_admin_user(db) -> None:
+    username = (settings.admin_username or "owner").strip().lower()
+    tenant_id = normalize_tenant_id(settings.admin_tenant_id)
+    role = (settings.admin_role or "owner").strip().lower()
+    password_hash = settings.admin_password_hash or hash_password(settings.admin_password)
+
+    existing = (
+        db.query(User)
+        .filter(and_(User.tenant_id == tenant_id, User.username == username))
+        .first()
+    )
+    if existing:
+        changed = False
+        if not existing.is_active:
+            existing.is_active = True
+            changed = True
+        if existing.role != role:
+            existing.role = role
+            changed = True
+        if settings.admin_password_hash and existing.password_hash != settings.admin_password_hash:
+            existing.password_hash = settings.admin_password_hash
+            changed = True
+        if changed:
+            db.commit()
+        return
+
+    user = User(
+        tenant_id=tenant_id,
+        username=username,
+        password_hash=password_hash,
+        role=role,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
 
 
 def initialize_schema_and_seed() -> None:
@@ -24,6 +66,8 @@ def initialize_schema_and_seed() -> None:
 
     db = next(get_db())
     try:
+        _ensure_admin_user(db)
+
         if db.query(Unit).count() == 0:
             units_seed = [
                 Unit(name="Unit A", size_m2=64, capacity=6, base_nightly_rate=80),

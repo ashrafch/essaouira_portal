@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { clearAuthSession, getCurrentUsername } from "../services/auth";
+import { clearAuthSession, getCurrentRole, getCurrentTenant, getCurrentUsername } from "../services/auth";
 
 const wrapper = {
   height: "100%",
@@ -12,6 +12,8 @@ const wrapper = {
 function Topbar() {
   const [online, setOnline] = useState(navigator.onLine);
   const username = getCurrentUsername() || "Owner";
+  const role = getCurrentRole() || "owner";
+  const tenant = getCurrentTenant() || "default";
 
   useEffect(() => {
     function handleOnline() {
@@ -62,7 +64,7 @@ function Topbar() {
           {online ? "Online" : "Offline (solo cache)"}
         </div>
         <div style={{ fontSize: "13px", color: "#6b7280" }}>
-          Logged as <strong>{username}</strong>
+          {username} <strong>({role})</strong> · tenant <strong>{tenant}</strong>
         </div>
         <button
           type="button"

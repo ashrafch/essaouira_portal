@@ -228,6 +228,28 @@ export function updatePricingDefaults(payload) {
   return apiPut("/pricing-defaults", payload);
 }
 
+/* --------- USER MANAGEMENT --------- */
+
+export function getUsers() {
+  return apiGet("/users");
+}
+
+export function createUser(payload) {
+  return apiPost("/users", payload);
+}
+
+export function updateUser(id, payload) {
+  return apiPut(`/users/${id}`, payload);
+}
+
+export function resetUserPassword(id, newPassword) {
+  return apiPost(`/users/${id}/reset-password`, { new_password: newPassword });
+}
+
+export function deleteUser(id) {
+  return apiDelete(`/users/${id}`);
+}
+
 /* --------- MAINTENANCE --------- */
 
 export function getMaintenanceTickets() {

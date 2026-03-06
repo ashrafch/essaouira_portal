@@ -19,6 +19,7 @@ URL:
 - API health: `http://localhost:8081/api/health`
 - API diretta: `http://localhost:8000/health`
 - Login default: `owner` / `owner123`
+- Tenant default login: `default`
 
 Porta frontend configurabile:
 ```bash
@@ -74,8 +75,17 @@ Backend (`apps/server/.env`):
 - `AUTH_ACCESS_TOKEN_MINUTES`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
+- `ADMIN_PASSWORD_HASH` (opzionale, preferibile in produzione)
+- `ADMIN_ROLE` (`owner|manager|operator|viewer`)
+- `ADMIN_TENANT_ID`
+- `PASSWORD_MIN_LENGTH`
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
+
+User management:
+- endpoint owner-only: `GET/POST/PUT/DELETE /users`
+- reset password: `POST /users/{id}/reset-password`
+- login payload supporta `tenant_id`
 
 Frontend (`apps/web/.env`):
 - `VITE_API_BASE_URL`
