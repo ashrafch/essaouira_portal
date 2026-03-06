@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import and_
+from sqlalchemy import and_, inspect, text
 
 from app.core.auth import hash_password
 from app.core.config import settings
@@ -14,6 +14,43 @@ from app.models.user import User
 from app.main_types import StaffRole
 
 logger = logging.getLogger("app.bootstrap")
+
+
+def _reconcile_users_table_schema() -> None:
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("users")}
+    statements: list[str] = []
+    if "tenant_id" not in existing_cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT 'default'"
+        )
+    if "role" not in existing_cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN role VARCHAR(32) NOT NULL DEFAULT 'viewer'"
+        )
+    if "is_active" not in existing_cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true"
+        )
+    if "created_at" not in existing_cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()"
+        )
+    if "updated_at" not in existing_cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.warning("Reconciled legacy users table schema: added missing columns.")
 
 
 def _ensure_admin_user(db) -> None:
@@ -56,6 +93,7 @@ def _ensure_admin_user(db) -> None:
 def initialize_schema_and_seed() -> None:
     if settings.auto_create_schema:
         Base.metadata.create_all(bind=engine)
+        _reconcile_users_table_schema()
         logger.info("Schema auto-creation enabled.")
     else:
         logger.info("Schema auto-creation disabled; expecting migrations.")
