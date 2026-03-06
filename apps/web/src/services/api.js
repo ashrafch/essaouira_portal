@@ -419,6 +419,14 @@ export function simulateDeviceSync(deviceId) {
   return apiPost(`/smart/devices/${deviceId}/simulate-sync`, {});
 }
 
+export function syncSmartProvider(provider = "mock") {
+  return apiPost(`/smart/providers/sync${buildQuery({ provider })}`, {});
+}
+
+export function getSmartProviderDebug(provider = "mock") {
+  return apiGet("/smart/providers/debug", { provider });
+}
+
 export function getSmartAlerts(params = {}) {
   return apiGet("/smart/alerts", params);
 }
