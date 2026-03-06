@@ -262,6 +262,7 @@ CI/CD:
 - Merge su `dev` solo dopo test passati
 
 Roadmap prodotto: `ROADMAP_PRODUCT.md`
+Analisi funzionalita attuale (operativa + tecnica): `docs/PORTAL_CURRENT_FUNCTIONALITY_ANALYSIS.md`
 
 ## UX Refresh
 
