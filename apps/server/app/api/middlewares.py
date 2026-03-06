@@ -40,6 +40,7 @@ WRITE_PROTECTED_PREFIXES = (
     "/message-jobs",
     "/channel-connections",
     "/revenue-rules",
+    "/smart",
 )
 
 

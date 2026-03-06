@@ -131,6 +131,7 @@ function Sidebar({ onNavigate = null }) {
     bookings: false,
     property: false,
     staff: false,
+    smart: false,
     facility: true,
     platform: false,
   });
@@ -198,6 +199,15 @@ function Sidebar({ onNavigate = null }) {
           label: "Anagrafica staff",
           badge: null,
         },
+      ],
+    },
+    {
+      id: "smart",
+      title: "Smart Building",
+      items: [
+        { to: "/smart-overview", label: "Smart overview", badge: null },
+        { to: "/devices", label: "Device inventory", badge: null },
+        { to: "/alerts", label: "Smart alerts", badge: null },
       ],
     },
     {

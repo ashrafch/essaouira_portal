@@ -397,6 +397,36 @@ export function deleteMaintenanceTicket(id) {
   return apiDelete(`/maintenance/${id}`);
 }
 
+/* --------- SMART BUILDING --------- */
+
+export function getSmartOverview() {
+  return apiGet("/smart/overview");
+}
+
+export function getDevices() {
+  return apiGet("/smart/devices");
+}
+
+export function createDevice(payload) {
+  return apiPost("/smart/devices", payload);
+}
+
+export function getDeviceState(deviceId) {
+  return apiGet(`/smart/devices/${deviceId}/state`);
+}
+
+export function simulateDeviceSync(deviceId) {
+  return apiPost(`/smart/devices/${deviceId}/simulate-sync`, {});
+}
+
+export function getSmartAlerts(params = {}) {
+  return apiGet("/smart/alerts", params);
+}
+
+export function acknowledgeSmartAlert(alertId) {
+  return apiPut(`/smart/alerts/${alertId}/acknowledge`, {});
+}
+
 export function getPlatformTenants() {
   return apiGet("/platform/tenants");
 }

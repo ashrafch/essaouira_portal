@@ -1,0 +1,134 @@
+from datetime import datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class DeviceBase(BaseModel):
+    unit_id: int | None = None
+    zone_name: str | None = Field(default=None, max_length=128)
+    provider: str = Field(default="mock", max_length=64)
+    external_id: str = Field(..., max_length=128)
+    name: str = Field(..., max_length=128)
+    category: str = Field(..., max_length=64)
+    model: str | None = Field(default=None, max_length=128)
+    manufacturer: str | None = Field(default=None, max_length=128)
+    is_active: bool = True
+    health_status: str = Field(default="unknown", max_length=32)
+    battery_level: int | None = Field(default=None, ge=0, le=100)
+
+
+class DeviceCreate(DeviceBase):
+    pass
+
+
+class DeviceUpdate(BaseModel):
+    unit_id: int | None = None
+    zone_name: str | None = Field(default=None, max_length=128)
+    name: str | None = Field(default=None, max_length=128)
+    category: str | None = Field(default=None, max_length=64)
+    model: str | None = Field(default=None, max_length=128)
+    manufacturer: str | None = Field(default=None, max_length=128)
+    is_active: bool | None = None
+    health_status: str | None = Field(default=None, max_length=32)
+    battery_level: int | None = Field(default=None, ge=0, le=100)
+
+
+class DeviceOut(DeviceBase):
+    id: int
+    tenant_id: str
+    last_seen_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceStateUpdate(BaseModel):
+    online: bool
+    power_state: str | None = Field(default=None, max_length=16)
+    motion_detected: bool | None = None
+    contact_open: bool | None = None
+    leak_detected: bool | None = None
+    temperature_c: Decimal | None = None
+    humidity_pct: Decimal | None = None
+    energy_w: Decimal | None = None
+    signal_rssi: int | None = None
+    raw_payload_json: str | None = None
+
+
+class DeviceStateOut(BaseModel):
+    id: int
+    tenant_id: str
+    device_id: int
+    online: bool
+    power_state: str | None = None
+    motion_detected: bool | None = None
+    contact_open: bool | None = None
+    leak_detected: bool | None = None
+    temperature_c: Decimal | None = None
+    humidity_pct: Decimal | None = None
+    energy_w: Decimal | None = None
+    signal_rssi: int | None = None
+    raw_payload_json: str | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeviceEventCreate(BaseModel):
+    event_type: str = Field(..., max_length=64)
+    severity: str = Field(default="info", max_length=16)
+    source: str = Field(default="system", max_length=32)
+    payload_json: str | None = None
+
+
+class DeviceEventOut(BaseModel):
+    id: int
+    tenant_id: str
+    device_id: int
+    unit_id: int | None = None
+    event_type: str
+    severity: str
+    source: str
+    payload_json: str | None = None
+    occurred_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AlertCreate(BaseModel):
+    unit_id: int | None = None
+    device_id: int | None = None
+    alert_type: str = Field(..., max_length=64)
+    severity: str = Field(default="warning", max_length=16)
+    title: str = Field(..., max_length=160)
+    description: str | None = None
+
+
+class AlertOut(BaseModel):
+    id: int
+    tenant_id: str
+    unit_id: int | None = None
+    device_id: int | None = None
+    alert_type: str
+    severity: str
+    status: str
+    title: str
+    description: str | None = None
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    acknowledged_by: str | None = None
+    resolved_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SmartOverviewOut(BaseModel):
+    total_devices: int
+    online_devices: int
+    offline_devices: int
+    open_alerts: int
+    critical_alerts: int
+    recently_seen_devices: int
+

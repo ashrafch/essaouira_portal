@@ -22,6 +22,9 @@ const Maintenance = lazy(() => import("./pages/Maintenance.jsx"));
 const Expenses = lazy(() => import("./pages/Expenses.jsx"));
 const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
+const SmartOverview = lazy(() => import("./pages/SmartOverview.jsx"));
+const Devices = lazy(() => import("./pages/Devices.jsx"));
+const Alerts = lazy(() => import("./pages/Alerts.jsx"));
 
 function PageFallback() {
   return (
@@ -55,6 +58,9 @@ const ROUTE_COMPONENTS = {
   maintenance: Maintenance,
   expenses: Expenses,
   adminControl: AdminControl,
+  smartOverview: SmartOverview,
+  devices: Devices,
+  alerts: Alerts,
 };
 
 function App() {

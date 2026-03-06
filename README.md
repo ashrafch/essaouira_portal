@@ -99,6 +99,7 @@ Backend (`apps/server/.env`):
 - `PASSWORD_MIN_LENGTH`
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
+- `SMART_PROVIDER_MODE` (`mock|home_assistant`, default `mock`)
 
 Gestione utenti:
 - endpoint `GET/POST/PUT /users` (owner del tenant)
@@ -123,6 +124,14 @@ Distribution & Revenue (Fase 3):
 - suggerimenti tariffari: `GET /revenue/rate-recommendations`
 - performance canali: `GET /analytics/channel-performance`
 - frontend: esteso su `/business` (performance canali, channel manager, revenue rules, suggerimenti tariffari)
+
+Smart Building Foundation (Nuova fase):
+- overview smart: `GET /smart/overview`
+- inventory device: `GET/POST/PUT /smart/devices...`
+- stato device: `GET/PUT /smart/devices/{id}/state`
+- eventi device: `GET /smart/events`, `POST /smart/devices/{id}/events`
+- alert smart: `GET/POST /smart/alerts`, `PUT /smart/alerts/{id}/acknowledge`
+- simulazione provider: `POST /smart/devices/{id}/simulate-sync` (mock, nessuna integrazione hardware reale)
 
 Audit trail:
 - endpoint `GET /audit-logs` (owner del tenant)

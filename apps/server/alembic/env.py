@@ -7,7 +7,17 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.db import Base
-from app.models import booking, cost_item, maintenance, pricing_defaults, staff_defaults, staff_member, staff_task, unit
+from app.models import (
+    booking,
+    cost_item,
+    maintenance,
+    pricing_defaults,
+    smart_building,
+    staff_defaults,
+    staff_member,
+    staff_task,
+    unit,
+)
 
 config = context.config
 

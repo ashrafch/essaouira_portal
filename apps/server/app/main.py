@@ -31,6 +31,7 @@ from app.core.auth import (
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.tenant import normalize_tenant_id, reset_current_tenant_id, set_current_tenant_id
+from app.domains.smart_building.router import router as smart_building_router
 from app.main_types import StaffRole
 from app.models.unit import Unit
 from app.models.booking import Booking
@@ -82,6 +83,7 @@ app.add_middleware(
 
 app.middleware("http")(request_logging)
 app.middleware("http")(authentication)
+app.include_router(smart_building_router)
 
 
 # ---------- HEALTH CHECK ----------
