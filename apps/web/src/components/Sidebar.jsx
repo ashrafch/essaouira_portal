@@ -130,6 +130,7 @@ function Sidebar() {
     property: false,
     staff: false,
     facility: true, // Apro la nuova sezione per evidenziarla
+    smart: true,
   });
 
   const [todayStats, setTodayStats] = useState({
@@ -201,6 +202,16 @@ function Sidebar() {
           label: "Manutenzioni",
           badge: "openTickets",
         },
+      ],
+    },
+    {
+      id: "smart",
+      title: "Smart Building",
+      items: [
+        { to: "/smart-overview", label: "Smart overview", badge: null },
+        { to: "/smart-devices", label: "Dispositivi", badge: null },
+        { to: "/smart-alerts", label: "Alert smart", badge: null },
+        { to: "/smart-automation", label: "Automazioni smart", badge: null },
       ],
     },
   ];

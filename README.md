@@ -15,10 +15,16 @@ docker compose up --build -d
 ```
 
 URL:
-- Frontend: `http://localhost:8080`
-- API health: `http://localhost:8080/api/health`
+- Frontend: `http://localhost:8081`
+- API health: `http://localhost:8081/api/health`
 - API diretta: `http://localhost:8000/health`
 - Login default: `owner` / `owner123`
+
+Porta frontend configurabile:
+```bash
+set WEB_PORT=8081
+docker compose up --build -d
+```
 
 Stop:
 

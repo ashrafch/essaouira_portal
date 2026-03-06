@@ -20,6 +20,11 @@ const BookingDocument = lazy(() => import("./pages/BookingDocument.jsx"));
 const Maintenance = lazy(() => import("./pages/Maintenance.jsx"));
 const Expenses = lazy(() => import("./pages/Expenses.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
+const SmartOverview = lazy(() => import("./pages/SmartOverview.jsx"));
+const SmartDevices = lazy(() => import("./pages/SmartDevices.jsx"));
+const SmartAlerts = lazy(() => import("./pages/SmartAlerts.jsx"));
+const SmartAutomation = lazy(() => import("./pages/SmartAutomation.jsx"));
+const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
 
 function PageFallback() {
   return <div style={{ padding: 20 }}>Caricamento pagina...</div>;
@@ -39,6 +44,11 @@ const ROUTE_COMPONENTS = {
   pricing: Pricing,
   maintenance: Maintenance,
   expenses: Expenses,
+  smartOverview: SmartOverview,
+  smartDevices: SmartDevices,
+  smartAlerts: SmartAlerts,
+  smartAutomation: SmartAutomation,
+  smartUnitDetail: SmartUnitDetail,
 };
 
 function App() {

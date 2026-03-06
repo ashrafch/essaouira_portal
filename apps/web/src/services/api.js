@@ -245,3 +245,61 @@ export function updateMaintenanceTicket(id, payload) {
 export function deleteMaintenanceTicket(id) {
   return apiDelete(`/maintenance/${id}`);
 }
+
+/* --------- SMART BUILDING --------- */
+
+export function getSmartOverview() {
+  return apiGet("/smart/overview");
+}
+
+export function getSmartUnitDetail(unitId, params = {}) {
+  return apiGet(`/smart/units/${unitId}`, params);
+}
+
+export function getSmartUnitTimeline(unitId, params = {}) {
+  return apiGet(`/smart/units/${unitId}/timeline`, params);
+}
+
+export function getSmartDevices() {
+  return apiGet("/smart/devices");
+}
+
+export function createSmartDevice(payload) {
+  return apiPost("/smart/devices", payload);
+}
+
+export function simulateSmartDeviceSync(deviceId) {
+  return apiPost(`/smart/devices/${deviceId}/simulate-sync`, {});
+}
+
+export function getSmartAlerts(params = {}) {
+  return apiGet("/smart/alerts", params);
+}
+
+export function createSmartAlert(payload) {
+  return apiPost("/smart/alerts", payload);
+}
+
+export function acknowledgeSmartAlert(alertId) {
+  return apiPut(`/smart/alerts/${alertId}/acknowledge`, {});
+}
+
+export function getSmartScenes() {
+  return apiGet("/smart/scenes");
+}
+
+export function runSmartScene(sceneId, context = {}) {
+  return apiPost(`/smart/scenes/${sceneId}/run`, { context });
+}
+
+export function getSmartAutomationRules() {
+  return apiGet("/smart/automation-rules");
+}
+
+export function triggerSmartAutomationRule(ruleId, payload = {}) {
+  return apiPost(`/smart/automation-rules/${ruleId}/trigger`, payload);
+}
+
+export function getSmartAutomationExecutions(params = {}) {
+  return apiGet("/smart/automation-executions", params);
+}
