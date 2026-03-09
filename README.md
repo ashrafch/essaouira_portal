@@ -87,11 +87,18 @@ Backend (`apps/server/.env`):
 - `HOME_ASSISTANT_TIMEOUT_SECONDS`
 - `HOME_ASSISTANT_INCLUDE_DOMAINS` (csv, es. `switch,light,climate,lock,sensor,binary_sensor`)
 - `HOME_ASSISTANT_UNIT_HINTS` (json map `entity_id -> unit hint`, es. `{\"switch.unita_luce\":\"unit a\"}`)
+- `DEVICE_OFFLINE_TIMEOUT_SECONDS` (default `1800`)
+- `DEVICE_BATTERY_WARNING_LEVEL` (default `20`)
+- `DEVICE_BATTERY_CRITICAL_LEVEL` (default `10`)
+- `DEVICE_SIGNAL_WARNING_RSSI` (default `-85`)
 
 Smart provider endpoints:
 - catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
 - state poll fallback: `POST /smart/providers/poll?provider=mock|home_assistant`
 - webhook ingest: `POST /smart/providers/{provider}/webhook`
+- health overview: `GET /smart/device-health`
+- health by unit: `GET /smart/units/{id}/device-health`
+- health by device: `GET /smart/devices/{id}/health`
 
 User management:
 - endpoint owner-only: `GET/POST/PUT/DELETE /users`

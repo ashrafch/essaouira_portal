@@ -53,6 +53,31 @@ def _reconcile_users_table_schema() -> None:
     logger.warning("Reconciled legacy users table schema: added missing columns.")
 
 
+def _reconcile_devices_table_schema() -> None:
+    inspector = inspect(engine)
+    if "devices" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("devices")}
+    statements: list[str] = []
+    if "connectivity_status" not in existing_cols:
+        statements.append(
+            "ALTER TABLE devices ADD COLUMN connectivity_status VARCHAR(16) NOT NULL DEFAULT 'unknown'"
+        )
+    if "signal_strength" not in existing_cols:
+        statements.append(
+            "ALTER TABLE devices ADD COLUMN signal_strength INTEGER NULL"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.warning("Reconciled devices table schema: added missing health columns.")
+
+
 def _ensure_admin_user(db) -> None:
     username = (settings.admin_username or "owner").strip().lower()
     tenant_id = normalize_tenant_id(settings.admin_tenant_id)
@@ -94,6 +119,7 @@ def initialize_schema_and_seed() -> None:
     if settings.auto_create_schema:
         Base.metadata.create_all(bind=engine)
         _reconcile_users_table_schema()
+        _reconcile_devices_table_schema()
         logger.info("Schema auto-creation enabled.")
     else:
         logger.info("Schema auto-creation disabled; expecting migrations.")

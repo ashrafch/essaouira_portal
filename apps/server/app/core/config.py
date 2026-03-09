@@ -22,6 +22,10 @@ class Settings:
     password_min_length: int = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
     auto_create_schema: bool = _as_bool(os.getenv("AUTO_CREATE_SCHEMA"), True)
     auto_seed_data: bool = _as_bool(os.getenv("AUTO_SEED_DATA"), True)
+    device_offline_timeout_seconds: int = int(os.getenv("DEVICE_OFFLINE_TIMEOUT_SECONDS", "1800"))
+    device_battery_warning_level: int = int(os.getenv("DEVICE_BATTERY_WARNING_LEVEL", "20"))
+    device_battery_critical_level: int = int(os.getenv("DEVICE_BATTERY_CRITICAL_LEVEL", "10"))
+    device_signal_warning_rssi: int = int(os.getenv("DEVICE_SIGNAL_WARNING_RSSI", "-85"))
 
 
 settings = Settings()

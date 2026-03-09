@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+ï»¿import { useEffect, useState } from "react";
 import {
   createSmartDevice,
-  getSmartDevices,
+  getSmartDeviceHealth,
   simulateSmartDeviceSync,
 } from "../services/api";
 import Modal from "../components/Modal";
@@ -18,18 +18,24 @@ const EMPTY_FORM = {
 
 function SmartDevices() {
   const [devices, setDevices] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState({ type: "info", message: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [filters, setFilters] = useState({ status: "", connectivity: "" });
 
   async function loadDevices() {
     setLoading(true);
     setError("");
     try {
-      const data = await getSmartDevices();
-      setDevices(data || []);
+      const data = await getSmartDeviceHealth({
+        status: filters.status || undefined,
+        connectivity: filters.connectivity || undefined,
+      });
+      setDevices(data?.devices || []);
+      setSummary(data?.property_summary || null);
     } catch (err) {
       setError(err.message || "Errore caricamento dispositivi");
     } finally {
@@ -39,7 +45,7 @@ function SmartDevices() {
 
   useEffect(() => {
     loadDevices();
-  }, []);
+  }, [filters.status, filters.connectivity]);
 
   function openCreateModal() {
     setForm(EMPTY_FORM);
@@ -74,7 +80,9 @@ function SmartDevices() {
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Smart Devices</h1>
-      <p style={{ color: "#6b7280" }}>Inventario dispositivi con test rapido provider mock.</p>
+      <p style={{ color: "#6b7280" }}>
+        Inventario dispositivi con health monitoring e visibilita operativa.
+      </p>
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
@@ -86,6 +94,31 @@ function SmartDevices() {
         <button type="button" onClick={openCreateModal}>+ Aggiungi dispositivo</button>
       </div>
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
+          <option value="">Tutti health</option>
+          <option value="healthy">healthy</option>
+          <option value="warning">warning</option>
+          <option value="critical">critical</option>
+        </select>
+        <select value={filters.connectivity} onChange={(e) => setFilters((prev) => ({ ...prev, connectivity: e.target.value }))}>
+          <option value="">Tutte connectivity</option>
+          <option value="online">online</option>
+          <option value="offline">offline</option>
+          <option value="unknown">unknown</option>
+        </select>
+      </div>
+
+      {summary && (
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", marginBottom: 14 }}>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Totali <strong>{summary.total_devices}</strong></div>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Online <strong>{summary.online_devices}</strong></div>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Offline <strong>{summary.offline_devices}</strong></div>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Warning <strong>{summary.warning_devices}</strong></div>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Critical <strong>{summary.critical_devices}</strong></div>
+        </div>
+      )}
+
       {loading ? (
         <p>Caricamento...</p>
       ) : devices.length === 0 ? (
@@ -93,15 +126,32 @@ function SmartDevices() {
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {devices.map((d) => (
-            <div key={d.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
+            <div key={d.device_id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>{d.name}</div>
                   <div style={{ fontSize: 13, color: "#6b7280" }}>
-                    {d.provider} · {d.category} · ext:{d.external_id}
+                    {d.provider} Â· {d.category}
+                  </div>
+                  <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
+                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
+                      Connectivity: <strong>{d.connectivity_status}</strong>
+                    </span>
+                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
+                      Health: <strong>{d.health_status}</strong>
+                    </span>
+                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
+                      Battery: <strong>{d.battery_level ?? "-"}</strong>
+                    </span>
+                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
+                      RSSI: <strong>{d.signal_strength ?? "-"}</strong>
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+                    Last seen: {d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : "n/a"}
                   </div>
                 </div>
-                <button type="button" onClick={() => handleSimulate(d.id)}>Simula sync</button>
+                <button type="button" onClick={() => handleSimulate(d.device_id)}>Simula sync</button>
               </div>
             </div>
           ))}

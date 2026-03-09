@@ -286,6 +286,18 @@ export function getSmartDevices() {
   return apiGet("/smart/devices");
 }
 
+export function getSmartDeviceHealth(params = {}) {
+  return apiGet("/smart/device-health", params);
+}
+
+export function getSmartUnitDeviceHealth(unitId) {
+  return apiGet(`/smart/units/${unitId}/device-health`);
+}
+
+export function getSingleSmartDeviceHealth(deviceId) {
+  return apiGet(`/smart/devices/${deviceId}/health`);
+}
+
 export function createSmartDevice(payload) {
   return apiPost("/smart/devices", payload);
 }

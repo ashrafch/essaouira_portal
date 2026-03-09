@@ -24,8 +24,10 @@ class DeviceBase(BaseModel):
     model: str | None = Field(default=None, max_length=128)
     manufacturer: str | None = Field(default=None, max_length=128)
     is_active: bool = True
+    connectivity_status: str = Field(default="unknown", max_length=16)
     health_status: str = Field(default="unknown", max_length=32)
     battery_level: int | None = Field(default=None, ge=0, le=100)
+    signal_strength: int | None = None
 
 
 class DeviceCreate(DeviceBase):
@@ -40,8 +42,10 @@ class DeviceUpdate(BaseModel):
     model: str | None = Field(default=None, max_length=128)
     manufacturer: str | None = Field(default=None, max_length=128)
     is_active: bool | None = None
+    connectivity_status: str | None = Field(default=None, max_length=16)
     health_status: str | None = Field(default=None, max_length=32)
     battery_level: int | None = Field(default=None, ge=0, le=100)
+    signal_strength: int | None = None
 
 
 class DeviceOut(DeviceBase):
@@ -205,6 +209,8 @@ class SmartUnitSummaryOut(BaseModel):
     unknown_state_devices: int
     open_alerts: int
     resolved_alerts: int
+    warning_devices: int = 0
+    critical_devices: int = 0
 
 
 class SmartUnitDetailOut(BaseModel):
@@ -215,6 +221,45 @@ class SmartUnitDetailOut(BaseModel):
     alerts_open: list[AlertOut]
     alerts_resolved: list[AlertOut]
     events_recent: list[DeviceEventOut]
+
+
+class DeviceHealthOut(BaseModel):
+    device_id: int
+    unit_id: int | None = None
+    unit_name: str | None = None
+    name: str
+    category: str
+    provider: str
+    connectivity_status: str
+    health_status: str
+    battery_level: int | None = None
+    signal_strength: int | None = None
+    last_seen_at: datetime | None = None
+    online: bool | None = None
+    needs_attention: bool
+    reasons: list[str] = Field(default_factory=list)
+
+
+class UnitDeviceHealthSummaryOut(BaseModel):
+    unit_id: int | None = None
+    unit_name: str
+    total_devices: int
+    online_devices: int
+    offline_devices: int
+    warning_devices: int
+    critical_devices: int
+
+
+class DeviceHealthOverviewOut(BaseModel):
+    property_summary: UnitDeviceHealthSummaryOut
+    units: list[UnitDeviceHealthSummaryOut]
+    devices: list[DeviceHealthOut]
+
+
+class UnitDeviceHealthOut(BaseModel):
+    unit: SmartUnitOut
+    summary: UnitDeviceHealthSummaryOut
+    devices: list[DeviceHealthOut]
 
 
 class DeviceCommandCreate(BaseModel):
