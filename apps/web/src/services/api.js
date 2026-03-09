@@ -5,15 +5,21 @@ const BASE_URL =
 const TOKEN_KEY = "essaouira_portal_token";
 let unauthorizedHandled = false;
 
+function getAccessToken() {
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
 function getAuthHeaders() {
-  const token = window.localStorage.getItem(TOKEN_KEY);
+  const token = getAccessToken();
   if (!token) return {};
   return { Authorization: `Bearer ${token}` };
 }
 
-async function handleResponse(res) {
+async function handleResponse(res, requestToken = null) {
   if (res.status === 401) {
-    if (!unauthorizedHandled) {
+    const currentToken = getAccessToken();
+    const shouldHandle = !requestToken || requestToken === currentToken;
+    if (shouldHandle && !unauthorizedHandled) {
       unauthorizedHandled = true;
       clearAuthSession();
       if (window.location.pathname !== "/login") {
@@ -47,34 +53,38 @@ function buildQuery(params = {}) {
 
 export async function apiGet(path, params) {
   const url = `${BASE_URL}${path}${buildQuery(params)}`;
+  const requestToken = getAccessToken();
   const res = await fetch(url, { headers: getAuthHeaders() });
-  return handleResponse(res);
+  return handleResponse(res, requestToken);
 }
 
 export async function apiPost(path, body) {
+  const requestToken = getAccessToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
-  return handleResponse(res);
+  return handleResponse(res, requestToken);
 }
 
 export async function apiPut(path, body) {
+  const requestToken = getAccessToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
-  return handleResponse(res);
+  return handleResponse(res, requestToken);
 }
 
 export async function apiDelete(path) {
+  const requestToken = getAccessToken();
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "DELETE",
     headers: getAuthHeaders(),
   });
-  await handleResponse(res);
+  await handleResponse(res, requestToken);
   return null;
 }
 
