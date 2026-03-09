@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { isAuthenticated, login } from "../services/auth";
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("default");
@@ -15,6 +16,12 @@ function Login() {
       navigate("/", { replace: true });
     }
   }, [navigate]);
+
+  useEffect(() => {
+    if (searchParams.get("reason") === "expired") {
+      setError("Sessione scaduta o token non valido. Effettua di nuovo il login.");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e) {
     e.preventDefault();

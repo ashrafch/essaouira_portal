@@ -1,6 +1,9 @@
+import { clearAuthSession } from "./auth";
+
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 const TOKEN_KEY = "essaouira_portal_token";
+let unauthorizedHandled = false;
 
 function getAuthHeaders() {
   const token = window.localStorage.getItem(TOKEN_KEY);
@@ -9,6 +12,16 @@ function getAuthHeaders() {
 }
 
 async function handleResponse(res) {
+  if (res.status === 401) {
+    if (!unauthorizedHandled) {
+      unauthorizedHandled = true;
+      clearAuthSession();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login?reason=expired";
+      }
+    }
+    throw new Error("Sessione scaduta o token non valido. Effettua di nuovo il login.");
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Errore API ${res.status}: ${text}`);
@@ -61,11 +74,8 @@ export async function apiDelete(path) {
     method: "DELETE",
     headers: getAuthHeaders(),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Errore API ${res.status}: ${text}`);
-  }
-  return;
+  await handleResponse(res);
+  return null;
 }
 
 /* --------- BASIC --------- */
