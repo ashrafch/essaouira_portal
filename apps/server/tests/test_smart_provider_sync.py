@@ -45,8 +45,9 @@ def test_provider_webhook_placeholder_ingestion():
         assert sync.status_code == 200
 
         devices = client.get("/smart/devices", headers=headers).json()
-        assert len(devices) >= 1
-        target = devices[0]
+        mock_devices = [d for d in devices if d.get("provider") == "mock"]
+        assert len(mock_devices) >= 1
+        target = mock_devices[0]
 
         ingest = client.post(
             "/smart/providers/mock/webhook",

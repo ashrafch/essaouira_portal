@@ -41,6 +41,7 @@ class ProviderWebhookEvent:
     event_type: str
     severity: str = "info"
     payload: dict[str, Any] | None = None
+    state: ProviderStateSnapshot | None = None
     occurred_at: datetime | None = None
 
 

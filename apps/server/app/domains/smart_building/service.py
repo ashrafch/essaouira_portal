@@ -96,7 +96,7 @@ class SmartBuildingService:
     def _safe_json_dumps(self, value: dict | None) -> str | None:
         if value is None:
             return None
-        return json.dumps(value, ensure_ascii=True)
+        return json.dumps(value, ensure_ascii=True, sort_keys=True)
 
     def _safe_json_loads(self, value: str | None) -> dict:
         if not value:
@@ -581,6 +581,39 @@ class SmartBuildingService:
         self.db.refresh(state)
         return state
 
+    def _state_payload_from_provider_snapshot(self, snapshot) -> DeviceStateUpdate:
+        return DeviceStateUpdate(
+            online=snapshot.online,
+            power_state=snapshot.power_state,
+            motion_detected=snapshot.motion_detected,
+            contact_open=snapshot.contact_open,
+            leak_detected=snapshot.leak_detected,
+            temperature_c=snapshot.temperature_c,
+            humidity_pct=snapshot.humidity_pct,
+            energy_w=snapshot.energy_w,
+            signal_rssi=snapshot.signal_rssi,
+            raw_payload_json=self._safe_json_dumps(snapshot.raw_payload or {}),
+        )
+
+    def _state_changed(self, device_id: int, payload: DeviceStateUpdate) -> bool:
+        state = self._scoped_query(DeviceState).filter(DeviceState.device_id == device_id).first()
+        if state is None:
+            return True
+        new_values = payload.model_dump()
+        current_values = {
+            "online": state.online,
+            "power_state": state.power_state,
+            "motion_detected": state.motion_detected,
+            "contact_open": state.contact_open,
+            "leak_detected": state.leak_detected,
+            "temperature_c": state.temperature_c,
+            "humidity_pct": state.humidity_pct,
+            "energy_w": state.energy_w,
+            "signal_rssi": state.signal_rssi,
+            "raw_payload_json": state.raw_payload_json,
+        }
+        return current_values != new_values
+
     def sync_catalog_from_provider(self, provider_name: str | None = None) -> dict[str, int | str]:
         self._require_write_access()
         provider = get_provider(provider_name)
@@ -591,7 +624,12 @@ class SmartBuildingService:
         updated_devices = 0
         synced_states = 0
 
-        for snapshot in provider.list_devices(self.tenant_id):
+        try:
+            snapshots = provider.list_devices(self.tenant_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Provider sync failed: {exc}") from exc
+
+        for snapshot in snapshots:
             device = self.get_device_by_provider_external(provider.provider_name, snapshot.external_id)
             if device is None:
                 device = Device(
@@ -628,21 +666,24 @@ class SmartBuildingService:
                 updated_devices += 1
 
             if snapshot.state is not None:
-                self.upsert_device_state(
-                    device.id,
-                    DeviceStateUpdate(
-                        online=snapshot.state.online,
-                        power_state=snapshot.state.power_state,
-                        motion_detected=snapshot.state.motion_detected,
-                        contact_open=snapshot.state.contact_open,
-                        leak_detected=snapshot.state.leak_detected,
-                        temperature_c=snapshot.state.temperature_c,
-                        humidity_pct=snapshot.state.humidity_pct,
-                        energy_w=snapshot.state.energy_w,
-                        signal_rssi=snapshot.state.signal_rssi,
-                        raw_payload_json=json.dumps(snapshot.state.raw_payload or {}, ensure_ascii=True),
-                    ),
-                )
+                state_payload = self._state_payload_from_provider_snapshot(snapshot.state)
+                changed = self._state_changed(device.id, state_payload)
+                self.upsert_device_state(device.id, state_payload)
+                if changed:
+                    self.create_device_event(
+                        device_id=device.id,
+                        payload=DeviceEventCreate(
+                            event_type="provider.sync",
+                            severity="info",
+                            source=provider.provider_name,
+                            payload_json=self._safe_json_dumps(
+                                {
+                                    "external_id": snapshot.external_id,
+                                    "mode": "catalog_sync",
+                                }
+                            ),
+                        ),
+                    )
                 synced_states += 1
 
             self.create_device_event(
@@ -708,6 +749,26 @@ class SmartBuildingService:
                 "event_id": None,
             }
 
+        if parsed.state is not None:
+            state_payload = self._state_payload_from_provider_snapshot(parsed.state)
+            changed = self._state_changed(device.id, state_payload)
+            self.upsert_device_state(device.id, state_payload)
+            if changed:
+                self.create_device_event(
+                    device_id=device.id,
+                    payload=DeviceEventCreate(
+                        event_type="provider.sync",
+                        severity="info",
+                        source=provider.provider_name,
+                        payload_json=self._safe_json_dumps(
+                            {
+                                "external_id": parsed.external_id,
+                                "mode": "webhook_state_changed",
+                            }
+                        ),
+                    ),
+                )
+
         event = self.create_device_event(
             device_id=device.id,
             payload=DeviceEventCreate(
@@ -728,6 +789,54 @@ class SmartBuildingService:
             "accepted": True,
             "reason": None,
             "event_id": event.id,
+        }
+
+    def poll_provider_states(self, provider_name: str | None = None) -> dict[str, int | str]:
+        self._require_write_access()
+        provider = get_provider(provider_name)
+        devices = (
+            self._scoped_query(Device)
+            .filter(Device.provider == provider.provider_name)
+            .order_by(Device.id.asc())
+            .all()
+        )
+        polled_devices = 0
+        updated_states = 0
+        events_emitted = 0
+        errors = 0
+
+        for device in devices:
+            polled_devices += 1
+            try:
+                snapshot = provider.pull_state(device.external_id)
+            except Exception:
+                errors += 1
+                continue
+
+            state_payload = self._state_payload_from_provider_snapshot(snapshot)
+            changed = self._state_changed(device.id, state_payload)
+            self.upsert_device_state(device.id, state_payload)
+            updated_states += 1
+            if changed:
+                self.create_device_event(
+                    device_id=device.id,
+                    payload=DeviceEventCreate(
+                        event_type="provider.sync",
+                        severity="info",
+                        source=provider.provider_name,
+                        payload_json=self._safe_json_dumps(
+                            {"external_id": device.external_id, "mode": "poll"}
+                        ),
+                    ),
+                )
+                events_emitted += 1
+
+        return {
+            "provider_name": provider.provider_name,
+            "polled_devices": polled_devices,
+            "updated_states": updated_states,
+            "events_emitted": events_emitted,
+            "errors": errors,
         }
 
     def create_device_event(self, device_id: int, payload: DeviceEventCreate) -> DeviceEvent:

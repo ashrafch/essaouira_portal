@@ -168,6 +168,14 @@ class ProviderSyncOut(BaseModel):
     synced_states: int
 
 
+class ProviderPollOut(BaseModel):
+    provider_name: str
+    polled_devices: int
+    updated_states: int
+    events_emitted: int
+    errors: int
+
+
 class ProviderWebhookIn(BaseModel):
     payload: dict
 

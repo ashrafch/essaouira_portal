@@ -21,6 +21,7 @@ from app.domains.smart_building.schemas import (
     DeviceStateUpdate,
     DeviceUpdate,
     ProviderDebugOut,
+    ProviderPollOut,
     ProviderSyncOut,
     ProviderWebhookIn,
     ProviderWebhookOut,
@@ -92,6 +93,15 @@ def provider_catalog_sync(
     provider: str | None = Query(default=None),
 ):
     return _service(request, db).sync_catalog_from_provider(provider)
+
+
+@router.post("/providers/poll", response_model=ProviderPollOut)
+def provider_state_poll(
+    request: Request,
+    db: Session = Depends(get_db),
+    provider: str | None = Query(default=None),
+):
+    return _service(request, db).poll_provider_states(provider)
 
 
 @router.post("/providers/{provider}/webhook", response_model=ProviderWebhookOut)

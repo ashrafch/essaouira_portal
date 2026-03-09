@@ -81,6 +81,17 @@ Backend (`apps/server/.env`):
 - `PASSWORD_MIN_LENGTH`
 - `AUTO_CREATE_SCHEMA`
 - `AUTO_SEED_DATA`
+- `SMART_PROVIDER_MODE` (`mock|home_assistant`)
+- `HOME_ASSISTANT_URL` (es. `http://homeassistant.local:8123`)
+- `HOME_ASSISTANT_TOKEN` (Long-Lived Access Token HA)
+- `HOME_ASSISTANT_TIMEOUT_SECONDS`
+- `HOME_ASSISTANT_INCLUDE_DOMAINS` (csv, es. `switch,light,climate,lock,sensor,binary_sensor`)
+- `HOME_ASSISTANT_UNIT_HINTS` (json map `entity_id -> unit hint`, es. `{\"switch.unita_luce\":\"unit a\"}`)
+
+Smart provider endpoints:
+- catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
+- state poll fallback: `POST /smart/providers/poll?provider=mock|home_assistant`
+- webhook ingest: `POST /smart/providers/{provider}/webhook`
 
 User management:
 - endpoint owner-only: `GET/POST/PUT/DELETE /users`
