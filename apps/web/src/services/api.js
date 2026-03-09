@@ -1,6 +1,10 @@
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
 const TOKEN_KEY = "essaouira_portal_token";
+const USER_KEY = "essaouira_portal_user";
+const ROLE_KEY = "essaouira_portal_role";
+const TENANT_KEY = "essaouira_portal_tenant";
+const AUTH_REDIRECT_GUARD = "essaouira_portal_auth_redirect_inflight";
 
 function getAuthHeaders() {
   const token = window.localStorage.getItem(TOKEN_KEY);
@@ -11,7 +15,22 @@ function getAuthHeaders() {
 async function handleResponse(res) {
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(USER_KEY);
+      window.localStorage.removeItem(ROLE_KEY);
+      window.localStorage.removeItem(TENANT_KEY);
+
+      if (window.location.pathname !== "/login" && !window.sessionStorage.getItem(AUTH_REDIRECT_GUARD)) {
+        window.sessionStorage.setItem(AUTH_REDIRECT_GUARD, "1");
+        const reason = encodeURIComponent("Sessione scaduta o token non valido. Effettua di nuovo il login.");
+        window.location.replace(`/login?reason=${reason}`);
+      }
+    }
     throw new Error(`Errore API ${res.status}: ${text}`);
+  }
+  if (window.sessionStorage.getItem(AUTH_REDIRECT_GUARD)) {
+    window.sessionStorage.removeItem(AUTH_REDIRECT_GUARD);
   }
   if (res.status === 204) {
     return null;

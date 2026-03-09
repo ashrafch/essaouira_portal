@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { isAuthenticated, login } from "../services/auth";
 
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [tenantId, setTenantId] = useState("default");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const authReason = searchParams.get("reason");
 
   useEffect(() => {
     if (isAuthenticated()) {
@@ -35,6 +37,11 @@ function Login() {
       <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 360, background: "white", borderRadius: 14, padding: 20, border: "1px solid #e5e7eb", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
         <h1 style={{ margin: 0, fontSize: 20 }}>Accesso Portale</h1>
         <p style={{ marginTop: 6, marginBottom: 14, fontSize: 13, color: "#6b7280" }}>Inserisci le credenziali di gestione.</p>
+        {authReason && (
+          <p style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 10px", fontSize: 12, marginBottom: 10 }}>
+            {authReason}
+          </p>
+        )}
 
         <label style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Username</label>
         <input value={username} onChange={(e) => setUsername(e.target.value)} required autoFocus style={{ marginTop: 4, marginBottom: 10 }} />
