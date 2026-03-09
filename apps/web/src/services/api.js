@@ -18,7 +18,9 @@ function getAuthHeaders() {
 async function handleResponse(res, requestToken = null) {
   if (res.status === 401) {
     const currentToken = getAccessToken();
-    const shouldHandle = !requestToken || requestToken === currentToken;
+    const shouldHandle =
+      (requestToken && currentToken && requestToken === currentToken) ||
+      (!requestToken && !currentToken);
     if (shouldHandle && !unauthorizedHandled) {
       unauthorizedHandled = true;
       clearAuthSession();
