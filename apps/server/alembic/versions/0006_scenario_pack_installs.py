@@ -19,39 +19,54 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "smart_scenario_pack_installs",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("property_id", sa.Integer(), nullable=False),
-        sa.Column("pack_key", sa.String(length=64), nullable=False),
-        sa.Column("status", sa.String(length=16), nullable=False, server_default="enabled"),
-        sa.Column("installed_by", sa.String(length=128), nullable=True),
-        sa.Column("details_json", sa.Text(), nullable=True),
-        sa.Column("installed_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("tenant_id", sa.String(length=64), server_default="default", nullable=False),
-        sa.ForeignKeyConstraint(["property_id"], ["properties.id"]),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("tenant_id", "property_id", "pack_key", name="uq_scenario_pack_tenant_property_key"),
-    )
-    op.create_index(
-        "ix_smart_scenario_pack_installs_property_id",
-        "smart_scenario_pack_installs",
-        ["property_id"],
-        unique=False,
-    )
-    op.create_index(
-        "ix_smart_scenario_pack_installs_pack_key",
-        "smart_scenario_pack_installs",
-        ["pack_key"],
-        unique=False,
-    )
-    op.create_index(
-        "ix_smart_scenario_pack_installs_tenant_id",
-        "smart_scenario_pack_installs",
-        ["tenant_id"],
-        unique=False,
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    tables = set(inspector.get_table_names())
+
+    if "smart_scenario_pack_installs" not in tables:
+        op.create_table(
+            "smart_scenario_pack_installs",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("property_id", sa.Integer(), nullable=False),
+            sa.Column("pack_key", sa.String(length=64), nullable=False),
+            sa.Column("status", sa.String(length=16), nullable=False, server_default="enabled"),
+            sa.Column("installed_by", sa.String(length=128), nullable=True),
+            sa.Column("details_json", sa.Text(), nullable=True),
+            sa.Column("installed_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("tenant_id", sa.String(length=64), server_default="default", nullable=False),
+            sa.ForeignKeyConstraint(["property_id"], ["properties.id"]),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("tenant_id", "property_id", "pack_key", name="uq_scenario_pack_tenant_property_key"),
+        )
+        tables.add("smart_scenario_pack_installs")
+
+    existing_indexes = {
+        idx.get("name")
+        for idx in inspector.get_indexes("smart_scenario_pack_installs")
+    } if "smart_scenario_pack_installs" in tables else set()
+
+    if "ix_smart_scenario_pack_installs_property_id" not in existing_indexes:
+        op.create_index(
+            "ix_smart_scenario_pack_installs_property_id",
+            "smart_scenario_pack_installs",
+            ["property_id"],
+            unique=False,
+        )
+    if "ix_smart_scenario_pack_installs_pack_key" not in existing_indexes:
+        op.create_index(
+            "ix_smart_scenario_pack_installs_pack_key",
+            "smart_scenario_pack_installs",
+            ["pack_key"],
+            unique=False,
+        )
+    if "ix_smart_scenario_pack_installs_tenant_id" not in existing_indexes:
+        op.create_index(
+            "ix_smart_scenario_pack_installs_tenant_id",
+            "smart_scenario_pack_installs",
+            ["tenant_id"],
+            unique=False,
+        )
 
 
 def downgrade() -> None:
