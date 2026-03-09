@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
@@ -39,12 +39,10 @@ function SmartOverview() {
     <div>
       <SectionHeader
         title="Smart Overview"
-        subtitle="Panoramica rapida dello stato smart, con accesso diretto al dettaglio unità."
+        subtitle="Panoramica rapida dello stato smart, con accesso diretto al dettaglio unità"
       />
 
-      {loading ? (
-        <LoadingSkeleton rows={6} height={32} />
-      ) : null}
+      {loading ? <LoadingSkeleton rows={6} height={32} /> : null}
       {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
 
       {!loading && !error && overview ? (
@@ -78,7 +76,7 @@ function SmartOverview() {
             <AppCard>
               <h3 style={{ marginBottom: 8 }}>Unità disponibili</h3>
               {units.length === 0 ? (
-                <EmptyState title="Nessuna unità trovata" description="Aggiungi unità dal setup/properties." />
+                <EmptyState title="Nessuna unità trovata" description="Aggiungi unità dal setup/properties" />
               ) : (
                 <div style={{ display: "grid", gap: 8, maxHeight: 220, overflow: "auto" }}>
                   {units.map((u) => (
@@ -108,3 +106,4 @@ function SmartOverview() {
 }
 
 export default SmartOverview;
+

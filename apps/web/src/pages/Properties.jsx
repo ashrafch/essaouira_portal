@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   createProperty,
   createSmartProviderConnection,
   getProperties,
   getSmartProviderConnections,
 } from "../services/api";
+import {
+  AppCard,
+  EmptyState,
+  LoadingSkeleton,
+  SectionHeader,
+  StatusBadge,
+} from "../components/ui";
+import ActivityCard from "../components/dashboard/ActivityCard";
 
 function Properties() {
   const [properties, setProperties] = useState([]);
@@ -75,15 +83,15 @@ function Properties() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Properties</h1>
-      <p style={{ color: "#6b7280" }}>
-        Gestione property multi-tenant e registry connessioni provider smart.
-      </p>
+      <SectionHeader
+        title="Properties & Provider Connections"
+        subtitle="Gestione portfolio property multi-tenant e connessioni smart provider persistenti"
+      />
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Nuova property</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, marginBottom: 12 }}>
+        <AppCard>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Nuova property</h3>
           <form onSubmit={onCreateProperty} style={{ display: "grid", gap: 8 }}>
             <input
               placeholder="Nome property"
@@ -104,10 +112,10 @@ function Properties() {
             />
             <button type="submit">Crea property</button>
           </form>
-        </section>
+        </AppCard>
 
-        <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
-          <h3 style={{ marginTop: 0 }}>Nuova provider connection</h3>
+        <AppCard>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Nuova provider connection</h3>
           <form onSubmit={onCreateConnection} style={{ display: "grid", gap: 8 }}>
             <select
               value={connectionForm.property_id}
@@ -135,47 +143,58 @@ function Properties() {
             />
             <button type="submit">Salva connection</button>
           </form>
-        </section>
+        </AppCard>
       </div>
 
-      <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12, marginBottom: 12 }}>
-        <h3 style={{ marginTop: 0 }}>Lista properties</h3>
-        {loading ? (
-          <p>Caricamento...</p>
-        ) : properties.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Nessuna property.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {properties.map((p) => (
-              <li key={p.id}>
-                {p.name} ({p.code}) · {p.timezone} · {p.status}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
-        <h3 style={{ marginTop: 0 }}>Provider connections</h3>
-        {loading ? (
-          <p>Caricamento...</p>
-        ) : connections.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Nessuna connection.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {connections.map((c) => (
-              <div key={c.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8 }}>
-                <strong>{c.provider_name}</strong> · property #{c.property_id} · {c.status}
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                  base_url: {c.base_url || "n/a"} · last_sync: {c.last_sync_at || "n/a"}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
+        <AppCard>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Lista properties</h3>
+          {loading ? (
+            <LoadingSkeleton rows={5} height={22} />
+          ) : properties.length === 0 ? (
+            <EmptyState title="Nessuna property" description="Crea la prima property per iniziare setup e onboarding smart" />
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {properties.map((p) => (
+                <div key={p.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <strong>{p.name}</strong>
+                    <StatusBadge status={p.status || "active"} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                    #{p.id} · {p.code} · {p.timezone}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </AppCard>
+
+        <AppCard>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Provider connections</h3>
+          {loading ? (
+            <LoadingSkeleton rows={5} height={22} />
+          ) : connections.length === 0 ? (
+            <EmptyState title="Nessuna connection" description="Aggiungi una connessione mock o Home Assistant per importare devices" />
+          ) : (
+            <div style={{ display: "grid", gap: 8 }}>
+              {connections.map((c) => (
+                <ActivityCard
+                  key={c.id}
+                  title={`${c.provider_name} · property #${c.property_id}`}
+                  subtitle={`base_url: ${c.base_url || "n/a"} · last sync: ${c.last_sync_at || "n/a"}`}
+                  severity={c.status === "error" ? "critical" : c.status === "disconnected" ? "warning" : "info"}
+                  timestamp={c.updated_at || c.created_at}
+                  right={<StatusBadge status={c.status || "unknown"} />}
+                />
+              ))}
+            </div>
+          )}
+        </AppCard>
+      </div>
     </div>
   );
 }
 
 export default Properties;
+

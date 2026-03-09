@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { canAccessRoute, getRole } from "../config/rbac";
 import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
@@ -163,7 +163,7 @@ function Sidebar({ className = "", onNavigate = null }) {
     },
     {
       id: "property",
-      title: "Proprietà",
+      title: "Proprieta",
       items: [
         { to: "/units", label: "Appartamenti", badge: null, routeKey: "units" },
         { to: "/properties", label: "Properties", badge: null, routeKey: "properties" },
@@ -417,7 +417,7 @@ function Sidebar({ className = "", onNavigate = null }) {
                   />
                   <span style={titleStyle}>{section.title}</span>
                 </div>
-                <span style={caret}>{isOpen ? "▾" : "▸"}</span>
+                <span style={caret}>{isOpen ? "?" : "?"}</span>
               </button>
 
               {isOpen && (
@@ -451,3 +451,5 @@ function Sidebar({ className = "", onNavigate = null }) {
 }
 
 export default Sidebar;
+
+

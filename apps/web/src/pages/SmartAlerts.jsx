@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   acknowledgeSmartAlert,
   createSmartAlert,
@@ -7,6 +7,15 @@ import {
 } from "../services/api";
 import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
+import {
+  EmptyState,
+  LoadingSkeleton,
+  SectionHeader,
+  SeverityBadge,
+  StatusBadge,
+} from "../components/ui";
+import FilterBar from "../components/dashboard/FilterBar";
+import ActivityCard from "../components/dashboard/ActivityCard";
 
 const EMPTY_FORM = {
   unit_id: "",
@@ -24,12 +33,16 @@ function SmartAlerts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feedback, setFeedback] = useState({ type: "info", message: "" });
   const [form, setForm] = useState(EMPTY_FORM);
+  const [statusFilter, setStatusFilter] = useState("");
 
-  async function loadAlerts() {
+  const loadAlerts = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [alertsData, unitsData] = await Promise.all([getSmartAlerts(), getUnits()]);
+      const [alertsData, unitsData] = await Promise.all([
+        getSmartAlerts(statusFilter ? { status: statusFilter } : {}),
+        getUnits(),
+      ]);
       setAlerts(alertsData || []);
       setUnits(unitsData || []);
     } catch (err) {
@@ -37,11 +50,17 @@ function SmartAlerts() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [statusFilter]);
 
   useEffect(() => {
     loadAlerts();
-  }, []);
+  }, [loadAlerts]);
+
+  const grouped = useMemo(() => {
+    const open = alerts.filter((a) => a.status === "open");
+    const resolved = alerts.filter((a) => a.status !== "open");
+    return { open, resolved };
+  }, [alerts]);
 
   function openCreateModal() {
     setForm(EMPTY_FORM);
@@ -81,7 +100,11 @@ function SmartAlerts() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Smart Alerts</h1>
+      <SectionHeader
+        title="Smart Alerts"
+        subtitle="Alert operativi da dispositivi, automazioni e regole smart"
+        right={<button type="button" onClick={openCreateModal}>+ Crea alert</button>}
+      />
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
@@ -89,31 +112,54 @@ function SmartAlerts() {
         onClose={() => setFeedback({ type: "info", message: "" })}
       />
 
-      <div style={{ marginBottom: 14 }}>
-        <button type="button" onClick={openCreateModal}>+ Crea alert</button>
-      </div>
+      <FilterBar>
+        <label style={{ minWidth: 180 }}>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Status</span>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Tutti</option>
+            <option value="open">Open</option>
+            <option value="acknowledged">Acknowledged</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
+      </FilterBar>
 
       {loading ? (
-        <p>Caricamento...</p>
+        <LoadingSkeleton rows={6} height={24} />
       ) : alerts.length === 0 ? (
-        <p style={{ color: "#6b7280" }}>Nessun alert.</p>
+        <EmptyState title="Nessun alert" description="Quando arriva un'anomalia smart la trovi qui" />
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {alerts.map((a) => (
-            <div key={a.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{a.title}</div>
-                  <div style={{ fontSize: 13, color: "#6b7280" }}>
-                    {a.alert_type} � {a.severity} � stato: {a.status}
-                  </div>
-                </div>
-                {a.status === "open" && (
-                  <button type="button" onClick={() => handleAck(a.id)}>Acknowledge</button>
-                )}
-              </div>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+          <div>
+            <h3 style={{ marginBottom: 8 }}>Open ({grouped.open.length})</h3>
+            <div style={{ display: "grid", gap: 8 }}>
+              {grouped.open.length === 0 ? <EmptyState title="Nessun alert open" /> : grouped.open.map((a) => (
+                <ActivityCard
+                  key={a.id}
+                  title={a.title}
+                  subtitle={`${a.alert_type} · unit ${a.unit_id || "n/a"}`}
+                  severity={a.severity}
+                  timestamp={a.last_seen_at || a.first_seen_at}
+                  right={<button type="button" onClick={() => handleAck(a.id)}>Acknowledge</button>}
+                />
+              ))}
             </div>
-          ))}
+          </div>
+          <div>
+            <h3 style={{ marginBottom: 8 }}>Storico ({grouped.resolved.length})</h3>
+            <div style={{ display: "grid", gap: 8 }}>
+              {grouped.resolved.length === 0 ? <EmptyState title="Nessun alert nello storico" /> : grouped.resolved.map((a) => (
+                <ActivityCard
+                  key={a.id}
+                  title={a.title}
+                  subtitle={`${a.alert_type} · status ${a.status}`}
+                  severity={a.severity}
+                  timestamp={a.resolved_at || a.last_seen_at || a.first_seen_at}
+                  right={<StatusBadge status={a.status} />}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -126,7 +172,7 @@ function SmartAlerts() {
         <form onSubmit={handleCreate} style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
             <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })}>
-              <option value="">Nessuna unita</option>
+              <option value="">Nessuna unità</option>
               {units.map((u) => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
@@ -137,9 +183,10 @@ function SmartAlerts() {
               <option value="warning">warning</option>
               <option value="critical">critical</option>
             </select>
-            <input required placeholder="titolo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input required placeholder="Titolo" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
-          <textarea rows={2} placeholder="descrizione" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ marginTop: 8, width: "100%" }} />
+          <SeverityBadge severity={form.severity} />
+          <textarea rows={2} placeholder="Descrizione" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={{ marginTop: 8, width: "100%" }} />
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
             <button type="button" onClick={() => setIsModalOpen(false)}>Annulla</button>
             <button type="submit">Crea alert</button>

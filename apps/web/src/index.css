@@ -207,3 +207,75 @@ svg {
     justify-content: center;
   }
 }
+
+.cp-trigger-btn {
+  background: #fff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.cp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(2, 6, 23, 0.42);
+  display: grid;
+  place-items: start center;
+  padding-top: 12vh;
+}
+
+.cp-surface {
+  width: min(760px, 92vw);
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #dbe3ee;
+  overflow: hidden;
+  box-shadow: var(--ui-shadow-md);
+}
+
+.cp-command {
+  width: 100%;
+}
+
+.cp-input-wrap {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+}
+
+.cp-input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+}
+
+.cp-list {
+  max-height: 58vh;
+  overflow: auto;
+  padding: 8px;
+}
+
+.cp-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.cp-item[data-selected="true"] {
+  background: #e6fffa;
+}
+
+.cp-error {
+  color: #b91c1c;
+  font-size: 12px;
+  padding: 6px 10px;
+}

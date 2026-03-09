@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import {
   createSmartDevice,
   getSmartDeviceHealth,
@@ -6,6 +7,9 @@ import {
 } from "../services/api";
 import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
+import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
+import FilterBar from "../components/dashboard/FilterBar";
+import DeviceCard from "../components/smart/DeviceCard";
 
 const EMPTY_FORM = {
   provider: "mock",
@@ -26,7 +30,7 @@ function SmartDevices() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [filters, setFilters] = useState({ status: "", connectivity: "" });
 
-  async function loadDevices() {
+  const loadDevices = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -41,11 +45,11 @@ function SmartDevices() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filters.connectivity, filters.status]);
 
   useEffect(() => {
     loadDevices();
-  }, [filters.status, filters.connectivity]);
+  }, [loadDevices]);
 
   function openCreateModal() {
     setForm(EMPTY_FORM);
@@ -79,10 +83,17 @@ function SmartDevices() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Smart Devices</h1>
-      <p style={{ color: "#6b7280" }}>
-        Inventario dispositivi con health monitoring e visibilita operativa.
-      </p>
+      <SectionHeader
+        title="Smart Devices"
+        subtitle="Inventario dispositivi con health monitoring, stato connessione e qualità segnale"
+        right={
+          <button type="button" onClick={openCreateModal}>
+            <Plus size={14} style={{ marginRight: 6 }} />
+            Add device
+          </button>
+        }
+      />
+
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
@@ -90,70 +101,45 @@ function SmartDevices() {
         onClose={() => setFeedback({ type: "info", message: "" })}
       />
 
-      <div style={{ marginBottom: 14 }}>
-        <button type="button" onClick={openCreateModal}>+ Aggiungi dispositivo</button>
-      </div>
+      <FilterBar>
+        <label style={{ minWidth: 190 }}>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Health status</span>
+          <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
+            <option value="">Tutti</option>
+            <option value="healthy">healthy</option>
+            <option value="warning">warning</option>
+            <option value="critical">critical</option>
+          </select>
+        </label>
+        <label style={{ minWidth: 190 }}>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Connectivity</span>
+          <select value={filters.connectivity} onChange={(e) => setFilters((prev) => ({ ...prev, connectivity: e.target.value }))}>
+            <option value="">Tutte</option>
+            <option value="online">online</option>
+            <option value="offline">offline</option>
+            <option value="unknown">unknown</option>
+          </select>
+        </label>
+      </FilterBar>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
-          <option value="">Tutti health</option>
-          <option value="healthy">healthy</option>
-          <option value="warning">warning</option>
-          <option value="critical">critical</option>
-        </select>
-        <select value={filters.connectivity} onChange={(e) => setFilters((prev) => ({ ...prev, connectivity: e.target.value }))}>
-          <option value="">Tutte connectivity</option>
-          <option value="online">online</option>
-          <option value="offline">offline</option>
-          <option value="unknown">unknown</option>
-        </select>
-      </div>
-
-      {summary && (
-        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", marginBottom: 14 }}>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Totali <strong>{summary.total_devices}</strong></div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Online <strong>{summary.online_devices}</strong></div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Offline <strong>{summary.offline_devices}</strong></div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Warning <strong>{summary.warning_devices}</strong></div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>Critical <strong>{summary.critical_devices}</strong></div>
+      {summary ? (
+        <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
+          <StatCard label="Total" value={summary.total_devices} />
+          <StatCard label="Online" value={summary.online_devices} tone="success" />
+          <StatCard label="Offline" value={summary.offline_devices} tone="danger" />
+          <StatCard label="Warning" value={summary.warning_devices} tone="warning" />
+          <StatCard label="Critical" value={summary.critical_devices} tone="danger" />
         </div>
-      )}
+      ) : null}
 
       {loading ? (
-        <p>Caricamento...</p>
+        <LoadingSkeleton rows={6} height={24} />
       ) : devices.length === 0 ? (
-        <p style={{ color: "#6b7280" }}>Nessun dispositivo.</p>
+        <EmptyState title="Nessun dispositivo" description="Importa dal provider o crea manualmente il primo device" />
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
           {devices.map((d) => (
-            <div key={d.device_id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{d.name}</div>
-                  <div style={{ fontSize: 13, color: "#6b7280" }}>
-                    {d.provider} · {d.category}
-                  </div>
-                  <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12 }}>
-                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
-                      Connectivity: <strong>{d.connectivity_status}</strong>
-                    </span>
-                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
-                      Health: <strong>{d.health_status}</strong>
-                    </span>
-                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
-                      Battery: <strong>{d.battery_level ?? "-"}</strong>
-                    </span>
-                    <span style={{ border: "1px solid #d1d5db", borderRadius: 999, padding: "2px 8px", background: "#f9fafb" }}>
-                      RSSI: <strong>{d.signal_strength ?? "-"}</strong>
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
-                    Last seen: {d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : "n/a"}
-                  </div>
-                </div>
-                <button type="button" onClick={() => handleSimulate(d.device_id)}>Simula sync</button>
-              </div>
-            </div>
+            <DeviceCard key={d.device_id} device={d} onSimulate={handleSimulate} />
           ))}
         </div>
       )}
@@ -174,6 +160,11 @@ function SmartDevices() {
               <option value="home_assistant">home_assistant</option>
             </select>
           </div>
+          <AppCard style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Suggerimento: usa `external_id` coerente con il provider per semplificare sync e mapping automatico.
+            </div>
+          </AppCard>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
             <button type="button" onClick={() => setIsModalOpen(false)}>Annulla</button>
             <button type="submit">Salva</button>

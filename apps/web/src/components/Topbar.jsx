@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Menu, Wifi, WifiOff } from "lucide-react";
 import { clearAuthSession, getCurrentRole, getCurrentTenant, getCurrentUsername } from "../services/auth";
+import CommandPalette from "./CommandPalette";
 import StatusBadge from "./ui/StatusBadge";
 
 function Topbar({ onToggleSidebar = null }) {
@@ -32,9 +33,10 @@ function Topbar({ onToggleSidebar = null }) {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 18px",
+        gap: 10,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         {onToggleSidebar ? (
           <button
             type="button"
@@ -52,7 +54,7 @@ function Topbar({ onToggleSidebar = null }) {
           </button>
         ) : null}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>Operativita Giornaliera</div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Operativita giornaliera</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>
             Controllo live prenotazioni, staff, costi e manutenzione
           </div>
@@ -60,6 +62,7 @@ function Topbar({ onToggleSidebar = null }) {
       </div>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <CommandPalette />
         <span
           style={{
             display: "inline-flex",
@@ -103,3 +106,4 @@ function Topbar({ onToggleSidebar = null }) {
 }
 
 export default Topbar;
+
