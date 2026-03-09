@@ -91,6 +91,7 @@ Backend (`apps/server/.env`):
 - `DEVICE_BATTERY_WARNING_LEVEL` (default `20`)
 - `DEVICE_BATTERY_CRITICAL_LEVEL` (default `10`)
 - `DEVICE_SIGNAL_WARNING_RSSI` (default `-85`)
+- `TELEMETRY_MIN_INTERVAL_SECONDS` (default `60`, filtro anti-duplicazione campioni ravvicinati)
 
 Smart provider endpoints:
 - catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
@@ -100,6 +101,9 @@ Smart provider endpoints:
 - health overview: `GET /smart/device-health`
 - health by unit: `GET /smart/units/{id}/device-health`
 - health by device: `GET /smart/devices/{id}/health`
+- telemetry by device: `GET /smart/telemetry/device/{device_id}?metric_type=&from=&to=&interval=`
+- telemetry by unit: `GET /smart/telemetry/unit/{unit_id}?metric_type=&from=&to=&interval=`
+- telemetry by property: `GET /smart/telemetry/property/{property_id}?metric_type=&from=&to=&interval=`
 - smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
 - scenario packs:
   - `GET /smart/scenario-packs`
@@ -132,6 +136,11 @@ Setup wizard (Milestone 12):
 - step `connect-provider` persiste una `SmartProviderConnection` (`metadata.provider_connection_id`)
 - step `units` assegna `property_id` alle unità create/esistenti
 - step `import-devices` usa provider connection se disponibile
+
+Telemetry (Milestone 14):
+- metriche supportate: `temperature`, `humidity`, `power`, `energy`, `battery`, `signal`, `motion`, `contact`
+- query `interval` supporta bucket `15m`, `1h`, `6h`, `12h`, `1d`
+- aggregazioni per bucket: `min`, `max`, `avg`, `sum` (`value` espone `sum` per `energy`, `avg` per le altre metriche)
 
 User management:
 - endpoint owner-only: `GET/POST/PUT/DELETE /users`

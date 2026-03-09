@@ -265,6 +265,33 @@ class UnitDeviceHealthOut(BaseModel):
     devices: list[DeviceHealthOut]
 
 
+class DeviceTelemetryPointOut(BaseModel):
+    recorded_at: datetime
+    value: Decimal
+    unit: str | None = None
+    count: int = 1
+    min_value: Decimal | None = None
+    max_value: Decimal | None = None
+    avg_value: Decimal | None = None
+    sum_value: Decimal | None = None
+
+
+class DeviceTelemetrySeriesOut(BaseModel):
+    metric_type: str
+    unit: str | None = None
+    points: list[DeviceTelemetryPointOut] = Field(default_factory=list)
+
+
+class DeviceTelemetryQueryOut(BaseModel):
+    scope_type: str
+    scope_id: int
+    metric_type: str | None = None
+    interval: str | None = None
+    from_ts: datetime | None = None
+    to_ts: datetime | None = None
+    series: list[DeviceTelemetrySeriesOut] = Field(default_factory=list)
+
+
 class SetupSessionOut(BaseModel):
     id: int
     tenant_id: str

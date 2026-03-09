@@ -26,6 +26,7 @@ const SmartDevices = lazy(() => import("./pages/SmartDevices.jsx"));
 const SmartAlerts = lazy(() => import("./pages/SmartAlerts.jsx"));
 const SmartAutomation = lazy(() => import("./pages/SmartAutomation.jsx"));
 const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
+const SmartDeviceDetail = lazy(() => import("./pages/SmartDeviceDetail.jsx"));
 const SetupWizard = lazy(() => import("./pages/SetupWizard.jsx"));
 const Properties = lazy(() => import("./pages/Properties.jsx"));
 const AdminControl = lazy(() => import("./pages/AdminControl.jsx"));
@@ -55,6 +56,7 @@ const ROUTE_COMPONENTS = {
   smartAlerts: SmartAlerts,
   smartAutomation: SmartAutomation,
   smartUnitDetail: SmartUnitDetail,
+  smartDeviceDetail: SmartDeviceDetail,
   setupWizard: SetupWizard,
   properties: Properties,
   adminControl: AdminControl,

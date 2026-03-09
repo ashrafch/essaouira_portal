@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -43,6 +44,7 @@ import {
 const MotionDiv = motion.div;
 
 function SmartDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -75,10 +77,10 @@ function SmartDashboard() {
   const chartOps = useMemo(() => {
     if (!dashboard) return [];
     return [
-      { label: "Open alerts", value: dashboard.kpis.open_alerts },
-      { label: "Exec today", value: dashboard.kpis.automation_executions_today },
-      { label: "Exec fail", value: dashboard.kpis.automation_failures_today },
-      { label: "Exec partial", value: dashboard.kpis.automation_partial_today },
+      { label: "Alert aperti", value: dashboard.kpis.open_alerts },
+      { label: "Esecuzioni oggi", value: dashboard.kpis.automation_executions_today },
+      { label: "Errori", value: dashboard.kpis.automation_failures_today },
+      { label: "Parziali", value: dashboard.kpis.automation_partial_today },
     ];
   }, [dashboard]);
 
@@ -142,7 +144,7 @@ function SmartDashboard() {
       });
       await loadDashboardAndPacks(propertyId, unitId);
     } catch (err) {
-      setActionError(err.message || "Errore abilitazione scenario pack");
+      setActionError(err.message || "Errore abilitazione pacchetto scenario");
     } finally {
       setBusyPack("");
     }
@@ -152,7 +154,13 @@ function SmartDashboard() {
     <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
       <SectionHeader
         title="Smart Dashboard"
-        subtitle="Vista operativa unificata per dispositivi, alert, automazioni e provider"
+        subtitle="Vista operativa unificata di dispositivi, alert, automazioni e provider"
+        right={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
+            <button type="button" onClick={() => navigate("/smart-automation")}>Apri automazioni</button>
+          </div>
+        }
       />
 
       <FilterBar>
@@ -202,26 +210,26 @@ function SmartDashboard() {
       {!loading && !error && dashboard ? (
         <>
           <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
-            <StatCard label="Properties" value={dashboard.kpis.total_properties} icon={<PlugZap size={16} />} />
-            <StatCard label="Units" value={dashboard.kpis.total_units} />
-            <StatCard label="Devices" value={dashboard.kpis.total_devices} icon={<Cpu size={16} />} />
+            <StatCard label="Property" value={dashboard.kpis.total_properties} icon={<PlugZap size={16} />} />
+            <StatCard label="Unità" value={dashboard.kpis.total_units} />
+            <StatCard label="Dispositivi" value={dashboard.kpis.total_devices} icon={<Cpu size={16} />} />
             <StatCard label="Online" value={dashboard.kpis.online_devices} tone="success" icon={<CheckCircle2 size={16} />} />
             <StatCard label="Offline" value={dashboard.kpis.offline_devices} tone="danger" icon={<AlertTriangle size={16} />} />
             <StatCard label="Warning" value={dashboard.kpis.warning_devices} tone="warning" />
             <StatCard label="Critical" value={dashboard.kpis.critical_devices} tone="danger" icon={<ShieldAlert size={16} />} />
-            <StatCard label="Open alerts" value={dashboard.kpis.open_alerts} tone="warning" />
-            <StatCard label="Exec today" value={dashboard.kpis.automation_executions_today} tone="info" icon={<Zap size={16} />} />
+            <StatCard label="Alert aperti" value={dashboard.kpis.open_alerts} tone="warning" />
+            <StatCard label="Esecuzioni oggi" value={dashboard.kpis.automation_executions_today} tone="info" icon={<Zap size={16} />} />
             <StatCard
-              label="Fail / Partial"
+              label="Errori / Parziali"
               value={`${dashboard.kpis.automation_failures_today}/${dashboard.kpis.automation_partial_today}`}
-              hint="failed/partial"
+              hint="fail/parziali"
               tone="danger"
             />
           </div>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Health distribution</h3>
+              <h3 style={{ marginBottom: 8 }}>Distribuzione salute dispositivi</h3>
               <div style={{ height: 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -237,7 +245,7 @@ function SmartDashboard() {
               </div>
             </AppCard>
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Automation & alerts trend</h3>
+              <h3 style={{ marginBottom: 8 }}>Andamento alert e automazioni</h3>
               <div style={{ height: 240 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartOps}>
@@ -252,20 +260,20 @@ function SmartDashboard() {
           </div>
 
           <AppCard style={{ marginBottom: 12 }}>
-            <h3 style={{ marginBottom: 10 }}>Health heatmap</h3>
+            <h3 style={{ marginBottom: 10 }}>Heatmap stato operativo</h3>
             <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
-              <HeatmapTile title="Online" value={dashboard.kpis.online_devices} level="healthy" subtitle="Connected" />
-              <HeatmapTile title="Offline" value={dashboard.kpis.offline_devices} level={dashboard.kpis.offline_devices > 0 ? "critical" : "healthy"} subtitle="Needs check" />
-              <HeatmapTile title="Warning" value={dashboard.kpis.warning_devices} level={dashboard.kpis.warning_devices > 0 ? "warning" : "healthy"} subtitle="Battery/signal" />
-              <HeatmapTile title="Critical" value={dashboard.kpis.critical_devices} level={dashboard.kpis.critical_devices > 0 ? "critical" : "healthy"} subtitle="Immediate action" />
-              <HeatmapTile title="Open alerts" value={dashboard.kpis.open_alerts} level={dashboard.kpis.open_alerts > 0 ? "warning" : "healthy"} subtitle="Operational" />
-              <HeatmapTile title="Automation failures" value={dashboard.kpis.automation_failures_today} level={dashboard.kpis.automation_failures_today > 0 ? "critical" : "healthy"} subtitle="Today" />
+              <HeatmapTile title="Online" value={dashboard.kpis.online_devices} level="healthy" subtitle="Connessi" />
+              <HeatmapTile title="Offline" value={dashboard.kpis.offline_devices} level={dashboard.kpis.offline_devices > 0 ? "critical" : "healthy"} subtitle="Da verificare" />
+              <HeatmapTile title="Warning" value={dashboard.kpis.warning_devices} level={dashboard.kpis.warning_devices > 0 ? "warning" : "healthy"} subtitle="Batteria / segnale" />
+              <HeatmapTile title="Critical" value={dashboard.kpis.critical_devices} level={dashboard.kpis.critical_devices > 0 ? "critical" : "healthy"} subtitle="Intervento rapido" />
+              <HeatmapTile title="Alert aperti" value={dashboard.kpis.open_alerts} level={dashboard.kpis.open_alerts > 0 ? "warning" : "healthy"} subtitle="Operativo" />
+              <HeatmapTile title="Errori automazione" value={dashboard.kpis.automation_failures_today} level={dashboard.kpis.automation_failures_today > 0 ? "critical" : "healthy"} subtitle="Oggi" />
             </div>
           </AppCard>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Units needing attention</h3>
+              <h3 style={{ marginBottom: 8 }}>Unità con criticità</h3>
               {(dashboard.problematic_units || []).length === 0 ? (
                 <EmptyState title="Nessuna unità critica" />
               ) : (
@@ -284,7 +292,7 @@ function SmartDashboard() {
             </AppCard>
 
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Recent alert activity</h3>
+              <h3 style={{ marginBottom: 8 }}>Alert recenti</h3>
               {(dashboard.recent_alerts || []).length === 0 ? (
                 <EmptyState title="Nessun alert recente" />
               ) : (
@@ -297,7 +305,7 @@ function SmartDashboard() {
             </AppCard>
 
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Recent automation failures</h3>
+              <h3 style={{ marginBottom: 8 }}>Errori automazione recenti</h3>
               {(dashboard.recent_automation_failures || []).length === 0 ? (
                 <EmptyState title="Nessun errore recente" />
               ) : (
@@ -310,9 +318,9 @@ function SmartDashboard() {
             </AppCard>
 
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Recent executions</h3>
+              <h3 style={{ marginBottom: 8 }}>Esecuzioni recenti</h3>
               {(dashboard.recent_executions || []).length === 0 ? (
-                <EmptyState title="Nessuna execution recente" />
+                <EmptyState title="Nessuna esecuzione recente" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {(dashboard.recent_executions || []).map((item) => (
@@ -324,9 +332,9 @@ function SmartDashboard() {
           </div>
 
           <AppCard style={{ marginBottom: 12 }}>
-            <h3 style={{ marginBottom: 10 }}>Provider connections status</h3>
+            <h3 style={{ marginBottom: 10 }}>Stato connessioni provider</h3>
             {(dashboard.provider_statuses || []).length === 0 ? (
-              <EmptyState title="Nessuna provider connection" description="Configura un provider in Properties o Setup Wizard" />
+              <EmptyState title="Nessuna connessione provider" description="Configura un provider da Properties o Setup Wizard" />
             ) : (
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
                 {dashboard.provider_statuses.map((item) => (
@@ -336,10 +344,10 @@ function SmartDashboard() {
                       <StatusBadge status={item.status || "offline"} />
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
-                      property #{item.property_id} · active {item.is_active ? "yes" : "no"}
+                      property #{item.property_id} · attiva {item.is_active ? "sì" : "no"}
                     </div>
                     <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
-                      last sync: {item.last_sync_at ? new Date(item.last_sync_at).toLocaleString() : "n/a"}
+                      ultimo sync: {item.last_sync_at ? new Date(item.last_sync_at).toLocaleString() : "n/d"}
                     </div>
                     {item.last_error ? (
                       <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>{item.last_error}</div>
@@ -351,8 +359,8 @@ function SmartDashboard() {
           </AppCard>
 
           <AppCard>
-            <h3 style={{ marginBottom: 10 }}>Scenario packs</h3>
-            {!propertyId ? <EmptyState title="Seleziona una property per abilitare un pack" /> : null}
+            <h3 style={{ marginBottom: 10 }}>Pacchetti scenario</h3>
+            {!propertyId ? <EmptyState title="Seleziona una property per abilitare un pacchetto" /> : null}
             <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
               {packDefs.map((pack) => {
                 const enabled = enabledPacks.find((p) => p.pack_key === pack.key);
@@ -367,14 +375,14 @@ function SmartDashboard() {
                       <StatusBadge status={enabled ? "healthy" : "offline"} />
                     </div>
                     <p style={{ margin: "6px 0", fontSize: 13, color: "#64748b" }}>{pack.description}</p>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Includes: {(pack.includes || []).join(", ")}</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Include: {(pack.includes || []).join(", ")}</div>
                     <button
                       type="button"
                       onClick={() => handleEnablePack(pack.key)}
                       disabled={!propertyId || busyPack === pack.key}
                       style={{ marginTop: 8 }}
                     >
-                      {busyPack === pack.key ? "Applying..." : enabled ? "Reapply pack" : "Enable pack"}
+                      {busyPack === pack.key ? "Applicazione..." : enabled ? "Riapplica pacchetto" : "Abilita pacchetto"}
                     </button>
                   </MotionDiv>
                 );
@@ -388,4 +396,3 @@ function SmartDashboard() {
 }
 
 export default SmartDashboard;
-

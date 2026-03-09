@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createProperty,
   createSmartProviderConnection,
@@ -15,6 +16,7 @@ import {
 import ActivityCard from "../components/dashboard/ActivityCard";
 
 function Properties() {
+  const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [connections, setConnections] = useState([]);
   const [error, setError] = useState("");
@@ -38,7 +40,7 @@ function Properties() {
       setProperties(p || []);
       setConnections(c || []);
     } catch (err) {
-      setError(err.message || "Errore caricamento properties");
+      setError(err.message || "Errore caricamento property");
     } finally {
       setLoading(false);
     }
@@ -77,15 +79,16 @@ function Properties() {
       setConnectionForm({ property_id: "", provider_name: "mock", base_url: "" });
       await load();
     } catch (err) {
-      setError(err.message || "Errore creazione provider connection");
+      setError(err.message || "Errore creazione connessione provider");
     }
   }
 
   return (
     <div>
       <SectionHeader
-        title="Properties & Provider Connections"
-        subtitle="Gestione portfolio property multi-tenant e connessioni smart provider persistenti"
+        title="Property e Connessioni Provider"
+        subtitle="Gestione portfolio property multi-tenant e connessioni provider persistenti"
+        right={<button type="button" onClick={() => navigate("/setup")}>Apri Setup Wizard</button>}
       />
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
 
@@ -100,7 +103,7 @@ function Properties() {
               required
             />
             <input
-              placeholder="Code / slug (opzionale)"
+              placeholder="Codice / slug (opzionale)"
               value={propertyForm.code}
               onChange={(e) => setPropertyForm((prev) => ({ ...prev, code: e.target.value }))}
             />
@@ -115,7 +118,7 @@ function Properties() {
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Nuova provider connection</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Nuova connessione provider</h3>
           <form onSubmit={onCreateConnection} style={{ display: "grid", gap: 8 }}>
             <select
               value={connectionForm.property_id}
@@ -137,22 +140,22 @@ function Properties() {
               <option value="home_assistant">home_assistant</option>
             </select>
             <input
-              placeholder="Base URL (per HA)"
+              placeholder="Base URL (solo Home Assistant)"
               value={connectionForm.base_url}
               onChange={(e) => setConnectionForm((prev) => ({ ...prev, base_url: e.target.value }))}
             />
-            <button type="submit">Salva connection</button>
+            <button type="submit">Salva connessione</button>
           </form>
         </AppCard>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12 }}>
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Lista properties</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Elenco property</h3>
           {loading ? (
             <LoadingSkeleton rows={5} height={22} />
           ) : properties.length === 0 ? (
-            <EmptyState title="Nessuna property" description="Crea la prima property per iniziare setup e onboarding smart" />
+            <EmptyState title="Nessuna property" description="Crea la prima property per iniziare onboarding e setup smart" />
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {properties.map((p) => (
@@ -162,7 +165,7 @@ function Properties() {
                     <StatusBadge status={p.status || "active"} />
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                    #{p.id} · {p.code} · {p.timezone}
+                    #{p.id} · {p.code || "n/d"} · {p.timezone}
                   </div>
                 </div>
               ))}
@@ -171,18 +174,18 @@ function Properties() {
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Provider connections</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Connessioni provider</h3>
           {loading ? (
             <LoadingSkeleton rows={5} height={22} />
           ) : connections.length === 0 ? (
-            <EmptyState title="Nessuna connection" description="Aggiungi una connessione mock o Home Assistant per importare devices" />
+            <EmptyState title="Nessuna connessione" description="Aggiungi una connessione mock o Home Assistant per importare dispositivi" />
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {connections.map((c) => (
                 <ActivityCard
                   key={c.id}
                   title={`${c.provider_name} · property #${c.property_id}`}
-                  subtitle={`base_url: ${c.base_url || "n/a"} · last sync: ${c.last_sync_at || "n/a"}`}
+                  subtitle={`base_url: ${c.base_url || "n/d"} · ultimo sync: ${c.last_sync_at || "n/d"}`}
                   severity={c.status === "error" ? "critical" : c.status === "disconnected" ? "warning" : "info"}
                   timestamp={c.updated_at || c.created_at}
                   right={<StatusBadge status={c.status || "unknown"} />}

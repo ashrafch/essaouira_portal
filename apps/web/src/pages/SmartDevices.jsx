@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   createSmartDevice,
   getSmartDeviceHealth,
@@ -21,6 +22,7 @@ const EMPTY_FORM = {
 };
 
 function SmartDevices() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,12 +86,12 @@ function SmartDevices() {
   return (
     <div>
       <SectionHeader
-        title="Smart Devices"
-        subtitle="Inventario dispositivi con health monitoring, stato connessione e qualità segnale"
+        title="Dispositivi Smart"
+        subtitle="Inventario dispositivi con stato salute, connettività e qualità segnale"
         right={
           <button type="button" onClick={openCreateModal}>
             <Plus size={14} style={{ marginRight: 6 }} />
-            Add device
+            Nuovo dispositivo
           </button>
         }
       />
@@ -103,7 +105,7 @@ function SmartDevices() {
 
       <FilterBar>
         <label style={{ minWidth: 190 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Health status</span>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Stato salute</span>
           <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
             <option value="">Tutti</option>
             <option value="healthy">healthy</option>
@@ -112,7 +114,7 @@ function SmartDevices() {
           </select>
         </label>
         <label style={{ minWidth: 190 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Connectivity</span>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Connettività</span>
           <select value={filters.connectivity} onChange={(e) => setFilters((prev) => ({ ...prev, connectivity: e.target.value }))}>
             <option value="">Tutte</option>
             <option value="online">online</option>
@@ -124,7 +126,7 @@ function SmartDevices() {
 
       {summary ? (
         <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
-          <StatCard label="Total" value={summary.total_devices} />
+          <StatCard label="Dispositivi" value={summary.total_devices} />
           <StatCard label="Online" value={summary.online_devices} tone="success" />
           <StatCard label="Offline" value={summary.offline_devices} tone="danger" />
           <StatCard label="Warning" value={summary.warning_devices} tone="warning" />
@@ -139,7 +141,12 @@ function SmartDevices() {
       ) : (
         <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))" }}>
           {devices.map((d) => (
-            <DeviceCard key={d.device_id} device={d} onSimulate={handleSimulate} />
+            <DeviceCard
+              key={d.device_id}
+              device={d}
+              onSimulate={handleSimulate}
+              onOpenDetail={(id) => navigate(`/smart-devices/${id}`)}
+            />
           ))}
         </div>
       )}
@@ -152,9 +159,9 @@ function SmartDevices() {
       >
         <form onSubmit={handleCreate} style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-            <input placeholder="external_id" value={form.external_id} onChange={(e) => setForm({ ...form, external_id: e.target.value })} required />
-            <input placeholder="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <input placeholder="category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required />
+            <input placeholder="ID esterno provider" value={form.external_id} onChange={(e) => setForm({ ...form, external_id: e.target.value })} required />
+            <input placeholder="Nome dispositivo" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <input placeholder="Categoria dispositivo" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required />
             <select value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
               <option value="mock">mock</option>
               <option value="home_assistant">home_assistant</option>

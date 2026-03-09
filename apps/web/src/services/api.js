@@ -324,6 +324,10 @@ export function getSmartDevices() {
   return apiGet("/smart/devices");
 }
 
+export function getSmartDevice(deviceId) {
+  return apiGet(`/smart/devices/${deviceId}`);
+}
+
 export function getSmartDeviceHealth(params = {}) {
   return apiGet("/smart/device-health", params);
 }
@@ -334,6 +338,18 @@ export function getSmartUnitDeviceHealth(unitId) {
 
 export function getSingleSmartDeviceHealth(deviceId) {
   return apiGet(`/smart/devices/${deviceId}/health`);
+}
+
+export function getSmartDeviceTelemetry(deviceId, params = {}) {
+  return apiGet(`/smart/telemetry/device/${deviceId}`, params);
+}
+
+export function getSmartUnitTelemetry(unitId, params = {}) {
+  return apiGet(`/smart/telemetry/unit/${unitId}`, params);
+}
+
+export function getSmartPropertyTelemetry(propertyId, params = {}) {
+  return apiGet(`/smart/telemetry/property/${propertyId}`, params);
 }
 
 export function createSmartDevice(payload) {

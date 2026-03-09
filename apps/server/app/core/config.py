@@ -26,6 +26,7 @@ class Settings:
     device_battery_warning_level: int = int(os.getenv("DEVICE_BATTERY_WARNING_LEVEL", "20"))
     device_battery_critical_level: int = int(os.getenv("DEVICE_BATTERY_CRITICAL_LEVEL", "10"))
     device_signal_warning_rssi: int = int(os.getenv("DEVICE_SIGNAL_WARNING_RSSI", "-85"))
+    telemetry_min_interval_seconds: int = int(os.getenv("TELEMETRY_MIN_INTERVAL_SECONDS", "60"))
 
 
 settings = Settings()

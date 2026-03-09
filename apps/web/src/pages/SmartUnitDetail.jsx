@@ -1,6 +1,15 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, Rocket } from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
 import ActivityCard from "../components/dashboard/ActivityCard";
 import DeviceCard from "../components/smart/DeviceCard";
@@ -8,17 +17,75 @@ import TimelineItem from "../components/smart/TimelineItem";
 import {
   getSmartUnitDetail,
   getSmartUnitDeviceHealth,
+  getSmartUnitTelemetry,
   getSmartUnitTimeline,
 } from "../services/api";
+
+const RANGE_OPTIONS = {
+  "24h": { hours: 24, interval: "15m" },
+  "7d": { days: 7, interval: "1h" },
+  "30d": { days: 30, interval: "6h" },
+};
+
+function buildDateRange(rangeKey) {
+  const now = new Date();
+  const cfg = RANGE_OPTIONS[rangeKey] || RANGE_OPTIONS["24h"];
+  const from = new Date(now);
+  if (cfg.hours) from.setHours(from.getHours() - cfg.hours);
+  if (cfg.days) from.setDate(from.getDate() - cfg.days);
+  return {
+    from: from.toISOString(),
+    to: now.toISOString(),
+    interval: cfg.interval,
+  };
+}
+
+function pickSeries(data, metricType) {
+  return (data?.series || []).find((s) => s.metric_type === metricType) || null;
+}
+
+function mapPoints(series) {
+  if (!series) return [];
+  return (series.points || []).map((p) => ({
+    label: new Date(p.recorded_at).toLocaleString(),
+    value: Number(p.value),
+  }));
+}
+
+function TelemetryLineCard({ title, unit, color, points }) {
+  return (
+    <AppCard>
+      <h3 style={{ marginBottom: 8 }}>{title}</h3>
+      {points.length === 0 ? (
+        <EmptyState title="Nessun dato nel periodo" />
+      ) : (
+        <div style={{ height: 220 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={points}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" minTickGap={28} tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(value) => [`${value}${unit ? ` ${unit}` : ""}`, "Valore"]} />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </AppCard>
+  );
+}
 
 function SmartUnitDetail() {
   const { unitId } = useParams();
   const navigate = useNavigate();
+  const [range, setRange] = useState("24h");
   const [loading, setLoading] = useState(true);
+  const [telemetryLoading, setTelemetryLoading] = useState(true);
   const [error, setError] = useState("");
   const [detail, setDetail] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [health, setHealth] = useState(null);
+  const [telemetry, setTelemetry] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -34,13 +101,29 @@ function SmartUnitDetail() {
         setTimeline(t?.items || []);
         setHealth(h);
       } catch (err) {
-        setError(err.message || "Errore caricamento unit smart");
+        setError(err.message || "Errore caricamento unità smart");
       } finally {
         setLoading(false);
       }
     }
     load();
   }, [unitId]);
+
+  useEffect(() => {
+    async function loadTelemetry() {
+      setTelemetryLoading(true);
+      try {
+        const params = buildDateRange(range);
+        const data = await getSmartUnitTelemetry(unitId, params);
+        setTelemetry(data);
+      } catch (err) {
+        setError(err.message || "Errore caricamento telemetria unità");
+      } finally {
+        setTelemetryLoading(false);
+      }
+    }
+    loadTelemetry();
+  }, [unitId, range]);
 
   const summary = detail?.summary;
   const healthSummary = health?.summary;
@@ -65,73 +148,82 @@ function SmartUnitDetail() {
     });
   }, [detail, health]);
 
+  const temperatureSeries = useMemo(() => mapPoints(pickSeries(telemetry, "temperature")), [telemetry]);
+  const humiditySeries = useMemo(() => mapPoints(pickSeries(telemetry, "humidity")), [telemetry]);
+  const powerSeries = useMemo(() => mapPoints(pickSeries(telemetry, "power")), [telemetry]);
+  const energySeries = useMemo(() => mapPoints(pickSeries(telemetry, "energy")), [telemetry]);
+
   if (loading) return <LoadingSkeleton rows={8} height={28} />;
   if (error) return <p style={{ color: "#b91c1c" }}>{error}</p>;
-  if (!detail || !summary) return <EmptyState title="Nessun dato unit smart" />;
+  if (!detail || !summary) return <EmptyState title="Nessun dato unità smart" />;
 
   return (
     <div>
       <SectionHeader
-        title={`Smart Unit · ${detail.unit.name}`}
-        subtitle="Control center operativo della singola unità: salute device, alert e timeline eventi"
+        title={`Unità Smart · ${detail.unit.name}`}
+        subtitle="Control center dell'unità: salute dispositivi, alert e timeline operativa"
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => navigate("/smart-automation")}>Open automation</button>
-            <button type="button" onClick={() => navigate("/smart-alerts")}>Create / manage alerts</button>
+            <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
+            <button type="button" onClick={() => navigate("/smart-automation")}>Automazioni unità</button>
           </div>
         }
       />
 
       <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
-        <StatCard label="Devices" value={summary.total_devices} />
+        <StatCard label="Dispositivi" value={summary.total_devices} />
         <StatCard label="Online" value={healthSummary?.online_devices ?? summary.online_devices} tone="success" />
         <StatCard label="Offline" value={healthSummary?.offline_devices ?? summary.offline_devices} tone="danger" />
         <StatCard label="Warning" value={healthSummary?.warning_devices ?? summary.warning_devices ?? 0} tone="warning" />
         <StatCard label="Critical" value={healthSummary?.critical_devices ?? summary.critical_devices ?? 0} tone="danger" />
-        <StatCard label="Open alerts" value={summary.open_alerts} icon={<AlertTriangle size={15} />} tone="warning" />
+        <StatCard label="Alert aperti" value={summary.open_alerts} icon={<AlertTriangle size={15} />} tone="warning" />
       </div>
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
         <AppCard>
-          <h3 style={{ marginBottom: 10 }}>Open alerts</h3>
+          <h3 style={{ marginBottom: 10 }}>Alert aperti</h3>
           {detail.alerts_open?.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {detail.alerts_open.slice(0, 6).map((a) => (
                 <ActivityCard
                   key={a.id}
                   title={a.title}
-                  subtitle={`${a.alert_type} · status ${a.status}`}
+                  subtitle={`${a.alert_type} · stato ${a.status}`}
                   severity={a.severity}
                   timestamp={a.last_seen_at || a.first_seen_at}
                 />
               ))}
             </div>
           ) : (
-            <EmptyState title="Nessun alert aperto" description="La unità non ha allarmi aperti" />
+            <EmptyState title="Nessun alert aperto" description="Questa unità non ha allarmi aperti" />
           )}
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginBottom: 10 }}>Quick actions</h3>
+          <h3 style={{ marginBottom: 10 }}>Azioni rapide</h3>
           <div style={{ display: "grid", gap: 10 }}>
             <button type="button" onClick={() => navigate("/smart-automation")}>
               <Rocket size={14} style={{ marginRight: 6 }} />
-              Trigger scene / rule
+              Esegui scena o regola
             </button>
-            <button type="button" onClick={() => navigate("/smart-devices")}>Manage bound devices</button>
-            <button type="button" onClick={() => navigate("/smart-dashboard")}>Go to smart dashboard</button>
+            <button type="button" onClick={() => navigate("/smart-devices")}>Gestisci dispositivi associati</button>
+            <button type="button" onClick={() => navigate("/smart-dashboard")}>Torna alla dashboard smart</button>
           </div>
         </AppCard>
       </div>
 
       <AppCard style={{ marginBottom: 12 }}>
-        <h3 style={{ marginBottom: 10 }}>Devices bound to unit</h3>
+        <h3 style={{ marginBottom: 10 }}>Dispositivi associati all'unità</h3>
         {devicesWithHealth.length === 0 ? (
-          <EmptyState title="Nessun device assegnato" description="Assegna dispositivi dalla Setup Wizard o dalla pagina Devices" />
+          <EmptyState title="Nessun dispositivo associato" description="Assegna dispositivi dal Setup Wizard o dalla pagina Dispositivi" />
         ) : (
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
             {devicesWithHealth.map((device) => (
-              <DeviceCard key={device.device_id} device={device} />
+              <DeviceCard
+                key={device.device_id}
+                device={device}
+                onOpenDetail={(id) => navigate(`/smart-devices/${id}`)}
+              />
             ))}
           </div>
         )}
@@ -140,7 +232,7 @@ function SmartUnitDetail() {
       <AppCard>
         <h3 style={{ marginBottom: 10 }}>Timeline attività</h3>
         {timeline.length === 0 ? (
-          <EmptyState title="Nessun evento recente" description="La timeline mostrerà eventi smart e operativi legati a questa unità" />
+          <EmptyState title="Nessun evento recente" description="Qui vedrai eventi smart e operativi legati a questa unità" />
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
             {timeline.map((item) => (
@@ -149,9 +241,37 @@ function SmartUnitDetail() {
           </div>
         )}
       </AppCard>
+
+      <AppCard style={{ marginTop: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0 }}>Trend telemetria unità</h3>
+          <div style={{ display: "flex", gap: 8 }}>
+            {Object.keys(RANGE_OPTIONS).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setRange(item)}
+                style={item === range ? { borderColor: "#0f766e", color: "#0f766e" } : undefined}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </AppCard>
+
+      {telemetryLoading ? <LoadingSkeleton rows={6} height={26} /> : null}
+
+      {!telemetryLoading ? (
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+          <TelemetryLineCard title="Temperatura" unit="C" color="#0ea5e9" points={temperatureSeries} />
+          <TelemetryLineCard title="Umidità" unit="%" color="#22c55e" points={humiditySeries} />
+          <TelemetryLineCard title="Potenza" unit="W" color="#f59e0b" points={powerSeries} />
+          <TelemetryLineCard title="Energia" unit="kWh" color="#8b5cf6" points={energySeries} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export default SmartUnitDetail;
-

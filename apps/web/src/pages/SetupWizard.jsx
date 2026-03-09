@@ -25,12 +25,12 @@ import FilterBar from "../components/dashboard/FilterBar";
 
 const STEPS = [
   { key: "property", label: "Property" },
-  { key: "units", label: "Units" },
+  { key: "units", label: "Unità" },
   { key: "connect_provider", label: "Provider" },
-  { key: "import_devices", label: "Devices" },
-  { key: "assign_devices", label: "Mapping" },
-  { key: "enable_automations", label: "Automations" },
-  { key: "complete", label: "Finish" },
+  { key: "import_devices", label: "Dispositivi" },
+  { key: "assign_devices", label: "Assegnazioni" },
+  { key: "enable_automations", label: "Automazioni" },
+  { key: "complete", label: "Fine" },
 ];
 
 function SetupWizard() {
@@ -104,7 +104,7 @@ function SetupWizard() {
       setSession(current);
       await refreshReferenceData();
     } catch (err) {
-      setError(err.message || "Errore caricamento setup wizard");
+      setError(err.message || "Errore caricamento Setup Wizard");
     } finally {
       setLoading(false);
     }
@@ -121,7 +121,7 @@ function SetupWizard() {
       const updated = await action();
       setSession(updated.session ? updated.session : updated);
       await refreshReferenceData();
-      setSuccess("Step completato.");
+      setSuccess("Step completato con successo.");
     } catch (err) {
       setError(err.message || "Errore step wizard");
     }
@@ -132,8 +132,8 @@ function SetupWizard() {
   return (
     <div>
       <SectionHeader
-        title="Property Setup Wizard"
-        subtitle="Onboarding guidato e resumable: property, provider, devices, mapping, automation packs"
+        title="Setup Wizard Smart Property"
+        subtitle="Onboarding guidato e resumable: property, provider, dispositivi, mapping e pacchetti automazione"
       />
 
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
@@ -166,7 +166,7 @@ function SetupWizard() {
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 1 · Property</h3>
           <div style={{ display: "grid", gap: 8 }}>
             <input
-              placeholder="Property name"
+              placeholder="Nome property"
               value={propertyForm.property_name}
               onChange={(e) => setPropertyForm((prev) => ({ ...prev, property_name: e.target.value }))}
             />
@@ -176,7 +176,7 @@ function SetupWizard() {
               onChange={(e) => setPropertyForm((prev) => ({ ...prev, timezone: e.target.value }))}
             />
             <input
-              placeholder="Currency"
+              placeholder="Valuta"
               value={propertyForm.currency}
               onChange={(e) => setPropertyForm((prev) => ({ ...prev, currency: e.target.value }))}
             />
@@ -202,7 +202,7 @@ function SetupWizard() {
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 2 · Units</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 2 · Unità</h3>
           <textarea
             rows={3}
             value={unitsInput}
@@ -224,12 +224,12 @@ function SetupWizard() {
               }))
             }
           >
-            Crea units
+            Crea unità
           </button>
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 3 · Connect Provider</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 3 · Connessione provider</h3>
           <select
             value={providerForm.provider}
             onChange={(e) => setProviderForm((prev) => ({ ...prev, provider: e.target.value }))}
@@ -253,15 +253,15 @@ function SetupWizard() {
           </button>
           {propertyScopedConnections.length > 0 ? (
             <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
-              Connections: {propertyScopedConnections.map((c) => `#${c.id}:${c.provider_name}`).join(", ")}
+              Connessioni attive: {propertyScopedConnections.map((c) => `#${c.id}:${c.provider_name}`).join(", ")}
             </div>
           ) : null}
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 4 · Import Devices</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 4 · Importazione dispositivi</h3>
           <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Importa catalogo dal provider selezionato nello step precedente.
+            Importa il catalogo dal provider selezionato nello step precedente.
           </p>
           <button
             type="button"
@@ -284,7 +284,7 @@ function SetupWizard() {
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 5 · Assign Devices to Units</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 5 · Assegna dispositivi alle unità</h3>
           {importedDevices.length === 0 ? (
             <EmptyState title="Nessun dispositivo importato" />
           ) : (
@@ -326,12 +326,12 @@ function SetupWizard() {
               }))
             }
           >
-            Salva mapping
+            Salva assegnazioni
           </button>
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 6 · Enable Automations</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 6 · Abilita pacchetti automazione</h3>
           <div style={{ display: "grid", gap: 6 }}>
             {["basic_hospitality_pack", "energy_saver_pack", "leak_protection_pack"].map((tpl) => (
               <label key={tpl} style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -360,12 +360,12 @@ function SetupWizard() {
               }))
             }
           >
-            Abilita templates
+            Abilita pacchetti
           </button>
         </AppCard>
 
         <AppCard>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 7 · Finish</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 7 · Completa setup</h3>
           <button type="button" onClick={() => runStep(async () => ({ session: await setupComplete() }))}>
             Completa setup
           </button>
@@ -379,7 +379,7 @@ function SetupWizard() {
 
       {properties.length > 0 ? (
         <AppCard style={{ marginTop: 12 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Properties disponibili</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 10 }}>Property disponibili</h3>
           <div style={{ display: "grid", gap: 6 }}>
             {properties.map((p) => (
               <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>

@@ -17,6 +17,7 @@ export const APP_ROUTES = [
   { path: "/smart-overview", key: "smartOverview", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-dashboard", key: "smartDashboard", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-devices", key: "smartDevices", allowedRoles: ["owner", "manager", "operator", "viewer"] },
+  { path: "/smart-devices/:deviceId", key: "smartDeviceDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-alerts", key: "smartAlerts", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-automation", key: "smartAutomation", allowedRoles: ["owner", "manager"] },
   { path: "/smart-units/:unitId", key: "smartUnitDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },

@@ -16,6 +16,7 @@ from app.domains.smart_building.schemas import (
     DeviceCreate,
     DeviceHealthOut,
     DeviceHealthOverviewOut,
+    DeviceTelemetryQueryOut,
     DeviceEventCreate,
     DeviceEventOut,
     DeviceOut,
@@ -174,6 +175,63 @@ def get_device(device_id: int, request: Request, db: Session = Depends(get_db)):
 @router.get("/devices/{device_id}/health", response_model=DeviceHealthOut)
 def get_device_health(device_id: int, request: Request, db: Session = Depends(get_db)):
     return _service(request, db).get_single_device_health(device_id)
+
+
+@router.get("/telemetry/device/{device_id}", response_model=DeviceTelemetryQueryOut)
+def get_device_telemetry(
+    device_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+    interval: str | None = Query(default=None),
+):
+    return _service(request, db).get_device_telemetry(
+        device_id=device_id,
+        metric_type=metric_type,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        interval=interval,
+    )
+
+
+@router.get("/telemetry/unit/{unit_id}", response_model=DeviceTelemetryQueryOut)
+def get_unit_telemetry(
+    unit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+    interval: str | None = Query(default=None),
+):
+    return _service(request, db).get_unit_telemetry(
+        unit_id=unit_id,
+        metric_type=metric_type,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        interval=interval,
+    )
+
+
+@router.get("/telemetry/property/{property_id}", response_model=DeviceTelemetryQueryOut)
+def get_property_telemetry(
+    property_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+    interval: str | None = Query(default=None),
+):
+    return _service(request, db).get_property_telemetry(
+        property_id=property_id,
+        metric_type=metric_type,
+        from_ts=from_ts,
+        to_ts=to_ts,
+        interval=interval,
+    )
 
 
 @router.get("/provider-connections", response_model=list[ProviderConnectionOut])

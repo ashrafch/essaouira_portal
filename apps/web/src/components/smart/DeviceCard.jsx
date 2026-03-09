@@ -1,7 +1,7 @@
 ﻿import { Signal, Wifi } from "lucide-react";
 import { AppCard, HealthIndicator, StatusBadge } from "../ui";
 
-function DeviceCard({ device, onSimulate = null }) {
+function DeviceCard({ device, onSimulate = null, onOpenDetail = null }) {
   return (
     <AppCard hover>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
@@ -22,16 +22,23 @@ function DeviceCard({ device, onSimulate = null }) {
               <Signal size={12} /> rssi {device.signal_strength ?? "-"}
             </span>
             <span className="ui-status" style={{ background: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}>
-              <Wifi size={12} /> seen {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : "n/a"}
+              <Wifi size={12} /> seen {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : "n/d"}
             </span>
             {device.needs_attention ? <StatusBadge status="warning" /> : null}
           </div>
         </div>
-        {onSimulate ? (
-          <button type="button" onClick={() => onSimulate(device.device_id)}>
-            Simula sync
-          </button>
-        ) : null}
+        <div style={{ display: "grid", gap: 8, alignContent: "start" }}>
+          {onOpenDetail ? (
+            <button type="button" onClick={() => onOpenDetail(device.device_id)}>
+              Apri dettaglio
+            </button>
+          ) : null}
+          {onSimulate ? (
+            <button type="button" onClick={() => onSimulate(device.device_id)}>
+              Simula sync
+            </button>
+          ) : null}
+        </div>
       </div>
     </AppCard>
   );

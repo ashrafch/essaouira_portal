@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   acknowledgeSmartAlert,
   createSmartAlert,
@@ -26,6 +27,7 @@ const EMPTY_FORM = {
 };
 
 function SmartAlerts() {
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,16 +96,21 @@ function SmartAlerts() {
       await loadAlerts();
       setFeedback({ type: "success", message: "Alert preso in carico." });
     } catch (err) {
-      setFeedback({ type: "error", message: err.message || "Errore acknowledge" });
+      setFeedback({ type: "error", message: err.message || "Errore presa in carico" });
     }
   }
 
   return (
     <div>
       <SectionHeader
-        title="Smart Alerts"
-        subtitle="Alert operativi da dispositivi, automazioni e regole smart"
-        right={<button type="button" onClick={openCreateModal}>+ Crea alert</button>}
+        title="Alert Smart"
+        subtitle="Alert operativi da dispositivi, regole e automazioni smart"
+        right={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={openCreateModal}>Nuovo alert</button>
+            <button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>
+          </div>
+        }
       />
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
       <FeedbackMessage
@@ -114,12 +121,12 @@ function SmartAlerts() {
 
       <FilterBar>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Status</span>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Stato</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Tutti</option>
-            <option value="open">Open</option>
-            <option value="acknowledged">Acknowledged</option>
-            <option value="resolved">Resolved</option>
+            <option value="open">Aperti</option>
+            <option value="acknowledged">In carico</option>
+            <option value="resolved">Risolti</option>
           </select>
         </label>
       </FilterBar>
@@ -131,16 +138,16 @@ function SmartAlerts() {
       ) : (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
           <div>
-            <h3 style={{ marginBottom: 8 }}>Open ({grouped.open.length})</h3>
+            <h3 style={{ marginBottom: 8 }}>Aperti ({grouped.open.length})</h3>
             <div style={{ display: "grid", gap: 8 }}>
-              {grouped.open.length === 0 ? <EmptyState title="Nessun alert open" /> : grouped.open.map((a) => (
+              {grouped.open.length === 0 ? <EmptyState title="Nessun alert aperto" /> : grouped.open.map((a) => (
                 <ActivityCard
                   key={a.id}
                   title={a.title}
-                  subtitle={`${a.alert_type} · unit ${a.unit_id || "n/a"}`}
+                  subtitle={`${a.alert_type} · unità ${a.unit_id || "n/d"}`}
                   severity={a.severity}
                   timestamp={a.last_seen_at || a.first_seen_at}
-                  right={<button type="button" onClick={() => handleAck(a.id)}>Acknowledge</button>}
+                  right={<button type="button" onClick={() => handleAck(a.id)}>Prendi in carico</button>}
                 />
               ))}
             </div>
@@ -152,7 +159,7 @@ function SmartAlerts() {
                 <ActivityCard
                   key={a.id}
                   title={a.title}
-                  subtitle={`${a.alert_type} · status ${a.status}`}
+                  subtitle={`${a.alert_type} · stato ${a.status}`}
                   severity={a.severity}
                   timestamp={a.resolved_at || a.last_seen_at || a.first_seen_at}
                   right={<StatusBadge status={a.status} />}
@@ -198,3 +205,4 @@ function SmartAlerts() {
 }
 
 export default SmartAlerts;
+

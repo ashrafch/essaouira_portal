@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getSmartAutomationExecutions,
   getSmartAutomationRules,
@@ -10,6 +11,7 @@ import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatusBadge } from
 import ActivityCard from "../components/dashboard/ActivityCard";
 
 function SmartAutomation() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [scenes, setScenes] = useState([]);
@@ -50,7 +52,7 @@ function SmartAutomation() {
       await runSmartScene(sceneId, { source: "ui.manual" });
       await load();
     } catch (err) {
-      setError(err.message || "Errore run scene");
+      setError(err.message || "Errore esecuzione scena");
     }
   }
 
@@ -64,15 +66,16 @@ function SmartAutomation() {
       });
       await load();
     } catch (err) {
-      setError(err.message || "Errore trigger rule");
+      setError(err.message || "Errore trigger regola");
     }
   }
 
   return (
     <div>
       <SectionHeader
-        title="Smart Automation"
-        subtitle="Scene, regole e execution trace per controllo operativo e troubleshooting"
+        title="Automazioni Smart"
+        subtitle="Scene, regole e trace di esecuzione per controllo operativo e troubleshooting"
+        right={<button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>}
       />
       {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
       {loading ? (
@@ -83,16 +86,16 @@ function SmartAutomation() {
             <AppCard>
               <h3 style={{ marginTop: 0, marginBottom: 10 }}>Scene</h3>
               {scenes.length === 0 ? (
-                <EmptyState title="Nessuna scena" />
+                <EmptyState title="Nessuna scena" description="Crea scene per azioni rapide su dispositivi smart" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {scenes.map((s) => (
                     <div key={s.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{s.name}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>{s.description || "No description"}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{s.description || "Nessuna descrizione"}</div>
                       </div>
-                      <button type="button" onClick={() => handleRunScene(s.id)}>Esegui</button>
+                      <button type="button" onClick={() => handleRunScene(s.id)}>Esegui scena</button>
                     </div>
                   ))}
                 </div>
@@ -102,7 +105,7 @@ function SmartAutomation() {
             <AppCard>
               <h3 style={{ marginTop: 0, marginBottom: 10 }}>Regole</h3>
               {rules.length === 0 ? (
-                <EmptyState title="Nessuna regola" />
+                <EmptyState title="Nessuna regola" description="Aggiungi regole per trigger automatici o manuali" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {rules.map((r) => (
@@ -113,7 +116,7 @@ function SmartAutomation() {
                           {r.trigger_type} ? {r.action_type}
                         </div>
                       </div>
-                      <button type="button" onClick={() => handleTriggerRule(r)}>Trigger</button>
+                      <button type="button" onClick={() => handleTriggerRule(r)}>Esegui regola</button>
                     </div>
                   ))}
                 </div>
@@ -123,16 +126,16 @@ function SmartAutomation() {
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
             <AppCard>
-              <h3 style={{ marginTop: 0, marginBottom: 10 }}>Execution log</h3>
+              <h3 style={{ marginTop: 0, marginBottom: 10 }}>Log esecuzioni</h3>
               {executions.length === 0 ? (
-                <EmptyState title="Nessuna execution" />
+                <EmptyState title="Nessuna esecuzione" description="Il log si popola quando scene/regole vengono eseguite" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {executions.map((e) => (
                     <ActivityCard
                       key={e.id}
                       title={`#${e.id} · ${e.trigger_type}`}
-                      subtitle={`${e.trigger_source} · correlation ${e.correlation_id || "n/a"}`}
+                      subtitle={`${e.trigger_source} · correlation ${e.correlation_id || "n/d"}`}
                       severity={e.status === "failed" ? "critical" : e.status === "partial" ? "warning" : "info"}
                       timestamp={e.started_at || e.finished_at}
                       right={<StatusBadge status={e.status} />}
@@ -143,16 +146,16 @@ function SmartAutomation() {
             </AppCard>
 
             <AppCard>
-              <h3 style={{ marginTop: 0, marginBottom: 10 }}>Recent failures</h3>
+              <h3 style={{ marginTop: 0, marginBottom: 10 }}>Errori recenti</h3>
               {failedExec.length === 0 ? (
-                <EmptyState title="Nessun failure recente" description="Le execution sono stabili nel periodo selezionato" />
+                <EmptyState title="Nessun errore recente" description="Le esecuzioni sono stabili nel periodo selezionato" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {failedExec.map((e) => (
                     <ActivityCard
                       key={e.id}
-                      title={`Execution #${e.id}`}
-                      subtitle={e.error_message || "Failure without explicit error message"}
+                      title={`Esecuzione #${e.id}`}
+                      subtitle={e.error_message || "Errore senza messaggio esplicito"}
                       severity={e.status === "failed" ? "critical" : "warning"}
                       timestamp={e.finished_at || e.started_at}
                     />

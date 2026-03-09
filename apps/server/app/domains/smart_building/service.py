@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import uuid
+from decimal import Decimal, InvalidOperation
 from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import HTTPException
@@ -60,6 +61,7 @@ from app.models.smart_building import (
     DeviceCommand,
     DeviceEvent,
     DeviceState,
+    DeviceTelemetry,
     Scene,
     SceneAction,
     SetupSession,
@@ -75,6 +77,33 @@ LOCK_CATEGORIES = {"smart_lock", "lock_controller"}
 AUTOMATION_EXECUTION_STATUSES = {"running", "executed", "failed", "partial"}
 AUTOMATION_DEDUP_WINDOW = timedelta(minutes=5)
 CONNECTIVITY_STATUSES = {"online", "offline", "unknown"}
+SUPPORTED_TELEMETRY_METRICS = {
+    "temperature",
+    "humidity",
+    "power",
+    "energy",
+    "battery",
+    "signal",
+    "motion",
+    "contact",
+}
+TELEMETRY_METRIC_UNITS = {
+    "temperature": "C",
+    "humidity": "%",
+    "power": "W",
+    "energy": "kWh",
+    "battery": "%",
+    "signal": "dBm",
+    "motion": "bool",
+    "contact": "bool",
+}
+TELEMETRY_INTERVAL_SECONDS = {
+    "5m": 5 * 60,
+    "15m": 15 * 60,
+    "1h": 60 * 60,
+    "6h": 6 * 60 * 60,
+    "1d": 24 * 60 * 60,
+}
 SETUP_STEPS = (
     "property",
     "units",
@@ -383,6 +412,75 @@ class SmartBuildingService:
             unit = self.db.query(Unit).filter(Unit.id == device.unit_id).first()
             unit_name = unit.name if unit else None
         return self._build_device_health_record(device, state, unit_name=unit_name)
+
+    def get_device_telemetry(
+        self,
+        *,
+        device_id: int,
+        metric_type: str | None,
+        from_ts: datetime | None,
+        to_ts: datetime | None,
+        interval: str | None,
+    ) -> dict[str, object]:
+        self.get_device_or_404(device_id)
+        payload = self._telemetry_query(
+            metric_type=metric_type,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            interval=interval,
+            scope_filters=(DeviceTelemetry.device_id == device_id,),
+        )
+        return {
+            "scope_type": "device",
+            "scope_id": device_id,
+            **payload,
+        }
+
+    def get_unit_telemetry(
+        self,
+        *,
+        unit_id: int,
+        metric_type: str | None,
+        from_ts: datetime | None,
+        to_ts: datetime | None,
+        interval: str | None,
+    ) -> dict[str, object]:
+        self._ensure_unit_visible(unit_id)
+        payload = self._telemetry_query(
+            metric_type=metric_type,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            interval=interval,
+            scope_filters=(DeviceTelemetry.unit_id == unit_id,),
+        )
+        return {
+            "scope_type": "unit",
+            "scope_id": unit_id,
+            **payload,
+        }
+
+    def get_property_telemetry(
+        self,
+        *,
+        property_id: int,
+        metric_type: str | None,
+        from_ts: datetime | None,
+        to_ts: datetime | None,
+        interval: str | None,
+    ) -> dict[str, object]:
+        self._property_or_404(property_id)
+        payload = self._telemetry_query(
+            metric_type=metric_type,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            interval=interval,
+            scope_filters=(DeviceTelemetry.property_id == property_id,),
+        )
+        return {
+            "scope_type": "property",
+            "scope_id": property_id,
+            **payload,
+        }
 
     def list_provider_connections(self, property_id: int | None = None) -> list[SmartProviderConnection]:
         query = self._scoped_query(SmartProviderConnection).order_by(
@@ -1262,6 +1360,244 @@ class SmartBuildingService:
                 continue
         return None
 
+    def _extract_energy_from_raw_payload(self, raw_payload_json: str | None) -> Decimal | None:
+        raw = self._safe_json_loads(raw_payload_json)
+        attrs = raw.get("attributes") if isinstance(raw.get("attributes"), dict) else {}
+        candidates = (
+            raw.get("energy_kwh"),
+            raw.get("energy"),
+            raw.get("total_energy"),
+            attrs.get("energy"),
+            attrs.get("total_energy"),
+            attrs.get("last_period"),
+        )
+        for value in candidates:
+            parsed = self._to_decimal(value)
+            if parsed is not None:
+                return parsed
+        return None
+
+    def _to_decimal(self, value) -> Decimal | None:
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    def _prepare_telemetry_samples(
+        self,
+        *,
+        device: Device,
+        payload: DeviceStateUpdate,
+        recorded_at: datetime,
+    ) -> list[dict[str, object]]:
+        samples: list[dict[str, object]] = []
+        unit = self.db.query(Unit).filter(Unit.id == device.unit_id).first() if device.unit_id else None
+        property_id = unit.property_id if unit is not None else None
+
+        metric_values: list[tuple[str, Decimal | None, str | None]] = [
+            ("temperature", self._to_decimal(payload.temperature_c), TELEMETRY_METRIC_UNITS["temperature"]),
+            ("humidity", self._to_decimal(payload.humidity_pct), TELEMETRY_METRIC_UNITS["humidity"]),
+            ("power", self._to_decimal(payload.energy_w), TELEMETRY_METRIC_UNITS["power"]),
+            ("signal", self._to_decimal(payload.signal_rssi), TELEMETRY_METRIC_UNITS["signal"]),
+            (
+                "motion",
+                Decimal("1") if payload.motion_detected is True else Decimal("0") if payload.motion_detected is False else None,
+                TELEMETRY_METRIC_UNITS["motion"],
+            ),
+            (
+                "contact",
+                Decimal("1") if payload.contact_open is True else Decimal("0") if payload.contact_open is False else None,
+                TELEMETRY_METRIC_UNITS["contact"],
+            ),
+        ]
+
+        battery = self._extract_battery_from_raw_payload(payload.raw_payload_json)
+        if battery is not None:
+            metric_values.append(("battery", Decimal(str(battery)), TELEMETRY_METRIC_UNITS["battery"]))
+
+        energy_total = self._extract_energy_from_raw_payload(payload.raw_payload_json)
+        if energy_total is not None:
+            metric_values.append(("energy", energy_total, TELEMETRY_METRIC_UNITS["energy"]))
+
+        min_interval = max(0, int(settings.telemetry_min_interval_seconds))
+        dedup_cutoff = recorded_at - timedelta(seconds=min_interval)
+
+        for metric_type, value, unit_name in metric_values:
+            if value is None:
+                continue
+            last_sample = (
+                self._scoped_query(DeviceTelemetry)
+                .filter(
+                    DeviceTelemetry.device_id == device.id,
+                    DeviceTelemetry.metric_type == metric_type,
+                )
+                .order_by(DeviceTelemetry.recorded_at.desc(), DeviceTelemetry.id.desc())
+                .first()
+            )
+            if (
+                last_sample is not None
+                and min_interval > 0
+                and last_sample.recorded_at is not None
+                and self._as_utc_datetime(last_sample.recorded_at) is not None
+            ):
+                last_recorded = self._as_utc_datetime(last_sample.recorded_at)
+                if (
+                    last_recorded is not None
+                    and last_recorded >= dedup_cutoff
+                    and self._to_decimal(last_sample.value) == value
+                ):
+                    continue
+
+            samples.append(
+                {
+                    "tenant_id": self.tenant_id,
+                    "property_id": property_id,
+                    "unit_id": device.unit_id,
+                    "device_id": device.id,
+                    "metric_type": metric_type,
+                    "value": value,
+                    "unit": unit_name,
+                    "recorded_at": recorded_at,
+                }
+            )
+        return samples
+
+    def _ingest_telemetry_for_state(
+        self,
+        *,
+        device: Device,
+        payload: DeviceStateUpdate,
+        recorded_at: datetime,
+    ) -> int:
+        created = 0
+        for sample in self._prepare_telemetry_samples(device=device, payload=payload, recorded_at=recorded_at):
+            self.db.add(DeviceTelemetry(**sample))
+            created += 1
+        return created
+
+    def _parse_telemetry_interval_seconds(self, interval: str | None) -> int | None:
+        if interval is None:
+            return None
+        normalized = interval.strip().lower()
+        if not normalized:
+            return None
+        seconds = TELEMETRY_INTERVAL_SECONDS.get(normalized)
+        if seconds is None:
+            raise HTTPException(status_code=400, detail="Intervallo telemetria non valido")
+        return seconds
+
+    def _bucket_datetime(self, timestamp: datetime, interval_seconds: int) -> datetime:
+        ts = self._as_utc_datetime(timestamp) or datetime.now(timezone.utc)
+        epoch = int(ts.timestamp())
+        bucket_epoch = epoch - (epoch % interval_seconds)
+        return datetime.fromtimestamp(bucket_epoch, tz=timezone.utc)
+
+    def _validate_metric_type(self, metric_type: str | None) -> str | None:
+        if metric_type is None:
+            return None
+        normalized = metric_type.strip().lower()
+        if not normalized:
+            return None
+        if normalized not in SUPPORTED_TELEMETRY_METRICS:
+            raise HTTPException(status_code=400, detail="metric_type telemetria non valido")
+        return normalized
+
+    def _telemetry_query(
+        self,
+        *,
+        metric_type: str | None,
+        from_ts: datetime | None,
+        to_ts: datetime | None,
+        interval: str | None,
+        scope_filters: tuple,
+    ) -> dict[str, object]:
+        normalized_metric = self._validate_metric_type(metric_type)
+        interval_seconds = self._parse_telemetry_interval_seconds(interval)
+        from_utc = self._as_utc_datetime(from_ts)
+        to_utc = self._as_utc_datetime(to_ts)
+        if from_utc is not None and to_utc is not None and from_utc > to_utc:
+            raise HTTPException(status_code=400, detail="Intervallo temporale non valido")
+
+        query = self._scoped_query(DeviceTelemetry).filter(*scope_filters)
+        if normalized_metric is not None:
+            query = query.filter(DeviceTelemetry.metric_type == normalized_metric)
+        if from_utc is not None:
+            query = query.filter(DeviceTelemetry.recorded_at >= from_utc)
+        if to_utc is not None:
+            query = query.filter(DeviceTelemetry.recorded_at <= to_utc)
+
+        rows = (
+            query.order_by(DeviceTelemetry.recorded_at.asc(), DeviceTelemetry.id.asc())
+            .limit(5000)
+            .all()
+        )
+        series_map: dict[tuple[str, str | None], dict[datetime, dict[str, object]]] = {}
+
+        for row in rows:
+            metric = (row.metric_type or "").strip().lower()
+            if not metric:
+                continue
+            unit_name = row.unit
+            key = (metric, unit_name)
+            if key not in series_map:
+                series_map[key] = {}
+            row_time = self._as_utc_datetime(row.recorded_at) or datetime.now(timezone.utc)
+            bucket = (
+                self._bucket_datetime(row_time, interval_seconds)
+                if interval_seconds is not None
+                else row_time
+            )
+            if bucket not in series_map[key]:
+                series_map[key][bucket] = {
+                    "recorded_at": bucket,
+                    "count": 0,
+                    "sum_value": Decimal("0"),
+                    "min_value": None,
+                    "max_value": None,
+                }
+            agg = series_map[key][bucket]
+            value = self._to_decimal(row.value)
+            if value is None:
+                continue
+            agg["count"] += 1
+            agg["sum_value"] = agg["sum_value"] + value
+            agg["min_value"] = value if agg["min_value"] is None else min(agg["min_value"], value)
+            agg["max_value"] = value if agg["max_value"] is None else max(agg["max_value"], value)
+
+        series: list[dict[str, object]] = []
+        for (metric, unit_name), buckets in sorted(series_map.items(), key=lambda item: item[0][0]):
+            points: list[dict[str, object]] = []
+            for bucket_time in sorted(buckets.keys()):
+                agg = buckets[bucket_time]
+                count = int(agg["count"])
+                if count <= 0:
+                    continue
+                sum_value = agg["sum_value"]
+                avg_value = (sum_value / Decimal(str(count))) if count > 0 else None
+                value = sum_value if metric == "energy" else avg_value
+                points.append(
+                    {
+                        "recorded_at": bucket_time,
+                        "value": value,
+                        "unit": unit_name,
+                        "count": count,
+                        "min_value": agg["min_value"],
+                        "max_value": agg["max_value"],
+                        "avg_value": avg_value,
+                        "sum_value": sum_value,
+                    }
+                )
+            series.append({"metric_type": metric, "unit": unit_name, "points": points})
+        return {
+            "metric_type": normalized_metric,
+            "interval": interval.strip().lower() if interval else None,
+            "from_ts": from_utc,
+            "to_ts": to_utc,
+            "series": series,
+        }
+
     def _compute_connectivity_status(
         self, device: Device, state: DeviceState | None, now: datetime
     ) -> str:
@@ -1849,6 +2185,8 @@ class SmartBuildingService:
         if payload.signal_rssi is not None:
             device.signal_strength = payload.signal_rssi
         device.last_seen_at = now
+
+        self._ingest_telemetry_for_state(device=device, payload=payload, recorded_at=now)
 
         health = self._build_device_health_record(device, state, now=now)
         device.connectivity_status = str(health["connectivity_status"])

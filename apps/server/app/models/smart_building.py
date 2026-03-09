@@ -45,6 +45,7 @@ class Device(TenantScopedMixin, Base):
     events = relationship("DeviceEvent", back_populates="device", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="device", cascade="all, delete-orphan")
     commands = relationship("DeviceCommand", back_populates="device", cascade="all, delete-orphan")
+    telemetry = relationship("DeviceTelemetry", back_populates="device", cascade="all, delete-orphan")
     scene_actions = relationship("SceneAction", back_populates="target_device")
     automation_rules = relationship("AutomationRule", back_populates="target_device")
 
@@ -272,3 +273,21 @@ class SmartScenarioPackInstall(TenantScopedMixin, Base):
     details_json = Column(Text, nullable=True)
     installed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class DeviceTelemetry(TenantScopedMixin, Base):
+    __tablename__ = "device_telemetry"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
+    metric_type = Column(String(64), nullable=False, index=True)
+    value = Column(Numeric(14, 4), nullable=False)
+    unit = Column(String(32), nullable=True)
+    recorded_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    device = relationship("Device", back_populates="telemetry")
+    property_ref = relationship("Property")
+    unit_ref = relationship("Unit")
