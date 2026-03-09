@@ -1,48 +1,63 @@
-import { Outlet } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { Outlet, useLocation } from "react-router-dom";
+import { useState } from "react";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
 
-const layoutStyle = {
-  display: "grid",
-  gridTemplateColumns: "240px 1fr",
-  gridTemplateRows: "60px 1fr",
-  minHeight: "100vh",
-  fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-};
-
-const sidebarWrapper = {
-  gridRow: "1 / 3",
-  gridColumn: "1 / 2",
-  borderRight: "1px solid #e5e7eb",
-  backgroundColor: "#f9fafb",
-};
-
-const topbarWrapper = {
-  gridRow: "1 / 2",
-  gridColumn: "2 / 3",
-  borderBottom: "1px solid #e5e7eb",
-  backgroundColor: "#ffffff",
-};
-
-const contentWrapper = {
-  gridRow: "2 / 3",
-  gridColumn: "2 / 3",
-  padding: "24px",
-  backgroundColor: "#f3f4f6",
-};
+const MotionDiv = motion.div;
 
 function Layout({ children }) {
   const content = children ?? <Outlet />;
+  const location = useLocation();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
-    <div style={layoutStyle}>
-      <aside style={sidebarWrapper}>
+    <div className="portal-layout">
+      <aside className="portal-sidebar desktop-only">
         <Sidebar />
       </aside>
-      <header style={topbarWrapper}>
-        <Topbar />
+
+      <AnimatePresence>
+        {mobileSidebarOpen ? (
+          <MotionDiv
+            className="mobile-sidebar-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            <MotionDiv
+              className="mobile-sidebar-panel"
+              initial={{ x: -24, opacity: 0.6 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -24, opacity: 0.6 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Sidebar onNavigate={() => setMobileSidebarOpen(false)} />
+            </MotionDiv>
+          </MotionDiv>
+        ) : null}
+      </AnimatePresence>
+
+      <header className="portal-topbar">
+        <Topbar onToggleSidebar={() => setMobileSidebarOpen(true)} />
       </header>
-      <main style={contentWrapper}>{content}</main>
+
+      <main className="portal-main">
+        <AnimatePresence mode="wait">
+          <MotionDiv
+            key={location.pathname}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.16 }}
+            style={{ height: "100%" }}
+          >
+            {content}
+          </MotionDiv>
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

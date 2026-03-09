@@ -124,7 +124,7 @@ function makeLinkStyle({ level }) {
   });
 }
 
-function Sidebar() {
+function Sidebar({ className = "", onNavigate = null }) {
   const location = useLocation();
   const role = getRole();
   const [openSections, setOpenSections] = useState({
@@ -353,7 +353,14 @@ function Sidebar() {
   }
 
   return (
-    <div style={wrapper}>
+    <div
+      className={className}
+      style={{
+        ...wrapper,
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)",
+      }}
+    >
       <div>
         <div style={brand}>Portale Essaouira</div>
         <div style={brandSub}>Gestione villa & appartamenti</div>
@@ -361,7 +368,14 @@ function Sidebar() {
 
       <div style={navContainer}>
         {/* DASHBOARD SINGOLA */}
-        <NavLink to="/" end style={topLinkStyle}>
+        <NavLink
+          to="/"
+          end
+          style={topLinkStyle}
+          onClick={() => {
+            if (onNavigate) onNavigate();
+          }}
+        >
           <span>Dashboard</span>
         </NavLink>
 
@@ -413,6 +427,9 @@ function Sidebar() {
                       key={item.to}
                       to={item.to}
                       style={subLinkStyle}
+                      onClick={() => {
+                        if (onNavigate) onNavigate();
+                      }}
                     >
                       <span>{item.label}</span>
                       {renderBadge(item.badge)}

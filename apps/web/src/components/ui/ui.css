@@ -1,0 +1,130 @@
+.ui-surface {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.ui-card {
+  padding: 16px;
+}
+
+.ui-card-hover {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ui-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ui-shadow-md);
+}
+
+.ui-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ui-title {
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
+
+.ui-subtitle {
+  margin-top: 4px;
+  color: var(--ui-muted-foreground);
+  font-size: 13px;
+}
+
+.ui-grid-cards {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.ui-kpi-value {
+  font-size: clamp(1.25rem, 1vw + 1rem, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-kpi-label {
+  font-size: 12px;
+  color: var(--ui-muted-foreground);
+  margin-bottom: 6px;
+}
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-soft);
+}
+
+.ui-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--ui-muted-foreground);
+}
+
+.ui-empty svg {
+  margin: 0 auto 8px auto;
+  color: #9ca3af;
+}
+
+.ui-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e5e7eb;
+}
+
+.ui-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 45%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: ui-shimmer 1.2s infinite;
+}
+
+@keyframes ui-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.ui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.ui-health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+@media (max-width: 880px) {
+  .ui-title {
+    font-size: 19px;
+  }
+}

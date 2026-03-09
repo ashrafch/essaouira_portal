@@ -1,15 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
 import { getSmartOverview, getUnits } from "../services/api";
-
-function StatCard({ label, value }) {
-  return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 14, background: "#fff" }}>
-      <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 700, marginTop: 6 }}>{value}</div>
-    </div>
-  );
-}
 
 function SmartOverview() {
   const [loading, setLoading] = useState(true);
@@ -34,41 +27,82 @@ function SmartOverview() {
     load();
   }, []);
 
+  const healthData = useMemo(() => {
+    if (!overview) return [];
+    return [
+      { name: "Online", value: overview.online_devices || 0, color: "#10b981" },
+      { name: "Offline", value: overview.offline_devices || 0, color: "#ef4444" },
+    ];
+  }, [overview]);
+
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Smart Overview</h1>
-      <p style={{ color: "#6b7280" }}>Stato globale dispositivi, alert e accesso rapido alle unità smart.</p>
+      <SectionHeader
+        title="Smart Overview"
+        subtitle="Panoramica rapida dello stato smart, con accesso diretto al dettaglio unità."
+      />
 
-      {loading && <p>Caricamento...</p>}
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {loading ? (
+        <LoadingSkeleton rows={6} height={32} />
+      ) : null}
+      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
 
-      {!loading && !error && overview && (
+      {!loading && !error && overview ? (
         <>
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: 18 }}>
+          <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
             <StatCard label="Dispositivi totali" value={overview.total_devices} />
-            <StatCard label="Online" value={overview.online_devices} />
-            <StatCard label="Offline" value={overview.offline_devices} />
-            <StatCard label="Alert aperti" value={overview.open_alerts} />
-            <StatCard label="Alert critici" value={overview.critical_alerts} />
-            <StatCard label="Visti ultime 12h" value={overview.recently_seen_devices} />
+            <StatCard label="Online" value={overview.online_devices} tone="success" />
+            <StatCard label="Offline" value={overview.offline_devices} tone="danger" />
+            <StatCard label="Alert aperti" value={overview.open_alerts} tone="warning" />
+            <StatCard label="Alert critici" value={overview.critical_alerts} tone="danger" />
+            <StatCard label="Visti ultime 12h" value={overview.recently_seen_devices} tone="info" />
           </div>
 
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 14 }}>
-            <h3 style={{ marginTop: 0 }}>Unità</h3>
-            {units.length === 0 ? (
-              <p style={{ color: "#6b7280" }}>Nessuna unità trovata.</p>
-            ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {units.map((u) => (
-                  <Link key={u.id} to={`/smart-units/${u.id}`} style={{ textDecoration: "none", color: "#0f766e", fontWeight: 600 }}>
-                    {u.name} - dettaglio smart
-                  </Link>
-                ))}
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+            <AppCard>
+              <h3 style={{ marginBottom: 8 }}>Distribuzione device health</h3>
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={healthData} dataKey="value" nameKey="name" outerRadius={78}>
+                      {healthData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            )}
+            </AppCard>
+
+            <AppCard>
+              <h3 style={{ marginBottom: 8 }}>Unità disponibili</h3>
+              {units.length === 0 ? (
+                <EmptyState title="Nessuna unità trovata" description="Aggiungi unità dal setup/properties." />
+              ) : (
+                <div style={{ display: "grid", gap: 8, maxHeight: 220, overflow: "auto" }}>
+                  {units.map((u) => (
+                    <Link
+                      key={u.id}
+                      to={`/smart-units/${u.id}`}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 10,
+                        padding: "8px 10px",
+                        fontWeight: 600,
+                        color: "#0f766e",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      {u.name} · dettaglio smart
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </AppCard>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
