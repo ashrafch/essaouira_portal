@@ -20,6 +20,7 @@ from app.core.tenant import normalize_tenant_id
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.domains.smart_building.router import router as smart_building_router
+from app.domains.smart_building.setup_router import router as setup_router
 from app.domains.smart_building.service import SmartBuildingService
 from app.main_types import StaffRole
 from app.models.unit import Unit
@@ -54,6 +55,7 @@ app.add_middleware(
 app.middleware("http")(request_logging)
 app.middleware("http")(authentication)
 app.include_router(smart_building_router)
+app.include_router(setup_router)
 
 
 @app.on_event("startup")

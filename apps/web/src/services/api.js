@@ -337,3 +337,41 @@ export function triggerSmartAutomationRule(ruleId, payload = {}) {
 export function getSmartAutomationExecutions(params = {}) {
   return apiGet("/smart/automation-executions", params);
 }
+
+/* --------- SETUP WIZARD --------- */
+
+export function setupStart() {
+  return apiPost("/setup/start", {});
+}
+
+export function getSetupSession() {
+  return apiGet("/setup/session");
+}
+
+export function setupProperty(payload) {
+  return apiPost("/setup/property", payload);
+}
+
+export function setupUnits(payload) {
+  return apiPost("/setup/units", payload);
+}
+
+export function setupConnectProvider(payload) {
+  return apiPost("/setup/connect-provider", payload);
+}
+
+export function setupImportDevices(payload = {}) {
+  return apiPost("/setup/import-devices", payload);
+}
+
+export function setupAssignDevices(payload) {
+  return apiPost("/setup/assign-devices", payload);
+}
+
+export function setupEnableAutomations(payload) {
+  return apiPost("/setup/enable-automations", payload);
+}
+
+export function setupComplete() {
+  return apiPost("/setup/complete", {});
+}

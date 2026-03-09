@@ -215,3 +215,15 @@ class AutomationExecution(TenantScopedMixin, Base):
 
     scene = relationship("Scene", back_populates="executions")
     rule = relationship("AutomationRule", back_populates="executions")
+
+
+class SetupSession(TenantScopedMixin, Base):
+    __tablename__ = "setup_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(String(16), nullable=False, default="in_progress", index=True)
+    current_step = Column(String(32), nullable=False, default="property")
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)

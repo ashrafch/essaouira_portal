@@ -225,7 +225,10 @@ function Sidebar() {
     {
       id: "admin",
       title: "Admin",
-      items: [{ to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl" }],
+      items: [
+        { to: "/setup", label: "Setup Wizard", badge: null, routeKey: "setupWizard" },
+        { to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl" },
+      ],
     },
   ];
   const routeFilteredSections = sections

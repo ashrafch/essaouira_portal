@@ -262,6 +262,50 @@ class UnitDeviceHealthOut(BaseModel):
     devices: list[DeviceHealthOut]
 
 
+class SetupSessionOut(BaseModel):
+    id: int
+    tenant_id: str
+    status: str
+    current_step: str
+    metadata: dict = Field(default_factory=dict)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SetupStartOut(BaseModel):
+    session: SetupSessionOut
+
+
+class SetupPropertyIn(BaseModel):
+    property_name: str = Field(..., min_length=2, max_length=128)
+    timezone: str | None = Field(default="Africa/Casablanca", max_length=64)
+    currency: str | None = Field(default="EUR", max_length=8)
+
+
+class SetupUnitsIn(BaseModel):
+    units: list[str] = Field(..., min_length=1, max_length=30)
+
+
+class SetupConnectProviderIn(BaseModel):
+    provider: str = Field(..., max_length=64)
+    config: dict = Field(default_factory=dict)
+
+
+class SetupImportDevicesIn(BaseModel):
+    provider: str | None = Field(default=None, max_length=64)
+
+
+class SetupAssignDevicesIn(BaseModel):
+    assignments: list[dict] = Field(default_factory=list)
+
+
+class SetupEnableAutomationsIn(BaseModel):
+    templates: list[str] = Field(default_factory=list)
+
+
 class DeviceCommandCreate(BaseModel):
     command_type: str = Field(..., max_length=64)
     payload: dict = Field(default_factory=dict)

@@ -100,6 +100,17 @@ Smart provider endpoints:
 - health by unit: `GET /smart/units/{id}/device-health`
 - health by device: `GET /smart/devices/{id}/health`
 
+Setup wizard endpoints:
+- `POST /setup/start`
+- `GET /setup/session`
+- `POST /setup/property`
+- `POST /setup/units`
+- `POST /setup/connect-provider`
+- `POST /setup/import-devices`
+- `POST /setup/assign-devices`
+- `POST /setup/enable-automations`
+- `POST /setup/complete`
+
 User management:
 - endpoint owner-only: `GET/POST/PUT/DELETE /users`
 - reset password: `POST /users/{id}/reset-password`
