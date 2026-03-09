@@ -1,7 +1,7 @@
 """add smart scenario pack installs
 
 Revision ID: 0006_scenario_pack_installs
-Revises: 0005_property_and_provider_registry
+Revises: 0005_property_provider_registry
 Create Date: 2026-03-09 14:15:00.000000
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "0006_scenario_pack_installs"
-down_revision: Union[str, None] = "0005_property_and_provider_registry"
+down_revision: Union[str, None] = "0005_property_provider_registry"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
