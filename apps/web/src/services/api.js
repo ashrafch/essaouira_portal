@@ -286,6 +286,10 @@ export function getSmartOverview() {
   return apiGet("/smart/overview");
 }
 
+export function getSmartDashboard(params = {}) {
+  return apiGet("/smart/dashboard", params);
+}
+
 export function getSmartUnitDetail(unitId, params = {}) {
   return apiGet(`/smart/units/${unitId}`, params);
 }
@@ -360,6 +364,18 @@ export function createSmartProviderConnection(payload) {
 
 export function updateSmartProviderConnection(connectionId, payload) {
   return apiPut(`/smart/provider-connections/${connectionId}`, payload);
+}
+
+export function getSmartScenarioPacks() {
+  return apiGet("/smart/scenario-packs");
+}
+
+export function getEnabledSmartScenarioPacks(params = {}) {
+  return apiGet("/smart/scenario-packs/enabled", params);
+}
+
+export function enableSmartScenarioPack(payload) {
+  return apiPost("/smart/scenario-packs/enable", payload);
 }
 
 /* --------- SETUP WIZARD --------- */

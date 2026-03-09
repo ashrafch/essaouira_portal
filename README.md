@@ -100,6 +100,11 @@ Smart provider endpoints:
 - health overview: `GET /smart/device-health`
 - health by unit: `GET /smart/units/{id}/device-health`
 - health by device: `GET /smart/devices/{id}/health`
+- smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
+- scenario packs:
+  - `GET /smart/scenario-packs`
+  - `GET /smart/scenario-packs/enabled?property_id=`
+  - `POST /smart/scenario-packs/enable`
 
 Property management endpoints:
 - `GET /properties`

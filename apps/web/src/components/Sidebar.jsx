@@ -217,6 +217,7 @@ function Sidebar() {
       id: "smart",
       title: "Smart Building",
       items: [
+        { to: "/smart-dashboard", label: "Smart dashboard", badge: null, routeKey: "smartDashboard" },
         { to: "/smart-overview", label: "Smart overview", badge: null, routeKey: "smartOverview" },
         { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices" },
         { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts" },

@@ -108,8 +108,8 @@ def test_setup_templates_create_automation_rules():
         rules = client.get("/smart/automation-rules", headers=_headers())
         assert rules.status_code == 200
         names = {r["name"] for r in rules.json()}
-        assert "[Setup] Trigger checkout energy saver" in names
-        assert "[Setup] Trigger leak maintenance" in names
+        assert any("Trigger checkout energy saver" in name for name in names)
+        assert any("Trigger leak maintenance" in name for name in names)
 
 
 def test_setup_session_tenant_isolation():

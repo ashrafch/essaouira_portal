@@ -64,6 +64,7 @@ from app.models.smart_building import (
     SceneAction,
     SetupSession,
     SmartProviderConnection,
+    SmartScenarioPackInstall,
 )
 
 
@@ -87,6 +88,42 @@ AUTOMATION_TEMPLATE_KEYS = {
     "basic_hospitality_pack",
     "energy_saver_pack",
     "leak_protection_pack",
+}
+
+SCENARIO_PACK_DEFINITIONS = {
+    "basic_hospitality_pack": {
+        "name": "Hospitality Basic Pack",
+        "description": "Baseline smart reactions per check-in/check-out con visibilita operativa.",
+        "supported_now": True,
+        "includes": [
+            "welcome_scene_placeholder",
+            "rule: booking.checked_in -> alert",
+            "rule: booking.checked_out -> alert",
+        ],
+        "notes": [
+            "Scene creata come placeholder manuale, senza controllo diretto hardware.",
+        ],
+    },
+    "energy_saver_pack": {
+        "name": "Energy Saver Pack",
+        "description": "Baseline risparmio energetico al checkout.",
+        "supported_now": True,
+        "includes": [
+            "rule: booking.checked_out -> alert",
+        ],
+        "notes": [
+            "Trigger vacancy/no-motion avanzati richiedono telemetria estesa (fase successiva).",
+        ],
+    },
+    "leak_protection_pack": {
+        "name": "Leak Protection Pack",
+        "description": "Hardening reazioni leak su alert smart.",
+        "supported_now": True,
+        "includes": [
+            "rule: alert.raised(leak) -> maintenance ticket",
+        ],
+        "notes": [],
+    },
 }
 
 
@@ -423,6 +460,361 @@ class SmartBuildingService:
         self.db.commit()
         self.db.refresh(connection)
         return connection
+
+    def list_scenario_pack_definitions(self) -> list[dict[str, object]]:
+        return [
+            {"key": key, **value}
+            for key, value in SCENARIO_PACK_DEFINITIONS.items()
+        ]
+
+    def list_enabled_scenario_packs(self, property_id: int | None = None) -> list[SmartScenarioPackInstall]:
+        query = self._scoped_query(SmartScenarioPackInstall).order_by(
+            SmartScenarioPackInstall.updated_at.desc(),
+            SmartScenarioPackInstall.id.desc(),
+        )
+        if property_id is not None:
+            self._property_or_404(property_id)
+            query = query.filter(SmartScenarioPackInstall.property_id == property_id)
+        return query.all()
+
+    def _property_units(self, property_id: int) -> list[Unit]:
+        return self.db.query(Unit).filter(Unit.property_id == property_id).order_by(Unit.id.asc()).all()
+
+    def _pack_prefix(self, prop: Property) -> str:
+        return f"[Pack:{prop.code}]"
+
+    def _rule_payload_for_pack(self, payload: dict, *, property_id: int, unit_ids: list[int]) -> dict:
+        enriched = dict(payload)
+        enriched["property_id"] = property_id
+        if unit_ids:
+            enriched["unit_ids"] = unit_ids
+        return enriched
+
+    def _materialize_scenario_pack(
+        self,
+        *,
+        pack_key: str,
+        property_id: int,
+    ) -> list[dict[str, object]]:
+        prop = self._property_or_404(property_id)
+        units = self._property_units(property_id)
+        unit_ids = [unit.id for unit in units]
+        prefix = self._pack_prefix(prop)
+        created: list[dict[str, object]] = []
+
+        if pack_key == "basic_hospitality_pack":
+            scene = self._ensure_scene(
+                name=f"{prefix} Hospitality Welcome Scene",
+                description=f"Placeholder scena welcome per property {prop.name}.",
+            )
+            created.append({"entity": "scene", "id": scene.id, "name": scene.name})
+            rule_checkin = self._ensure_rule(
+                name=f"{prefix} Trigger check-in welcome",
+                description=f"Check-in completato: alert readiness smart ({prop.name}).",
+                trigger_type="booking.checked_in",
+                trigger_filter={"property_id": property_id, "unit_ids": unit_ids},
+                action_type="action.create_alert",
+                payload=self._rule_payload_for_pack(
+                    {
+                        "severity": "info",
+                        "title": f"[{prop.code}] Check-in completato",
+                        "description": "Verifica comfort unita e readiness smart.",
+                        "alert_type": "automation.alert.raised",
+                    },
+                    property_id=property_id,
+                    unit_ids=unit_ids,
+                ),
+            )
+            created.append({"entity": "rule", "id": rule_checkin.id, "name": rule_checkin.name})
+            rule_checkout = self._ensure_rule(
+                name=f"{prefix} Trigger checkout fallback",
+                description=f"Checkout completato: reminder spegnimento carichi ({prop.name}).",
+                trigger_type="booking.checked_out",
+                trigger_filter={"property_id": property_id, "unit_ids": unit_ids},
+                action_type="action.create_alert",
+                payload=self._rule_payload_for_pack(
+                    {
+                        "severity": "warning",
+                        "title": f"[{prop.code}] Checkout completato",
+                        "description": "Conferma profilo eco e spegnimento carichi non essenziali.",
+                        "alert_type": "automation.alert.raised",
+                    },
+                    property_id=property_id,
+                    unit_ids=unit_ids,
+                ),
+            )
+            created.append({"entity": "rule", "id": rule_checkout.id, "name": rule_checkout.name})
+        elif pack_key == "energy_saver_pack":
+            rule = self._ensure_rule(
+                name=f"{prefix} Trigger checkout energy saver",
+                description=f"Checkout: alert energia/eco mode per {prop.name}.",
+                trigger_type="booking.checked_out",
+                trigger_filter={"property_id": property_id, "unit_ids": unit_ids},
+                action_type="action.create_alert",
+                payload=self._rule_payload_for_pack(
+                    {
+                        "severity": "warning",
+                        "title": f"[{prop.code}] Attiva energy saver",
+                        "description": "Imposta setpoint eco e verifica spegnimento luci/relays.",
+                        "alert_type": "automation.alert.raised",
+                    },
+                    property_id=property_id,
+                    unit_ids=unit_ids,
+                ),
+            )
+            created.append({"entity": "rule", "id": rule.id, "name": rule.name})
+        elif pack_key == "leak_protection_pack":
+            rule = self._ensure_rule(
+                name=f"{prefix} Trigger leak maintenance",
+                description=f"Leak alert: apertura ticket manutenzione ({prop.name}).",
+                trigger_type="alert.raised",
+                trigger_filter={
+                    "property_id": property_id,
+                    "unit_ids": unit_ids,
+                    "alert_types": ["sensor.leak_detected", "custom.sensor.leak_detected"],
+                },
+                action_type="action.create_maintenance_ticket",
+                payload=self._rule_payload_for_pack(
+                    {
+                        "title": f"[{prop.code}] Leak protection follow-up",
+                        "description": "Verifica perdita segnalata dai sensori smart.",
+                        "severity": "high",
+                    },
+                    property_id=property_id,
+                    unit_ids=unit_ids,
+                ),
+            )
+            created.append({"entity": "rule", "id": rule.id, "name": rule.name})
+        return created
+
+    def enable_scenario_pack(
+        self,
+        *,
+        property_id: int,
+        pack_key: str,
+        requested_by: str | None = None,
+    ) -> SmartScenarioPackInstall:
+        self._require_write_access()
+        normalized = (pack_key or "").strip().lower()
+        if normalized not in AUTOMATION_TEMPLATE_KEYS:
+            raise HTTPException(status_code=400, detail=f"Scenario pack non supportato: {pack_key}")
+        self._property_or_404(property_id)
+
+        install = (
+            self._scoped_query(SmartScenarioPackInstall)
+            .filter(
+                SmartScenarioPackInstall.property_id == property_id,
+                SmartScenarioPackInstall.pack_key == normalized,
+            )
+            .first()
+        )
+
+        created = self._materialize_scenario_pack(pack_key=normalized, property_id=property_id)
+        details = {
+            "pack_key": normalized,
+            "property_id": property_id,
+            "created_or_reused": created,
+            "installed_by": requested_by or "system",
+            "installed_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        if install is None:
+            install = SmartScenarioPackInstall(
+                tenant_id=self.tenant_id,
+                property_id=property_id,
+                pack_key=normalized,
+                status="enabled",
+                installed_by=requested_by or "system",
+                details_json=self._safe_json_dumps(details),
+            )
+            self.db.add(install)
+        else:
+            install.status = "enabled"
+            install.installed_by = requested_by or install.installed_by
+            install.details_json = self._safe_json_dumps(details)
+        self.db.commit()
+        self.db.refresh(install)
+        return install
+
+    def _extract_execution_scope(self, execution: AutomationExecution) -> dict[str, int | str | None]:
+        context = self._safe_json_loads(execution.context_json)
+        snapshot = self._safe_json_loads(execution.trigger_snapshot_json)
+        unit_id = context.get("unit_id") or snapshot.get("unit_id")
+        alert_id = context.get("alert_id") or snapshot.get("alert_id")
+        booking_id = context.get("booking_id") or snapshot.get("booking_id")
+        try:
+            unit_id = int(unit_id) if unit_id is not None else None
+        except (TypeError, ValueError):
+            unit_id = None
+        return {
+            "unit_id": unit_id,
+            "alert_id": alert_id,
+            "booking_id": booking_id,
+        }
+
+    def _execution_matches_scope(
+        self,
+        execution: AutomationExecution,
+        *,
+        unit_id: int | None,
+        unit_ids: set[int] | None,
+    ) -> bool:
+        if unit_id is None and not unit_ids:
+            return True
+        scope = self._extract_execution_scope(execution)
+        scoped_unit_id = scope.get("unit_id")
+        if scoped_unit_id is None:
+            return False
+        if unit_id is not None:
+            return scoped_unit_id == unit_id
+        return int(scoped_unit_id) in (unit_ids or set())
+
+    def smart_dashboard(
+        self,
+        *,
+        property_id: int | None = None,
+        unit_id: int | None = None,
+    ) -> dict[str, object]:
+        unit_ids_for_scope: set[int] | None = None
+        if property_id is not None:
+            self._property_or_404(property_id)
+            scoped_units = self._property_units(property_id)
+            unit_ids_for_scope = {u.id for u in scoped_units}
+        if unit_id is not None:
+            self._ensure_unit_visible(unit_id)
+            unit_ids_for_scope = {unit_id}
+
+        health = self.get_device_health_overview(
+            unit_id=unit_id,
+            property_id=property_id,
+        )
+        device_records = health["devices"]
+        total_devices = len(device_records)
+        online_devices = sum(1 for d in device_records if d.get("connectivity_status") == "online")
+        offline_devices = sum(1 for d in device_records if d.get("connectivity_status") == "offline")
+        warning_devices = sum(1 for d in device_records if d.get("health_status") == "warning")
+        critical_devices = sum(1 for d in device_records if d.get("health_status") == "critical")
+
+        properties_query = self._scoped_query(Property)
+        if property_id is not None:
+            properties_query = properties_query.filter(Property.id == property_id)
+        total_properties = properties_query.with_entities(func.count(Property.id)).scalar() or 0
+
+        units_query = self.db.query(Unit)
+        if unit_ids_for_scope:
+            units_query = units_query.filter(Unit.id.in_(list(unit_ids_for_scope)))
+        total_units = units_query.with_entities(func.count(Unit.id)).scalar() or 0
+
+        alerts_query = self._scoped_query(Alert)
+        if unit_ids_for_scope:
+            alerts_query = alerts_query.filter(Alert.unit_id.in_(list(unit_ids_for_scope)))
+        open_alerts = alerts_query.filter(Alert.status == "open").with_entities(func.count(Alert.id)).scalar() or 0
+        recent_alert_rows = (
+            alerts_query.order_by(Alert.last_seen_at.desc(), Alert.id.desc()).limit(8).all()
+        )
+        recent_alerts = [
+            {
+                "id": f"alert-{a.id}",
+                "title": a.title,
+                "subtitle": a.description,
+                "severity": a.severity or "warning",
+                "occurred_at": a.last_seen_at,
+                "refs": {"alert_id": a.id, "unit_id": a.unit_id, "device_id": a.device_id},
+            }
+            for a in recent_alert_rows
+        ]
+
+        start_today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        executions_query = self._scoped_query(AutomationExecution).filter(AutomationExecution.started_at >= start_today)
+        executions_today = executions_query.order_by(AutomationExecution.started_at.desc(), AutomationExecution.id.desc()).all()
+        executions_today = [
+            e for e in executions_today
+            if self._execution_matches_scope(e, unit_id=unit_id, unit_ids=unit_ids_for_scope)
+        ]
+        automation_executions_today = len(executions_today)
+        automation_failures_today = sum(1 for e in executions_today if e.status == "failed")
+        automation_partial_today = sum(1 for e in executions_today if e.status == "partial")
+
+        recent_executions_rows = (
+            self._scoped_query(AutomationExecution)
+            .order_by(AutomationExecution.started_at.desc(), AutomationExecution.id.desc())
+            .limit(120)
+            .all()
+        )
+        recent_executions_rows = [
+            e for e in recent_executions_rows
+            if self._execution_matches_scope(e, unit_id=unit_id, unit_ids=unit_ids_for_scope)
+        ][:10]
+        recent_executions = [
+            {
+                "id": f"exec-{e.id}",
+                "title": f"Esecuzione #{e.id} ({e.status})",
+                "subtitle": f"{e.trigger_type} · {e.trigger_source}",
+                "severity": "critical" if e.status == "failed" else ("warning" if e.status == "partial" else "info"),
+                "occurred_at": e.started_at,
+                "refs": {"execution_id": e.id, "rule_id": e.rule_id, "scene_id": e.scene_id},
+            }
+            for e in recent_executions_rows
+        ]
+        recent_automation_failures = [
+            {
+                "id": f"exec-{e.id}",
+                "title": f"Esecuzione #{e.id} ({e.status})",
+                "subtitle": f"{e.trigger_type} · {e.trigger_source}",
+                "severity": "critical" if e.status == "failed" else "warning",
+                "occurred_at": e.started_at,
+                "refs": {"execution_id": e.id, "rule_id": e.rule_id, "scene_id": e.scene_id},
+            }
+            for e in recent_executions_rows
+            if e.status in {"failed", "partial"}
+        ][:8]
+
+        provider_query = self._scoped_query(SmartProviderConnection)
+        if property_id is not None:
+            provider_query = provider_query.filter(SmartProviderConnection.property_id == property_id)
+        provider_statuses = [
+            {
+                "connection_id": conn.id,
+                "property_id": conn.property_id,
+                "provider_name": conn.provider_name,
+                "status": conn.status,
+                "is_active": conn.is_active,
+                "last_sync_at": conn.last_sync_at,
+                "last_error": conn.last_error,
+            }
+            for conn in provider_query.order_by(SmartProviderConnection.updated_at.desc()).limit(20).all()
+        ]
+
+        problematic_units = [
+            item for item in health["units"]
+            if item["offline_devices"] > 0 or item["warning_devices"] > 0 or item["critical_devices"] > 0
+        ][:8]
+        top_device_issues = [
+            item for item in device_records if item.get("needs_attention")
+        ][:10]
+
+        return {
+            "filters": {"property_id": property_id, "unit_id": unit_id},
+            "kpis": {
+                "total_properties": int(total_properties),
+                "total_units": int(total_units),
+                "total_devices": int(total_devices),
+                "online_devices": int(online_devices),
+                "offline_devices": int(offline_devices),
+                "warning_devices": int(warning_devices),
+                "critical_devices": int(critical_devices),
+                "open_alerts": int(open_alerts),
+                "automation_executions_today": int(automation_executions_today),
+                "automation_failures_today": int(automation_failures_today),
+                "automation_partial_today": int(automation_partial_today),
+            },
+            "problematic_units": problematic_units,
+            "top_device_issues": top_device_issues,
+            "recent_alerts": recent_alerts,
+            "recent_automation_failures": recent_automation_failures,
+            "recent_executions": recent_executions,
+            "provider_statuses": provider_statuses,
+        }
 
     def _safe_json_dumps(self, value: dict | None) -> str | None:
         if value is None:
@@ -789,6 +1181,7 @@ class SmartBuildingService:
         trigger_type: str,
         action_type: str,
         payload: dict,
+        trigger_filter: dict | None = None,
     ) -> AutomationRule:
         existing = self._scoped_query(AutomationRule).filter(AutomationRule.name == name).first()
         if existing is not None:
@@ -798,74 +1191,43 @@ class SmartBuildingService:
                 name=name,
                 description=description,
                 trigger_type=trigger_type,
+                trigger_filter=trigger_filter or {},
                 action_type=action_type,
                 payload=payload,
                 is_active=True,
             )
         )
 
-    def _enable_template(self, template: str) -> dict[str, object]:
+    def _enable_template(self, template: str, *, property_id: int, installed_by: str | None = None) -> dict[str, object]:
         key = template.strip().lower()
         if key not in AUTOMATION_TEMPLATE_KEYS:
             raise HTTPException(status_code=400, detail=f"Template non supportato: {template}")
-
-        created: list[dict[str, object]] = []
-        if key == "basic_hospitality_pack":
-            scene = self._ensure_scene(
-                name="[Setup] Hospitality Welcome Scene",
-                description="Template base di accoglienza ospite.",
-            )
-            created.append({"entity": "scene", "id": scene.id, "name": scene.name})
-            rule = self._ensure_rule(
-                name="[Setup] Trigger check-in welcome",
-                description="Genera alert operativa quando il check-in e completato.",
-                trigger_type="booking.checked_in",
-                action_type="action.create_alert",
-                payload={
-                    "severity": "info",
-                    "title": "Guest check-in completato",
-                    "description": "Controlla comfort e readiness unita.",
-                },
-            )
-            created.append({"entity": "rule", "id": rule.id, "name": rule.name})
-        elif key == "energy_saver_pack":
-            rule = self._ensure_rule(
-                name="[Setup] Trigger checkout energy saver",
-                description="Crea alert per attivare modalita risparmio energetico al checkout.",
-                trigger_type="booking.checked_out",
-                action_type="action.create_alert",
-                payload={
-                    "severity": "warning",
-                    "title": "Checkout completato: attiva energy saver",
-                    "description": "Verifica spegnimento carichi e setpoint eco.",
-                },
-            )
-            created.append({"entity": "rule", "id": rule.id, "name": rule.name})
-        elif key == "leak_protection_pack":
-            rule = self._ensure_rule(
-                name="[Setup] Trigger leak maintenance",
-                description="Apre ticket manutenzione su alert leak.",
-                trigger_type="alert.raised",
-                action_type="action.create_maintenance_ticket",
-                payload={
-                    "title": "Leak protection follow-up",
-                    "description": "Verifica perdita segnalata dai sensori smart.",
-                    "severity": "high",
-                },
-            )
-            created.append({"entity": "rule", "id": rule.id, "name": rule.name})
-        return {"template": key, "created": created}
+        install = self.enable_scenario_pack(
+            property_id=property_id,
+            pack_key=key,
+            requested_by=installed_by,
+        )
+        details = self._safe_json_loads(install.details_json)
+        return {"template": key, "created": details.get("created_or_reused", [])}
 
     def setup_enable_automations(self, payload: SetupEnableAutomationsIn) -> dict[str, object]:
         self._require_owner_access()
         session = self._active_setup_session_or_404()
         property_id = payload.property_id or self._safe_json_loads(session.metadata_json).get("property_id")
-        if property_id:
-            self._property_or_404(int(property_id))
+        if not property_id:
+            raise HTTPException(status_code=400, detail="Property non impostata nel setup wizard")
+        self._property_or_404(int(property_id))
         templates = payload.templates or []
         if not templates:
             templates = ["basic_hospitality_pack"]
-        results = [self._enable_template(template) for template in templates]
+        results = [
+            self._enable_template(
+                template,
+                property_id=int(property_id),
+                installed_by="setup_wizard",
+            )
+            for template in templates
+        ]
         session = self._update_setup_session(
             session,
             current_step="complete",
@@ -2184,6 +2546,65 @@ class SmartBuildingService:
         self.db.refresh(rule)
         return rule
 
+    def _context_property_id(self, context: dict | None) -> int | None:
+        if not context:
+            return None
+        raw_property_id = context.get("property_id")
+        if raw_property_id is not None:
+            try:
+                return int(raw_property_id)
+            except (TypeError, ValueError):
+                return None
+        raw_unit_id = context.get("unit_id")
+        try:
+            unit_id = int(raw_unit_id) if raw_unit_id is not None else None
+        except (TypeError, ValueError):
+            unit_id = None
+        if unit_id is None:
+            return None
+        unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
+        return unit.property_id if unit else None
+
+    def _rule_filter_matches(self, rule: AutomationRule, context: dict | None) -> bool:
+        filters = self._safe_json_loads(rule.trigger_filter_json)
+        if not filters:
+            return True
+        payload = context or {}
+
+        filter_property_id = filters.get("property_id")
+        if filter_property_id is not None:
+            try:
+                expected_property_id = int(filter_property_id)
+            except (TypeError, ValueError):
+                expected_property_id = None
+            if expected_property_id is None or self._context_property_id(payload) != expected_property_id:
+                return False
+
+        filter_unit_ids = filters.get("unit_ids") or []
+        if filter_unit_ids:
+            try:
+                expected_unit_ids = {int(v) for v in filter_unit_ids}
+            except (TypeError, ValueError):
+                expected_unit_ids = set()
+            raw_unit_id = payload.get("unit_id")
+            try:
+                runtime_unit_id = int(raw_unit_id) if raw_unit_id is not None else None
+            except (TypeError, ValueError):
+                runtime_unit_id = None
+            if runtime_unit_id is None or runtime_unit_id not in expected_unit_ids:
+                return False
+
+        alert_types = filters.get("alert_types") or []
+        if alert_types:
+            current_alert_type = str(payload.get("alert_type") or "").strip().lower()
+            allowed_alert_types = {
+                str(item).strip().lower() for item in alert_types if str(item).strip()
+            }
+            if current_alert_type not in allowed_alert_types:
+                return False
+
+        return True
+
     def trigger_rules_for_business_event(
         self,
         *,
@@ -2206,6 +2627,8 @@ class SmartBuildingService:
         )
         executions: list[AutomationExecution] = []
         for rule in rules:
+            if not self._rule_filter_matches(rule, context):
+                continue
             execution = self.trigger_automation_rule(
                 rule.id,
                 RuleTriggerRequest(
@@ -2574,6 +2997,8 @@ class SmartBuildingService:
         if runtime_trigger != configured_trigger and runtime_trigger != "manual":
             raise HTTPException(status_code=400, detail="Trigger runtime non compatibile con la regola")
         effective_trigger = configured_trigger if runtime_trigger == "manual" else runtime_trigger
+        if not self._rule_filter_matches(rule, payload.context):
+            raise HTTPException(status_code=409, detail="Rule trigger_filter mismatch for provided context")
 
         correlation_id = self._make_correlation_id(payload.correlation_id)
         snapshot = self._make_trigger_snapshot(

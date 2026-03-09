@@ -31,6 +31,9 @@ from app.domains.smart_building.schemas import (
     ProviderWebhookIn,
     ProviderWebhookOut,
     RuleTriggerRequest,
+    ScenarioPackDefinitionOut,
+    ScenarioPackEnableIn,
+    ScenarioPackInstallOut,
     SceneActionCreate,
     SceneActionOut,
     SceneActionUpdate,
@@ -38,6 +41,7 @@ from app.domains.smart_building.schemas import (
     SceneOut,
     SceneRunRequest,
     SceneUpdate,
+    SmartDashboardOut,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
@@ -60,6 +64,16 @@ def _service(request: Request, db: Session) -> SmartBuildingService:
 @router.get("/overview", response_model=SmartOverviewOut)
 def get_smart_overview(request: Request, db: Session = Depends(get_db)):
     return _service(request, db).smart_overview()
+
+
+@router.get("/dashboard", response_model=SmartDashboardOut)
+def get_smart_dashboard(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+):
+    return _service(request, db).smart_dashboard(property_id=property_id, unit_id=unit_id)
 
 
 @router.get("/units/{unit_id}", response_model=SmartUnitDetailOut)
@@ -210,6 +224,34 @@ def update_provider_connection(
         config=payload.config,
         is_active=payload.is_active,
         last_error=payload.last_error,
+    )
+
+
+@router.get("/scenario-packs", response_model=list[ScenarioPackDefinitionOut])
+def list_scenario_packs(request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).list_scenario_pack_definitions()
+
+
+@router.get("/scenario-packs/enabled", response_model=list[ScenarioPackInstallOut])
+def list_enabled_scenario_packs(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+):
+    return _service(request, db).list_enabled_scenario_packs(property_id=property_id)
+
+
+@router.post("/scenario-packs/enable", response_model=ScenarioPackInstallOut)
+def enable_scenario_pack(
+    payload: ScenarioPackEnableIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).enable_scenario_pack(
+        property_id=payload.property_id,
+        pack_key=payload.pack_key,
+        requested_by=username,
     )
 
 

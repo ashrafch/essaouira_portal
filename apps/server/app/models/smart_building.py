@@ -251,3 +251,24 @@ class SmartProviderConnection(TenantScopedMixin, Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class SmartScenarioPackInstall(TenantScopedMixin, Base):
+    __tablename__ = "smart_scenario_pack_installs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "property_id",
+            "pack_key",
+            name="uq_scenario_pack_tenant_property_key",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    pack_key = Column(String(64), nullable=False, index=True)
+    status = Column(String(16), nullable=False, default="enabled")
+    installed_by = Column(String(128), nullable=True)
+    details_json = Column(Text, nullable=True)
+    installed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

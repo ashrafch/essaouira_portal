@@ -598,3 +598,75 @@ class AutomationExecutionOut(BaseModel):
     finished_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ScenarioPackDefinitionOut(BaseModel):
+    key: str
+    name: str
+    description: str
+    supported_now: bool = True
+    includes: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class ScenarioPackEnableIn(BaseModel):
+    property_id: int
+    pack_key: str = Field(..., max_length=64)
+
+
+class ScenarioPackInstallOut(BaseModel):
+    id: int
+    tenant_id: str
+    property_id: int
+    pack_key: str
+    status: str
+    installed_by: str | None = None
+    details_json: str | None = None
+    installed_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SmartDashboardKpisOut(BaseModel):
+    total_properties: int
+    total_units: int
+    total_devices: int
+    online_devices: int
+    offline_devices: int
+    warning_devices: int
+    critical_devices: int
+    open_alerts: int
+    automation_executions_today: int
+    automation_failures_today: int
+    automation_partial_today: int
+
+
+class SmartDashboardItemOut(BaseModel):
+    id: str
+    title: str
+    subtitle: str | None = None
+    severity: str = "info"
+    occurred_at: datetime | None = None
+    refs: dict = Field(default_factory=dict)
+
+
+class SmartDashboardProviderStatusOut(BaseModel):
+    connection_id: int
+    property_id: int
+    provider_name: str
+    status: str
+    is_active: bool
+    last_sync_at: datetime | None = None
+    last_error: str | None = None
+
+
+class SmartDashboardOut(BaseModel):
+    filters: dict = Field(default_factory=dict)
+    kpis: SmartDashboardKpisOut
+    problematic_units: list[UnitDeviceHealthSummaryOut] = Field(default_factory=list)
+    top_device_issues: list[DeviceHealthOut] = Field(default_factory=list)
+    recent_alerts: list[SmartDashboardItemOut] = Field(default_factory=list)
+    recent_automation_failures: list[SmartDashboardItemOut] = Field(default_factory=list)
+    recent_executions: list[SmartDashboardItemOut] = Field(default_factory=list)
+    provider_statuses: list[SmartDashboardProviderStatusOut] = Field(default_factory=list)
