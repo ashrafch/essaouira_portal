@@ -23,6 +23,9 @@ from app.domains.smart_building.schemas import (
     DeviceStateUpdate,
     DeviceUpdate,
     ProviderDebugOut,
+    ProviderConnectionCreateIn,
+    ProviderConnectionOut,
+    ProviderConnectionUpdateIn,
     ProviderPollOut,
     ProviderSyncOut,
     ProviderWebhookIn,
@@ -134,11 +137,13 @@ def list_device_health(
     status: str | None = Query(default=None),
     connectivity: str | None = Query(default=None),
     unit_id: int | None = Query(default=None),
+    property_id: int | None = Query(default=None),
 ):
     return _service(request, db).get_device_health_overview(
         status=status,
         connectivity=connectivity,
         unit_id=unit_id,
+        property_id=property_id,
     )
 
 
@@ -155,6 +160,57 @@ def get_device(device_id: int, request: Request, db: Session = Depends(get_db)):
 @router.get("/devices/{device_id}/health", response_model=DeviceHealthOut)
 def get_device_health(device_id: int, request: Request, db: Session = Depends(get_db)):
     return _service(request, db).get_single_device_health(device_id)
+
+
+@router.get("/provider-connections", response_model=list[ProviderConnectionOut])
+def list_provider_connections(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+):
+    return _service(request, db).list_provider_connections(property_id=property_id)
+
+
+@router.post("/provider-connections", response_model=ProviderConnectionOut)
+def create_provider_connection(
+    payload: ProviderConnectionCreateIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).create_provider_connection(
+        property_id=payload.property_id,
+        provider_name=payload.provider_name,
+        status=payload.status,
+        base_url=payload.base_url,
+        config=payload.config,
+        is_active=payload.is_active,
+    )
+
+
+@router.get("/provider-connections/{connection_id}", response_model=ProviderConnectionOut)
+def get_provider_connection(
+    connection_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).get_provider_connection_or_404(connection_id)
+
+
+@router.put("/provider-connections/{connection_id}", response_model=ProviderConnectionOut)
+def update_provider_connection(
+    connection_id: int,
+    payload: ProviderConnectionUpdateIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).update_provider_connection(
+        connection_id=connection_id,
+        status=payload.status,
+        base_url=payload.base_url,
+        config=payload.config,
+        is_active=payload.is_active,
+        last_error=payload.last_error,
+    )
 
 
 @router.put("/devices/{device_id}", response_model=DeviceOut)

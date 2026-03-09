@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
+  getProperties,
   getSetupSession,
   getSmartDevices,
+  getSmartProviderConnections,
   getUnits,
   setupAssignDevices,
   setupComplete,
@@ -27,6 +29,8 @@ function SetupWizard() {
   const [session, setSession] = useState(null);
   const [units, setUnits] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [providerConnections, setProviderConnections] = useState([]);
   const [assignments, setAssignments] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,6 +47,8 @@ function SetupWizard() {
 
   const currentStep = session?.current_step || "property";
   const metadata = session?.metadata || {};
+  const selectedPropertyId = metadata.property_id || "";
+  const selectedConnectionId = metadata.provider_connection_id || "";
   const importedDeviceIds = metadata.imported_device_ids || [];
 
   const importedDevices = useMemo(() => {
@@ -51,10 +57,27 @@ function SetupWizard() {
     return devices.filter((d) => setIds.has(d.id));
   }, [devices, importedDeviceIds]);
 
+  const propertyScopedUnits = useMemo(() => {
+    if (!selectedPropertyId) return units;
+    return units.filter((u) => u.property_id === Number(selectedPropertyId));
+  }, [units, selectedPropertyId]);
+
+  const propertyScopedConnections = useMemo(() => {
+    if (!selectedPropertyId) return providerConnections;
+    return providerConnections.filter((c) => c.property_id === Number(selectedPropertyId));
+  }, [providerConnections, selectedPropertyId]);
+
   async function refreshReferenceData() {
-    const [unitsData, devicesData] = await Promise.all([getUnits(), getSmartDevices()]);
+    const [unitsData, devicesData, propertiesData, connectionsData] = await Promise.all([
+      getUnits(),
+      getSmartDevices(),
+      getProperties(),
+      getSmartProviderConnections(),
+    ]);
     setUnits(unitsData || []);
     setDevices(devicesData || []);
+    setProperties(propertiesData || []);
+    setProviderConnections(connectionsData || []);
   }
 
   async function load() {
@@ -143,11 +166,23 @@ function SetupWizard() {
             onChange={(e) => setPropertyForm((prev) => ({ ...prev, currency: e.target.value }))}
           />
         </div>
+        {selectedPropertyId && (
+          <p style={{ marginTop: 8, fontSize: 13, color: "#374151" }}>Property corrente: #{selectedPropertyId}</p>
+        )}
         <div style={{ marginTop: 10 }}>
           <button
             type="button"
             onClick={() =>
-              runStep(async () => ({ session: await setupProperty(propertyForm) }))
+              runStep(async () => ({
+                session: await setupProperty({
+                  ...propertyForm,
+                  property_code: propertyForm.property_name
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-+|-+$/g, ""),
+                }),
+              }))
             }
           >
             Salva property
@@ -185,6 +220,9 @@ function SetupWizard() {
 
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12, marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>Step 3 - Connect Provider</h3>
+        {selectedPropertyId ? (
+          <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>Property target: #{selectedPropertyId}</div>
+        ) : null}
         <select
           value={providerForm.provider}
           onChange={(e) => setProviderForm((prev) => ({ ...prev, provider: e.target.value }))}
@@ -195,7 +233,14 @@ function SetupWizard() {
         <div style={{ marginTop: 10 }}>
           <button
             type="button"
-            onClick={() => runStep(async () => ({ session: await setupConnectProvider(providerForm) }))}
+            onClick={() =>
+              runStep(async () => ({
+                session: await setupConnectProvider({
+                  ...providerForm,
+                  property_id: selectedPropertyId ? Number(selectedPropertyId) : undefined,
+                }),
+              }))
+            }
           >
             Connetti provider
           </button>
@@ -209,13 +254,25 @@ function SetupWizard() {
         </p>
         <button
           type="button"
-          onClick={() => runStep(async () => ({ session: await setupImportDevices({}) }))}
+          onClick={() =>
+            runStep(async () => ({
+              session: await setupImportDevices({
+                property_id: selectedPropertyId ? Number(selectedPropertyId) : undefined,
+                provider_connection_id: selectedConnectionId ? Number(selectedConnectionId) : undefined,
+              }),
+            }))
+          }
         >
           Importa dispositivi
         </button>
         {metadata.import_result && (
           <div style={{ marginTop: 8, fontSize: 13, color: "#374151" }}>
             Importati: {metadata.import_result.imported_devices} · Aggiornati: {metadata.import_result.updated_devices}
+          </div>
+        )}
+        {propertyScopedConnections.length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 13, color: "#374151" }}>
+            Connections property: {propertyScopedConnections.map((c) => `#${c.id}:${c.provider_name}`).join(", ")}
           </div>
         )}
       </section>
@@ -236,7 +293,7 @@ function SetupWizard() {
                   onChange={(e) => setAssignments((prev) => ({ ...prev, [device.id]: e.target.value }))}
                 >
                   <option value="">Non assegnato</option>
-                  {units.map((unit) => (
+                  {propertyScopedUnits.map((unit) => (
                     <option key={unit.id} value={unit.id}>
                       {unit.name}
                     </option>
@@ -246,12 +303,18 @@ function SetupWizard() {
             ))}
           </div>
         )}
+        {propertyScopedUnits.length > 0 && (
+          <p style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+            Units disponibili per property: {propertyScopedUnits.length}
+          </p>
+        )}
         <div style={{ marginTop: 10 }}>
           <button
             type="button"
             onClick={() =>
               runStep(async () => ({
                 session: await setupAssignDevices({
+                  property_id: selectedPropertyId ? Number(selectedPropertyId) : undefined,
                   assignments: Object.entries(assignments)
                     .filter(([, unitId]) => unitId)
                     .map(([deviceId, unitId]) => ({
@@ -270,11 +333,7 @@ function SetupWizard() {
       <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12, marginBottom: 12 }}>
         <h3 style={{ marginTop: 0 }}>Step 6 - Enable Recommended Automations</h3>
         <div style={{ display: "grid", gap: 6 }}>
-          {[
-            "basic_hospitality_pack",
-            "energy_saver_pack",
-            "leak_protection_pack",
-          ].map((tpl) => (
+          {["basic_hospitality_pack", "energy_saver_pack", "leak_protection_pack"].map((tpl) => (
             <label key={tpl} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
                 type="checkbox"
@@ -294,7 +353,10 @@ function SetupWizard() {
             type="button"
             onClick={() =>
               runStep(async () => ({
-                session: await setupEnableAutomations({ templates }),
+                session: await setupEnableAutomations({
+                  property_id: selectedPropertyId ? Number(selectedPropertyId) : undefined,
+                  templates,
+                }),
               }))
             }
           >
@@ -314,6 +376,19 @@ function SetupWizard() {
           </p>
         )}
       </section>
+
+      {properties.length > 0 && (
+        <section style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", padding: 12, marginTop: 12 }}>
+          <h3 style={{ marginTop: 0 }}>Properties disponibili</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {properties.map((p) => (
+              <li key={p.id}>
+                #{p.id} {p.name} ({p.code})
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

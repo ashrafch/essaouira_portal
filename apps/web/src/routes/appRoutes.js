@@ -12,6 +12,7 @@ export const APP_ROUTES = [
   { path: "/tariffe-canali", key: "pricing", allowedRoles: ["owner", "manager"] },
   { path: "/maintenance", key: "maintenance", allowedRoles: ["owner", "manager", "operator"] },
   { path: "/expenses", key: "expenses", allowedRoles: ["owner", "manager", "operator"] },
+  { path: "/properties", key: "properties", allowedRoles: ["owner", "manager", "viewer"] },
   { path: "/admin-control", key: "adminControl", allowedRoles: ["owner"] },
   { path: "/smart-overview", key: "smartOverview", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-devices", key: "smartDevices", allowedRoles: ["owner", "manager", "operator", "viewer"] },

@@ -24,6 +24,7 @@ from app.domains.smart_building.setup_router import router as setup_router
 from app.domains.smart_building.service import SmartBuildingService
 from app.main_types import StaffRole
 from app.models.unit import Unit
+from app.models.property import Property
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.cost_item import CostItem
@@ -358,6 +359,7 @@ def delete_user(user_id: int, request: Request, db: Session = Depends(get_db)):
 
 class UnitOut(BaseModel):
     id: int
+    property_id: int | None = None
     name: str
     size_m2: int | None
     capacity: int | None
@@ -369,6 +371,7 @@ class UnitOut(BaseModel):
 
 
 class UnitUpdate(BaseModel):
+    property_id: int | None = None
     name: str | None = None
     size_m2: int | None = None
     capacity: int | None = None
@@ -388,6 +391,8 @@ def update_unit(unit_id: int, payload: UnitUpdate, db: Session = Depends(get_db)
     if not unit:
         raise HTTPException(status_code=404, detail="Unità non trovata")
 
+    if payload.property_id is not None:
+        unit.property_id = payload.property_id
     if payload.name is not None:
         unit.name = payload.name
     if payload.size_m2 is not None:
@@ -402,6 +407,158 @@ def update_unit(unit_id: int, payload: UnitUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(unit)
     return unit
+
+
+# ---------- PROPERTIES ----------
+
+
+class PropertyOut(BaseModel):
+    id: int
+    tenant_id: str
+    name: str
+    code: str
+    status: str
+    timezone: str
+    address_line1: str | None = None
+    city: str | None = None
+    country: str | None = None
+    metadata_json: str | None = None
+    is_active: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class PropertyCreate(BaseModel):
+    name: str
+    code: str | None = None
+    status: str = "active"
+    timezone: str = "Africa/Casablanca"
+    address_line1: str | None = None
+    city: str | None = None
+    country: str | None = None
+    metadata_json: str | None = None
+    is_active: bool = True
+
+
+class PropertyUpdate(BaseModel):
+    name: str | None = None
+    code: str | None = None
+    status: str | None = None
+    timezone: str | None = None
+    address_line1: str | None = None
+    city: str | None = None
+    country: str | None = None
+    metadata_json: str | None = None
+    is_active: bool | None = None
+
+
+def _slugify_property(value: str) -> str:
+    raw = (value or "").strip().lower()
+    slug = "".join(ch if ch.isalnum() else "-" for ch in raw)
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug.strip("-")[:64] or "property"
+
+
+@app.get("/properties", response_model=list[PropertyOut])
+def list_properties(request: Request, db: Session = Depends(get_db)):
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    return (
+        db.query(Property)
+        .filter(Property.tenant_id == tenant_id)
+        .order_by(Property.name.asc(), Property.id.asc())
+        .all()
+    )
+
+
+@app.post("/properties", response_model=PropertyOut)
+def create_property(payload: PropertyCreate, request: Request, db: Session = Depends(get_db)):
+    _require_owner(request)
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    code = _slugify_property(payload.code or payload.name)
+    exists = (
+        db.query(Property)
+        .filter(Property.tenant_id == tenant_id, Property.code == code)
+        .first()
+    )
+    if exists is not None:
+        raise HTTPException(status_code=400, detail="Property code gia presente per questo tenant")
+    prop = Property(
+        tenant_id=tenant_id,
+        name=payload.name.strip(),
+        code=code,
+        status=(payload.status or "active").strip().lower(),
+        timezone=payload.timezone.strip() if payload.timezone else "Africa/Casablanca",
+        address_line1=payload.address_line1,
+        city=payload.city,
+        country=payload.country,
+        metadata_json=payload.metadata_json,
+        is_active=payload.is_active,
+    )
+    db.add(prop)
+    db.commit()
+    db.refresh(prop)
+    return prop
+
+
+@app.get("/properties/{property_id}", response_model=PropertyOut)
+def get_property(property_id: int, request: Request, db: Session = Depends(get_db)):
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    prop = (
+        db.query(Property)
+        .filter(Property.id == property_id, Property.tenant_id == tenant_id)
+        .first()
+    )
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property non trovata")
+    return prop
+
+
+@app.put("/properties/{property_id}", response_model=PropertyOut)
+def update_property(
+    property_id: int, payload: PropertyUpdate, request: Request, db: Session = Depends(get_db)
+):
+    _require_owner(request)
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    prop = (
+        db.query(Property)
+        .filter(Property.id == property_id, Property.tenant_id == tenant_id)
+        .first()
+    )
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property non trovata")
+    if payload.name is not None:
+        prop.name = payload.name
+    if payload.code is not None:
+        next_code = _slugify_property(payload.code)
+        conflict = (
+            db.query(Property)
+            .filter(Property.tenant_id == tenant_id, Property.code == next_code, Property.id != property_id)
+            .first()
+        )
+        if conflict is not None:
+            raise HTTPException(status_code=400, detail="Property code gia presente per questo tenant")
+        prop.code = next_code
+    if payload.status is not None:
+        prop.status = payload.status.strip().lower()
+    if payload.timezone is not None:
+        prop.timezone = payload.timezone
+    if payload.address_line1 is not None:
+        prop.address_line1 = payload.address_line1
+    if payload.city is not None:
+        prop.city = payload.city
+    if payload.country is not None:
+        prop.country = payload.country
+    if payload.metadata_json is not None:
+        prop.metadata_json = payload.metadata_json
+    if payload.is_active is not None:
+        prop.is_active = payload.is_active
+    db.commit()
+    db.refresh(prop)
+    return prop
 
 
 # ---------- BOOKING Schemas ----------

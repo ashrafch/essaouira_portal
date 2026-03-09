@@ -84,6 +84,18 @@ export function updateUnit(unitId, payload) {
   return apiPut(`/units/${unitId}`, payload);
 }
 
+export function getProperties() {
+  return apiGet("/properties");
+}
+
+export function createProperty(payload) {
+  return apiPost("/properties", payload);
+}
+
+export function updateProperty(propertyId, payload) {
+  return apiPut(`/properties/${propertyId}`, payload);
+}
+
 /* --------- BOOKINGS --------- */
 
 export function getBookings() {
@@ -336,6 +348,18 @@ export function triggerSmartAutomationRule(ruleId, payload = {}) {
 
 export function getSmartAutomationExecutions(params = {}) {
   return apiGet("/smart/automation-executions", params);
+}
+
+export function getSmartProviderConnections(params = {}) {
+  return apiGet("/smart/provider-connections", params);
+}
+
+export function createSmartProviderConnection(payload) {
+  return apiPost("/smart/provider-connections", payload);
+}
+
+export function updateSmartProviderConnection(connectionId, payload) {
+  return apiPut(`/smart/provider-connections/${connectionId}`, payload);
 }
 
 /* --------- SETUP WIZARD --------- */

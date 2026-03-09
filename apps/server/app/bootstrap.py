@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.tenant import normalize_tenant_id
 from app.db import Base, engine, get_db
 from app.models.pricing_defaults import PricingDefaults
+from app.models.property import Property
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.unit import Unit
@@ -78,6 +79,118 @@ def _reconcile_devices_table_schema() -> None:
     logger.warning("Reconciled devices table schema: added missing health columns.")
 
 
+def _reconcile_units_table_schema() -> None:
+    inspector = inspect(engine)
+    if "units" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("units")}
+    statements: list[str] = []
+    if "property_id" not in existing_cols:
+        statements.append("ALTER TABLE units ADD COLUMN property_id INTEGER NULL")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.warning("Reconciled units table schema: added property_id.")
+
+
+def _reconcile_properties_table_schema() -> None:
+    inspector = inspect(engine)
+    if "properties" in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE properties (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    name VARCHAR(128) NOT NULL,
+                    code VARCHAR(64) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'active',
+                    timezone VARCHAR(64) NOT NULL DEFAULT 'Africa/Casablanca',
+                    address_line1 VARCHAR(255),
+                    city VARCHAR(128),
+                    country VARCHAR(64),
+                    metadata_json TEXT,
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_properties_tenant_code ON properties (tenant_id, code)"
+            )
+        )
+    logger.warning("Created properties table via reconcile.")
+
+
+def _reconcile_provider_connections_schema() -> None:
+    inspector = inspect(engine)
+    if "smart_provider_connections" in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE smart_provider_connections (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    property_id INTEGER NOT NULL,
+                    provider_name VARCHAR(64) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'disconnected',
+                    base_url VARCHAR(255),
+                    config_json TEXT,
+                    last_sync_at TIMESTAMP WITH TIME ZONE,
+                    last_error TEXT,
+                    is_active BOOLEAN NOT NULL DEFAULT true,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_provider_connection_tenant_property_provider ON smart_provider_connections (tenant_id, property_id, provider_name)"
+            )
+        )
+    logger.warning("Created smart_provider_connections table via reconcile.")
+
+
+def _ensure_default_property_for_existing_units(db) -> None:
+    default_property = (
+        db.query(Property)
+        .filter(Property.tenant_id == "default", Property.code == "default-property")
+        .first()
+    )
+    if default_property is None:
+        default_property = Property(
+            tenant_id="default",
+            name="Default Property",
+            code="default-property",
+            status="active",
+            timezone="Africa/Casablanca",
+            is_active=True,
+        )
+        db.add(default_property)
+        db.commit()
+        db.refresh(default_property)
+
+    units_without_property = db.query(Unit).filter(Unit.property_id.is_(None)).all()
+    if units_without_property:
+        for unit in units_without_property:
+            unit.property_id = default_property.id
+        db.commit()
+
+
 def _ensure_admin_user(db) -> None:
     username = (settings.admin_username or "owner").strip().lower()
     tenant_id = normalize_tenant_id(settings.admin_tenant_id)
@@ -119,7 +232,10 @@ def initialize_schema_and_seed() -> None:
     if settings.auto_create_schema:
         Base.metadata.create_all(bind=engine)
         _reconcile_users_table_schema()
+        _reconcile_properties_table_schema()
+        _reconcile_units_table_schema()
         _reconcile_devices_table_schema()
+        _reconcile_provider_connections_schema()
         logger.info("Schema auto-creation enabled.")
     else:
         logger.info("Schema auto-creation disabled; expecting migrations.")
@@ -131,6 +247,7 @@ def initialize_schema_and_seed() -> None:
     db = next(get_db())
     try:
         _ensure_admin_user(db)
+        _ensure_default_property_for_existing_units(db)
 
         if db.query(Unit).count() == 0:
             units_seed = [

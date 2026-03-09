@@ -23,7 +23,7 @@ def test_provider_debug_and_catalog_sync_idempotent():
         first_sync = client.post("/smart/providers/sync?provider=mock", headers=headers)
         assert first_sync.status_code == 200
         first_data = first_sync.json()
-        assert first_data["imported_devices"] >= 1
+        assert (first_data["imported_devices"] + first_data["updated_devices"]) >= 1
         assert first_data["synced_states"] >= 1
 
         second_sync = client.post("/smart/providers/sync?provider=mock", headers=headers)

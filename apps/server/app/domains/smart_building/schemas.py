@@ -227,6 +227,8 @@ class DeviceHealthOut(BaseModel):
     device_id: int
     unit_id: int | None = None
     unit_name: str | None = None
+    property_id: int | None = None
+    property_name: str | None = None
     name: str
     category: str
     provider: str
@@ -252,6 +254,7 @@ class UnitDeviceHealthSummaryOut(BaseModel):
 
 class DeviceHealthOverviewOut(BaseModel):
     property_summary: UnitDeviceHealthSummaryOut
+    properties: list[UnitDeviceHealthSummaryOut]
     units: list[UnitDeviceHealthSummaryOut]
     devices: list[DeviceHealthOut]
 
@@ -281,29 +284,70 @@ class SetupStartOut(BaseModel):
 
 class SetupPropertyIn(BaseModel):
     property_name: str = Field(..., min_length=2, max_length=128)
+    property_code: str | None = Field(default=None, max_length=64)
     timezone: str | None = Field(default="Africa/Casablanca", max_length=64)
     currency: str | None = Field(default="EUR", max_length=8)
 
 
 class SetupUnitsIn(BaseModel):
+    property_id: int | None = None
     units: list[str] = Field(..., min_length=1, max_length=30)
 
 
 class SetupConnectProviderIn(BaseModel):
+    property_id: int | None = None
     provider: str = Field(..., max_length=64)
     config: dict = Field(default_factory=dict)
 
 
 class SetupImportDevicesIn(BaseModel):
+    property_id: int | None = None
+    provider_connection_id: int | None = None
     provider: str | None = Field(default=None, max_length=64)
 
 
 class SetupAssignDevicesIn(BaseModel):
+    property_id: int | None = None
     assignments: list[dict] = Field(default_factory=list)
 
 
 class SetupEnableAutomationsIn(BaseModel):
+    property_id: int | None = None
     templates: list[str] = Field(default_factory=list)
+
+
+class ProviderConnectionCreateIn(BaseModel):
+    property_id: int
+    provider_name: str = Field(..., max_length=64)
+    status: str = Field(default="connected", max_length=16)
+    base_url: str | None = Field(default=None, max_length=255)
+    config: dict = Field(default_factory=dict)
+    is_active: bool = True
+
+
+class ProviderConnectionUpdateIn(BaseModel):
+    status: str | None = Field(default=None, max_length=16)
+    base_url: str | None = Field(default=None, max_length=255)
+    config: dict | None = None
+    is_active: bool | None = None
+    last_error: str | None = None
+
+
+class ProviderConnectionOut(BaseModel):
+    id: int
+    tenant_id: str
+    property_id: int
+    provider_name: str
+    status: str
+    base_url: str | None = None
+    config_json: str | None = None
+    last_sync_at: datetime | None = None
+    last_error: str | None = None
+    is_active: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DeviceCommandCreate(BaseModel):

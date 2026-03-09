@@ -28,19 +28,30 @@ class HomeAssistantProvider(SmartDeviceProvider):
     supports_webhook_ingest = True
     supports_command_execution = True
 
-    def __init__(self) -> None:
-        self._base_url = os.getenv("HOME_ASSISTANT_URL", "").strip().rstrip("/")
-        self._token = os.getenv("HOME_ASSISTANT_TOKEN", "").strip()
+    def __init__(
+        self,
+        *,
+        base_url: str | None = None,
+        token: str | None = None,
+        timeout_seconds: int | None = None,
+        include_domains: str | None = None,
+        unit_hints_json: str | None = None,
+    ) -> None:
+        self._base_url = (base_url or os.getenv("HOME_ASSISTANT_URL", "")).strip().rstrip("/")
+        self._token = (token or os.getenv("HOME_ASSISTANT_TOKEN", "")).strip()
         timeout_raw = os.getenv("HOME_ASSISTANT_TIMEOUT_SECONDS", "8").strip()
+        effective_timeout = timeout_seconds if timeout_seconds is not None else timeout_raw
         try:
-            self._timeout = max(2, min(int(timeout_raw), 30))
-        except ValueError:
+            self._timeout = max(2, min(int(effective_timeout), 30))
+        except (TypeError, ValueError):
             self._timeout = 8
         self._include_domains = self._parse_domains(
-            os.getenv("HOME_ASSISTANT_INCLUDE_DOMAINS"),
+            include_domains if include_domains is not None else os.getenv("HOME_ASSISTANT_INCLUDE_DOMAINS"),
             default=SUPPORTED_ENTITY_DOMAINS,
         )
-        self._unit_hint_map = self._parse_unit_hint_map(os.getenv("HOME_ASSISTANT_UNIT_HINTS", ""))
+        self._unit_hint_map = self._parse_unit_hint_map(
+            unit_hints_json if unit_hints_json is not None else os.getenv("HOME_ASSISTANT_UNIT_HINTS", "")
+        )
 
     def _parse_domains(self, value: str | None, *, default: set[str]) -> set[str]:
         if not value:

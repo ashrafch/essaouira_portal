@@ -166,6 +166,7 @@ function Sidebar() {
       title: "Proprietà",
       items: [
         { to: "/units", label: "Appartamenti", badge: null, routeKey: "units" },
+        { to: "/properties", label: "Properties", badge: null, routeKey: "properties" },
         { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null, routeKey: "pricing" },
         { to: "/expenses", label: "Spese Generali", badge: null, routeKey: "expenses" },
         {

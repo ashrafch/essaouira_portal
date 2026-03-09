@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
 from app.db import Base
 
 
@@ -7,6 +7,7 @@ class Unit(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
     size_m2 = Column(Integer, nullable=True)
     capacity = Column(Integer, nullable=True)
 

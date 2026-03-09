@@ -49,6 +49,7 @@ from app.domains.smart_building.schemas import (
 )
 from app.models.booking import Booking
 from app.models.maintenance import MaintenanceTicket
+from app.models.property import Property
 from app.models.staff_task import StaffTask
 from app.models.unit import Unit
 from app.models.smart_building import (
@@ -62,6 +63,7 @@ from app.models.smart_building import (
     Scene,
     SceneAction,
     SetupSession,
+    SmartProviderConnection,
 )
 
 
@@ -97,6 +99,16 @@ class SmartBuildingService:
     def _scoped_query(self, model):
         return self.db.query(model).filter(model.tenant_id == self.tenant_id)
 
+    def _get_provider_connection(self, connection_id: int) -> SmartProviderConnection:
+        connection = (
+            self._scoped_query(SmartProviderConnection)
+            .filter(SmartProviderConnection.id == connection_id)
+            .first()
+        )
+        if connection is None:
+            raise HTTPException(status_code=404, detail="Provider connection non trovata")
+        return connection
+
     def _require_write_access(self) -> None:
         if self.role in {"operator", "viewer"}:
             raise HTTPException(status_code=403, detail="Permesso insufficiente per modifiche smart")
@@ -112,6 +124,59 @@ class SmartBuildingService:
             if has_device_binding is None:
                 raise HTTPException(status_code=404, detail="Unita non trovata")
         return unit
+
+    def _property_or_404(self, property_id: int) -> Property:
+        prop = (
+            self._scoped_query(Property)
+            .filter(Property.id == property_id)
+            .first()
+        )
+        if prop is None:
+            raise HTTPException(status_code=404, detail="Property non trovata")
+        return prop
+
+    def _provider_instance_for_connection(
+        self,
+        provider_name: str | None = None,
+        connection: SmartProviderConnection | None = None,
+    ):
+        cfg = {}
+        effective_name = provider_name
+        if connection is not None:
+            effective_name = connection.provider_name
+            cfg = self._safe_json_loads(connection.config_json)
+            if connection.base_url:
+                cfg["base_url"] = connection.base_url
+        return get_provider(effective_name, config=cfg)
+
+    def _resolve_connection_for_device_provider(
+        self, device: Device
+    ) -> SmartProviderConnection | None:
+        if device.unit_id is None:
+            return None
+        unit = self.db.query(Unit).filter(Unit.id == device.unit_id).first()
+        if unit is None or unit.property_id is None:
+            return None
+        return (
+            self._scoped_query(SmartProviderConnection)
+            .filter(
+                SmartProviderConnection.property_id == unit.property_id,
+                SmartProviderConnection.provider_name == device.provider,
+                SmartProviderConnection.is_active.is_(True),
+            )
+            .first()
+        )
+
+    def _resolve_connection_for_provider(
+        self, provider_name: str, property_id: int | None = None
+    ) -> SmartProviderConnection | None:
+        query = self._scoped_query(SmartProviderConnection).filter(
+            SmartProviderConnection.provider_name == provider_name,
+            SmartProviderConnection.is_active.is_(True),
+        )
+        if property_id is not None:
+            query = query.filter(SmartProviderConnection.property_id == property_id)
+        return query.order_by(SmartProviderConnection.updated_at.desc(), SmartProviderConnection.id.desc()).first()
 
     def list_devices(self) -> list[Device]:
         return self._scoped_query(Device).order_by(Device.id.asc()).all()
@@ -140,6 +205,7 @@ class SmartBuildingService:
         status: str | None = None,
         connectivity: str | None = None,
         unit_id: int | None = None,
+        property_id: int | None = None,
     ) -> dict[str, object]:
         normalized_status = (status or "").strip().lower() or None
         if normalized_status is not None and normalized_status not in {"healthy", "warning", "critical"}:
@@ -149,6 +215,16 @@ class SmartBuildingService:
             raise HTTPException(status_code=400, detail="connectivity non valida")
 
         devices_query = self._scoped_query(Device)
+        if property_id is not None:
+            self._property_or_404(property_id)
+            unit_ids_for_property = [
+                row[0]
+                for row in self.db.query(Unit.id).filter(Unit.property_id == property_id).all()
+            ]
+            if unit_ids_for_property:
+                devices_query = devices_query.filter(Device.unit_id.in_(unit_ids_for_property))
+            else:
+                devices_query = devices_query.filter(Device.id == -1)
         if unit_id is not None:
             self._ensure_unit_visible(unit_id)
             devices_query = devices_query.filter(Device.unit_id == unit_id)
@@ -164,10 +240,16 @@ class SmartBuildingService:
             states_by_device = {state.device_id: state for state in states}
 
         unit_ids = {device.unit_id for device in devices if device.unit_id is not None}
-        unit_map: dict[int, str] = {}
+        unit_map: dict[int, Unit] = {}
         if unit_ids:
             units = self.db.query(Unit).filter(Unit.id.in_(unit_ids)).all()
-            unit_map = {unit.id: unit.name for unit in units}
+            unit_map = {unit.id: unit for unit in units}
+
+        property_ids = {unit.property_id for unit in unit_map.values() if unit.property_id is not None}
+        property_map: dict[int, str] = {}
+        if property_ids:
+            props = self._scoped_query(Property).filter(Property.id.in_(property_ids)).all()
+            property_map = {prop.id: prop.name for prop in props}
 
         now = datetime.now(timezone.utc)
         records: list[dict[str, object]] = []
@@ -176,8 +258,12 @@ class SmartBuildingService:
                 device,
                 states_by_device.get(device.id),
                 now=now,
-                unit_name=unit_map.get(device.unit_id) if device.unit_id is not None else "Unassigned",
+                unit_name=unit_map.get(device.unit_id).name if device.unit_id is not None and unit_map.get(device.unit_id) else "Unassigned",
             )
+            unit_obj = unit_map.get(device.unit_id) if device.unit_id is not None else None
+            prop_id = unit_obj.property_id if unit_obj is not None else None
+            record["property_id"] = prop_id
+            record["property_name"] = property_map.get(prop_id) if prop_id is not None else None
             if normalized_status is not None and record["health_status"] != normalized_status:
                 continue
             if normalized_connectivity is not None and record["connectivity_status"] != normalized_connectivity:
@@ -200,10 +286,34 @@ class SmartBuildingService:
                 self._aggregate_health_summary(
                     group,
                     unit_id=int(key),
-                    unit_name=unit_map.get(int(key), f"Unit {key}"),
+                    unit_name=(
+                        unit_map[int(key)].name
+                        if int(key) in unit_map
+                        else f"Unit {key}"
+                    ),
                 )
             )
         unit_summaries.sort(key=lambda item: (item["unit_id"] is None, item["unit_name"]))
+
+        by_property: dict[int | None, list[dict[str, object]]] = {}
+        for record in records:
+            key = record.get("property_id")
+            by_property.setdefault(key, []).append(record)
+        property_summaries: list[dict[str, object]] = []
+        for key, group in by_property.items():
+            if key is None:
+                property_summaries.append(
+                    self._aggregate_health_summary(group, unit_id=None, unit_name="Unassigned")
+                )
+            else:
+                property_summaries.append(
+                    self._aggregate_health_summary(
+                        group,
+                        unit_id=int(key),
+                        unit_name=property_map.get(int(key), f"Property {key}"),
+                    )
+                )
+        property_summaries.sort(key=lambda item: (item["unit_id"] is None, item["unit_name"]))
 
         property_summary = self._aggregate_health_summary(
             records,
@@ -212,6 +322,7 @@ class SmartBuildingService:
         )
         return {
             "property_summary": property_summary,
+            "properties": property_summaries,
             "units": unit_summaries,
             "devices": records,
         }
@@ -235,6 +346,83 @@ class SmartBuildingService:
             unit = self.db.query(Unit).filter(Unit.id == device.unit_id).first()
             unit_name = unit.name if unit else None
         return self._build_device_health_record(device, state, unit_name=unit_name)
+
+    def list_provider_connections(self, property_id: int | None = None) -> list[SmartProviderConnection]:
+        query = self._scoped_query(SmartProviderConnection).order_by(
+            SmartProviderConnection.updated_at.desc(), SmartProviderConnection.id.desc()
+        )
+        if property_id is not None:
+            self._property_or_404(property_id)
+            query = query.filter(SmartProviderConnection.property_id == property_id)
+        return query.all()
+
+    def get_provider_connection_or_404(self, connection_id: int) -> SmartProviderConnection:
+        return self._get_provider_connection(connection_id)
+
+    def create_provider_connection(
+        self,
+        *,
+        property_id: int,
+        provider_name: str,
+        status: str = "connected",
+        base_url: str | None = None,
+        config: dict | None = None,
+        is_active: bool = True,
+    ) -> SmartProviderConnection:
+        self._require_owner_access()
+        self._property_or_404(property_id)
+        normalized_provider = (provider_name or "").strip().lower()
+        if normalized_provider not in {"mock", "home_assistant"}:
+            raise HTTPException(status_code=400, detail="Provider non supportato")
+        existing = (
+            self._scoped_query(SmartProviderConnection)
+            .filter(
+                SmartProviderConnection.property_id == property_id,
+                SmartProviderConnection.provider_name == normalized_provider,
+            )
+            .first()
+        )
+        if existing is not None:
+            raise HTTPException(status_code=400, detail="Provider connection gia presente")
+        connection = SmartProviderConnection(
+            tenant_id=self.tenant_id,
+            property_id=property_id,
+            provider_name=normalized_provider,
+            status=(status or "connected").strip().lower(),
+            base_url=(base_url or "").strip() or None,
+            config_json=self._safe_json_dumps(config or {}),
+            is_active=bool(is_active),
+        )
+        self.db.add(connection)
+        self.db.commit()
+        self.db.refresh(connection)
+        return connection
+
+    def update_provider_connection(
+        self,
+        connection_id: int,
+        *,
+        status: str | None = None,
+        base_url: str | None = None,
+        config: dict | None = None,
+        is_active: bool | None = None,
+        last_error: str | None = None,
+    ) -> SmartProviderConnection:
+        self._require_owner_access()
+        connection = self._get_provider_connection(connection_id)
+        if status is not None:
+            connection.status = status.strip().lower()
+        if base_url is not None:
+            connection.base_url = base_url.strip() or None
+        if config is not None:
+            connection.config_json = self._safe_json_dumps(config)
+        if is_active is not None:
+            connection.is_active = bool(is_active)
+        if last_error is not None:
+            connection.last_error = last_error
+        self.db.commit()
+        self.db.refresh(connection)
+        return connection
 
     def _safe_json_dumps(self, value: dict | None) -> str | None:
         if value is None:
@@ -386,11 +574,36 @@ class SmartBuildingService:
     def setup_property(self, payload: SetupPropertyIn) -> dict[str, object]:
         self._require_owner_access()
         session = self._active_setup_session_or_404()
+        code = (
+            payload.property_name.strip().lower().replace(" ", "-").replace("--", "-")[:64]
+            or f"property-{self.tenant_id}"
+        )
+        existing = (
+            self._scoped_query(Property)
+            .filter(Property.code == code)
+            .first()
+        )
+        if existing is None:
+            prop = Property(
+                tenant_id=self.tenant_id,
+                name=payload.property_name.strip(),
+                code=code,
+                status="active",
+                timezone=payload.timezone or "Africa/Casablanca",
+                metadata_json=self._safe_json_dumps({"currency": payload.currency or "EUR"}),
+                is_active=True,
+            )
+            self.db.add(prop)
+            self.db.commit()
+            self.db.refresh(prop)
+        else:
+            prop = existing
         session = self._update_setup_session(
             session,
             current_step="units",
             metadata_updates={
                 "property_name": payload.property_name.strip(),
+                "property_id": prop.id,
                 "timezone": payload.timezone or "Africa/Casablanca",
                 "currency": (payload.currency or "EUR").upper(),
             },
@@ -400,6 +613,10 @@ class SmartBuildingService:
     def setup_units(self, payload: SetupUnitsIn) -> dict[str, object]:
         self._require_owner_access()
         session = self._active_setup_session_or_404()
+        metadata = self._safe_json_loads(session.metadata_json)
+        property_id = payload.property_id or metadata.get("property_id")
+        if not property_id:
+            raise HTTPException(status_code=400, detail="Step property richiesto prima di creare units")
         created_ids: list[int] = []
         existing_ids: list[int] = []
 
@@ -409,9 +626,11 @@ class SmartBuildingService:
                 continue
             existing = self.db.query(Unit).filter(Unit.name == name).first()
             if existing is not None:
+                if existing.property_id is None:
+                    existing.property_id = int(property_id)
                 existing_ids.append(existing.id)
                 continue
-            unit = Unit(name=name, currency="EUR")
+            unit = Unit(name=name, property_id=int(property_id), currency="EUR")
             self.db.add(unit)
             self.db.flush()
             created_ids.append(unit.id)
@@ -432,15 +651,50 @@ class SmartBuildingService:
     def setup_connect_provider(self, payload: SetupConnectProviderIn) -> dict[str, object]:
         self._require_owner_access()
         session = self._active_setup_session_or_404()
+        metadata = self._safe_json_loads(session.metadata_json)
+        property_id = payload.property_id or metadata.get("property_id")
+        if not property_id:
+            raise HTTPException(status_code=400, detail="Property non impostata nel wizard")
+        self._property_or_404(int(property_id))
         provider_name = (payload.provider or "").strip().lower()
         if provider_name not in {"mock", "home_assistant"}:
             raise HTTPException(status_code=400, detail="Provider non supportato dal setup wizard")
         _ = get_provider(provider_name)
+        connection = (
+            self._scoped_query(SmartProviderConnection)
+            .filter(
+                SmartProviderConnection.property_id == int(property_id),
+                SmartProviderConnection.provider_name == provider_name,
+            )
+            .first()
+        )
+        base_url = str((payload.config or {}).get("base_url", "")).strip() or None
+        config_payload = dict(payload.config or {})
+        if connection is None:
+            connection = SmartProviderConnection(
+                tenant_id=self.tenant_id,
+                property_id=int(property_id),
+                provider_name=provider_name,
+                status="connected",
+                base_url=base_url,
+                config_json=self._safe_json_dumps(config_payload),
+                is_active=True,
+            )
+            self.db.add(connection)
+        else:
+            connection.status = "connected"
+            connection.base_url = base_url
+            connection.config_json = self._safe_json_dumps(config_payload)
+            connection.is_active = True
+            connection.last_error = None
+        self.db.commit()
+        self.db.refresh(connection)
         session = self._update_setup_session(
             session,
             current_step="import_devices",
             metadata_updates={
                 "provider_name": provider_name,
+                "provider_connection_id": connection.id,
                 "provider_config": payload.config or {},
             },
         )
@@ -451,13 +705,20 @@ class SmartBuildingService:
         session = self._active_setup_session_or_404()
         metadata = self._safe_json_loads(session.metadata_json)
         provider_name = (payload.provider or metadata.get("provider_name") or "mock").strip().lower()
-        sync_result = self.sync_catalog_from_provider(provider_name)
+        connection_id = payload.provider_connection_id or metadata.get("provider_connection_id")
+        connection = self._get_provider_connection(int(connection_id)) if connection_id else None
+        sync_result = self.sync_catalog_from_provider(provider_name, provider_connection=connection)
         imported_devices = (
             self._scoped_query(Device)
             .filter(Device.provider == provider_name)
             .order_by(Device.id.asc())
             .all()
         )
+        if connection is not None:
+            connection.last_sync_at = datetime.now(timezone.utc)
+            connection.status = "connected"
+            connection.last_error = None
+            self.db.commit()
         session = self._update_setup_session(
             session,
             current_step="assign_devices",
@@ -476,6 +737,7 @@ class SmartBuildingService:
         assigned = 0
         skipped_conflict = 0
         invalid = 0
+        property_id = payload.property_id or self._safe_json_loads(session.metadata_json).get("property_id")
         for item in payload.assignments or []:
             try:
                 device_id = int(item.get("device_id"))
@@ -488,6 +750,11 @@ class SmartBuildingService:
                 invalid += 1
                 continue
             self._ensure_unit_visible(unit_id)
+            if property_id:
+                unit = self.db.query(Unit).filter(Unit.id == unit_id).first()
+                if unit is not None and unit.property_id not in {None, int(property_id)}:
+                    skipped_conflict += 1
+                    continue
             if device.unit_id is not None and device.unit_id != unit_id:
                 skipped_conflict += 1
                 continue
@@ -592,6 +859,9 @@ class SmartBuildingService:
     def setup_enable_automations(self, payload: SetupEnableAutomationsIn) -> dict[str, object]:
         self._require_owner_access()
         session = self._active_setup_session_or_404()
+        property_id = payload.property_id or self._safe_json_loads(session.metadata_json).get("property_id")
+        if property_id:
+            self._property_or_404(int(property_id))
         templates = payload.templates or []
         if not templates:
             templates = ["basic_hospitality_pack"]
@@ -1078,7 +1348,9 @@ class SmartBuildingService:
         }
 
     def provider_debug(self, provider_name: str | None = None) -> dict[str, object]:
-        provider = get_provider(provider_name)
+        selected_name = (provider_name or "").strip().lower()
+        connection = self._resolve_connection_for_provider(selected_name) if selected_name else None
+        provider = self._provider_instance_for_connection(provider_name, connection)
         return {
             "provider_name": provider.provider_name,
             "supports_catalog_sync": bool(getattr(provider, "supports_catalog_sync", False)),
@@ -1268,9 +1540,14 @@ class SmartBuildingService:
         }
         return current_values != new_values
 
-    def sync_catalog_from_provider(self, provider_name: str | None = None) -> dict[str, int | str]:
+    def sync_catalog_from_provider(
+        self,
+        provider_name: str | None = None,
+        *,
+        provider_connection: SmartProviderConnection | None = None,
+    ) -> dict[str, int | str]:
         self._require_write_access()
-        provider = get_provider(provider_name)
+        provider = self._provider_instance_for_connection(provider_name, provider_connection)
         if not getattr(provider, "supports_catalog_sync", False):
             raise HTTPException(status_code=400, detail="Provider does not support catalog sync")
 
@@ -1281,6 +1558,10 @@ class SmartBuildingService:
         try:
             snapshots = provider.list_devices(self.tenant_id)
         except Exception as exc:
+            if provider_connection is not None:
+                provider_connection.status = "error"
+                provider_connection.last_error = str(exc)
+                self.db.commit()
             raise HTTPException(status_code=502, detail=f"Provider sync failed: {exc}") from exc
 
         for snapshot in snapshots:
@@ -1367,7 +1648,8 @@ class SmartBuildingService:
         self, provider_name: str, payload: dict, username: str | None = None
     ) -> dict[str, object]:
         self._require_write_access()
-        provider = get_provider(provider_name)
+        connection = self._resolve_connection_for_provider(provider_name)
+        provider = self._provider_instance_for_connection(provider_name, connection)
         if not getattr(provider, "supports_webhook_ingest", False):
             return {
                 "provider_name": provider.provider_name,
@@ -1447,7 +1729,9 @@ class SmartBuildingService:
 
     def poll_provider_states(self, provider_name: str | None = None) -> dict[str, int | str]:
         self._require_write_access()
-        provider = get_provider(provider_name)
+        selected_name = (provider_name or "").strip().lower()
+        connection = self._resolve_connection_for_provider(selected_name) if selected_name else None
+        provider = self._provider_instance_for_connection(provider_name, connection)
         devices = (
             self._scoped_query(Device)
             .filter(Device.provider == provider.provider_name)
@@ -1608,7 +1892,10 @@ class SmartBuildingService:
             ),
         )
 
-        provider = get_provider(device.provider)
+        provider = self._provider_instance_for_connection(
+            device.provider,
+            self._resolve_connection_for_device_provider(device),
+        )
         if not getattr(provider, "supports_command_execution", False):
             command.status = "failed"
             command.failed_at = datetime.now(timezone.utc)
@@ -2384,7 +2671,10 @@ class SmartBuildingService:
 
     def simulate_sync(self, device_id: int) -> DeviceState:
         device = self.get_device_or_404(device_id)
-        provider = get_provider(device.provider)
+        provider = self._provider_instance_for_connection(
+            device.provider,
+            self._resolve_connection_for_device_provider(device),
+        )
         snapshot = provider.pull_state(device.external_id)
         state = self.upsert_device_state(
             device_id,

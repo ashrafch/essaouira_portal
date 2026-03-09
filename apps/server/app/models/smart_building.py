@@ -227,3 +227,27 @@ class SetupSession(TenantScopedMixin, Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class SmartProviderConnection(TenantScopedMixin, Base):
+    __tablename__ = "smart_provider_connections"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "property_id",
+            "provider_name",
+            name="uq_provider_connection_tenant_property_provider",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False, index=True)
+    provider_name = Column(String(64), nullable=False)
+    status = Column(String(16), nullable=False, default="disconnected")
+    base_url = Column(String(255), nullable=True)
+    config_json = Column(Text, nullable=True)
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

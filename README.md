@@ -96,9 +96,20 @@ Smart provider endpoints:
 - catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
 - state poll fallback: `POST /smart/providers/poll?provider=mock|home_assistant`
 - webhook ingest: `POST /smart/providers/{provider}/webhook`
+- provider connections: `GET/POST /smart/provider-connections`, `GET/PUT /smart/provider-connections/{id}`
 - health overview: `GET /smart/device-health`
 - health by unit: `GET /smart/units/{id}/device-health`
 - health by device: `GET /smart/devices/{id}/health`
+
+Property management endpoints:
+- `GET /properties`
+- `POST /properties`
+- `GET /properties/{id}`
+- `PUT /properties/{id}`
+
+Note:
+- `Unit.property_id` collega le unità PMS a una property reale.
+- per retrocompatibilita, migrazione/backfill crea una property di default per tenant e assegna le unità senza property.
 
 Setup wizard endpoints:
 - `POST /setup/start`
@@ -110,6 +121,12 @@ Setup wizard endpoints:
 - `POST /setup/assign-devices`
 - `POST /setup/enable-automations`
 - `POST /setup/complete`
+
+Setup wizard (Milestone 12):
+- step `property` persiste una `Property` reale (`metadata.property_id`)
+- step `connect-provider` persiste una `SmartProviderConnection` (`metadata.provider_connection_id`)
+- step `units` assegna `property_id` alle unità create/esistenti
+- step `import-devices` usa provider connection se disponibile
 
 User management:
 - endpoint owner-only: `GET/POST/PUT/DELETE /users`
