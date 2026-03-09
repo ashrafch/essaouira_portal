@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { isAuthenticated, login } from "../services/auth";
+import { login } from "../services/auth";
 
 function Login() {
   const navigate = useNavigate();
@@ -11,12 +11,6 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const authReason = searchParams.get("reason");
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
