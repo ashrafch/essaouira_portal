@@ -312,6 +312,22 @@ export function getSmartDashboard(params = {}) {
   return apiGet("/smart/dashboard", params);
 }
 
+export function getSmartOperations(params = {}) {
+  return apiGet("/smart/operations", params);
+}
+
+export function getSmartOperationsUnitsNeedingAttention(params = {}) {
+  return apiGet("/smart/operations/units-needing-attention", params);
+}
+
+export function getSmartOperationsIssues(params = {}) {
+  return apiGet("/smart/operations/issues", params);
+}
+
+export function getSmartOperationsActivity(params = {}) {
+  return apiGet("/smart/operations/activity", params);
+}
+
 export function getSmartUnitDetail(unitId, params = {}) {
   return apiGet(`/smart/units/${unitId}`, params);
 }

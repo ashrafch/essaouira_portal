@@ -35,6 +35,7 @@ function CommandPalette() {
   const navItems = useMemo(() => {
     const all = [
       { label: "Smart Dashboard", path: "/smart-dashboard", routeKey: "smartDashboard" },
+      { label: "Smart Operations", path: "/smart-operations", routeKey: "smartOperations" },
       { label: "Smart Overview", path: "/smart-overview", routeKey: "smartOverview" },
       { label: "Property", path: "/properties", routeKey: "properties" },
       { label: "Dispositivi Smart", path: "/smart-devices", routeKey: "smartDevices" },

@@ -105,6 +105,11 @@ Smart provider endpoints:
 - telemetry by unit: `GET /smart/telemetry/unit/{unit_id}?metric_type=&from=&to=&interval=`
 - telemetry by property: `GET /smart/telemetry/property/{property_id}?metric_type=&from=&to=&interval=`
 - smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
+- smart operations mode:
+  - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
+  - `GET /smart/operations/units-needing-attention?property_id=&unit_id=&severity=`
+  - `GET /smart/operations/issues?property_id=&unit_id=&severity=&issue_type=&status=`
+  - `GET /smart/operations/activity?property_id=&unit_id=&severity=`
 - scenario packs:
   - `GET /smart/scenario-packs`
   - `GET /smart/scenario-packs/enabled?property_id=`

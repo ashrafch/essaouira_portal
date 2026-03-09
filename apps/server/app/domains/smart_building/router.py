@@ -43,6 +43,10 @@ from app.domains.smart_building.schemas import (
     SceneRunRequest,
     SceneUpdate,
     SmartDashboardOut,
+    SmartDashboardItemOut,
+    SmartOperationsIssueOut,
+    SmartOperationsOut,
+    SmartOperationsUnitOut,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
@@ -75,6 +79,74 @@ def get_smart_dashboard(
     unit_id: int | None = Query(default=None),
 ):
     return _service(request, db).smart_dashboard(property_id=property_id, unit_id=unit_id)
+
+
+@router.get("/operations", response_model=SmartOperationsOut)
+def get_smart_operations(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    issue_type: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+):
+    return _service(request, db).smart_operations(
+        property_id=property_id,
+        unit_id=unit_id,
+        severity=severity,
+        issue_type=issue_type,
+        status=status,
+    )
+
+
+@router.get("/operations/units-needing-attention", response_model=list[SmartOperationsUnitOut])
+def get_units_needing_attention(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    severity: str | None = Query(default=None),
+):
+    return _service(request, db).list_smart_operations_units_needing_attention(
+        property_id=property_id,
+        unit_id=unit_id,
+        severity=severity,
+    )
+
+
+@router.get("/operations/issues", response_model=list[SmartOperationsIssueOut])
+def get_operations_issues(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    issue_type: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+):
+    return _service(request, db).list_smart_operations_issues(
+        property_id=property_id,
+        unit_id=unit_id,
+        severity=severity,
+        issue_type=issue_type,
+        status=status,
+    )
+
+
+@router.get("/operations/activity", response_model=list[SmartDashboardItemOut])
+def get_operations_activity(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    severity: str | None = Query(default=None),
+):
+    return _service(request, db).list_smart_operations_activity(
+        property_id=property_id,
+        unit_id=unit_id,
+        severity=severity,
+    )
 
 
 @router.get("/units/{unit_id}", response_model=SmartUnitDetailOut)

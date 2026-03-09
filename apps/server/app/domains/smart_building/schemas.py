@@ -697,3 +697,63 @@ class SmartDashboardOut(BaseModel):
     recent_automation_failures: list[SmartDashboardItemOut] = Field(default_factory=list)
     recent_executions: list[SmartDashboardItemOut] = Field(default_factory=list)
     provider_statuses: list[SmartDashboardProviderStatusOut] = Field(default_factory=list)
+
+
+class SmartOperationsSummaryOut(BaseModel):
+    units_needing_attention: int
+    open_issues: int
+    critical_issues: int
+    open_alerts: int
+    offline_devices: int
+    unhealthy_devices: int
+    automation_failures_recent: int
+
+
+class SmartOperationsUnitOut(BaseModel):
+    unit_id: int
+    unit_name: str
+    property_id: int | None = None
+    property_name: str | None = None
+    attention_score: int
+    severity: str
+    status: str
+    reasons: list[str] = Field(default_factory=list)
+    open_alerts: int = 0
+    critical_alerts: int = 0
+    offline_devices: int = 0
+    warning_devices: int = 0
+    critical_devices: int = 0
+    automation_failures: int = 0
+    automation_partial: int = 0
+    smart_maintenance_open: int = 0
+    recent_issue_at: datetime | None = None
+
+
+class SmartOperationsIssueOut(BaseModel):
+    issue_id: str
+    issue_type: str
+    severity: str
+    status: str
+    title: str
+    description: str | None = None
+    property_id: int | None = None
+    property_name: str | None = None
+    unit_id: int | None = None
+    unit_name: str | None = None
+    device_id: int | None = None
+    alert_id: int | None = None
+    execution_id: int | None = None
+    maintenance_id: int | None = None
+    task_id: int | None = None
+    suggested_action: str | None = None
+    occurred_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    refs: dict = Field(default_factory=dict)
+
+
+class SmartOperationsOut(BaseModel):
+    filters: dict = Field(default_factory=dict)
+    summary: SmartOperationsSummaryOut
+    units_needing_attention: list[SmartOperationsUnitOut] = Field(default_factory=list)
+    issues: list[SmartOperationsIssueOut] = Field(default_factory=list)
+    activity: list[SmartDashboardItemOut] = Field(default_factory=list)
