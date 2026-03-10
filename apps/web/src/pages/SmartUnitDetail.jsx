@@ -10,13 +10,23 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
+import {
+  AppCard,
+  EmptyState,
+  FreshnessBadge,
+  LastUpdatedIndicator,
+  LiveStatusDot,
+  LoadingSkeleton,
+  SectionHeader,
+  StatCard,
+} from "../components/ui";
 import ActivityCard from "../components/dashboard/ActivityCard";
 import DeviceCard from "../components/smart/DeviceCard";
 import EnergySummaryCard from "../components/smart/EnergySummaryCard";
 import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
 import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
 import TimelineItem from "../components/smart/TimelineItem";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 import {
   getSmartUnitDetail,
   getSmartUnitDeviceHealth,
@@ -90,43 +100,64 @@ function SmartUnitDetail() {
   const [health, setHealth] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
 
-  useEffect(() => {
-    async function load() {
+  async function loadCore(silent = false) {
+    if (!silent) {
       setLoading(true);
-      setError("");
-      try {
-        const [d, t, h] = await Promise.all([
-          getSmartUnitDetail(unitId, { events_limit: 30 }),
-          getSmartUnitTimeline(unitId, { limit: 30 }),
-          getSmartUnitDeviceHealth(unitId),
-        ]);
-        setDetail(d);
-        setTimeline(t?.items || []);
-        setHealth(h);
-      } catch (err) {
-        setError(err.message || "Errore caricamento unità smart");
-      } finally {
+    }
+    setError("");
+    try {
+      const [d, t, h] = await Promise.all([
+        getSmartUnitDetail(unitId, { events_limit: 30 }),
+        getSmartUnitTimeline(unitId, { limit: 30 }),
+        getSmartUnitDeviceHealth(unitId),
+      ]);
+      setDetail(d);
+      setTimeline(t?.items || []);
+      setHealth(h);
+    } catch (err) {
+      setError(err.message || "Errore caricamento unità smart");
+    } finally {
+      if (!silent) {
         setLoading(false);
       }
     }
-    load();
-  }, [unitId]);
+  }
 
-  useEffect(() => {
-    async function loadTelemetry() {
+  async function loadTelemetry(silent = false) {
+    if (!silent) {
       setTelemetryLoading(true);
-      try {
-        const params = buildDateRange(range);
-        const data = await getSmartUnitTelemetry(unitId, params);
-        setTelemetry(data);
-      } catch (err) {
-        setError(err.message || "Errore caricamento telemetria unità");
-      } finally {
+    }
+    try {
+      const params = buildDateRange(range);
+      const data = await getSmartUnitTelemetry(unitId, params);
+      setTelemetry(data);
+    } catch (err) {
+      setError(err.message || "Errore caricamento telemetria unità");
+    } finally {
+      if (!silent) {
         setTelemetryLoading(false);
       }
     }
+  }
+
+  useEffect(() => {
+    loadCore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitId]);
+
+  useEffect(() => {
     loadTelemetry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unitId, range]);
+
+  const { isRefreshing, lastRefreshAt, refreshNow } = useAutoRefresh({
+    onRefresh: async () => {
+      await Promise.all([loadCore(true), loadTelemetry(true)]);
+    },
+    intervalMs: 15000,
+    enabled: !loading && !error,
+    immediate: false,
+  });
 
   const summary = detail?.summary;
   const healthSummary = health?.summary;
@@ -167,6 +198,14 @@ function SmartUnitDetail() {
         subtitle="Control center dell'unità: salute dispositivi, alert e timeline operativa"
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <LiveStatusDot active={!document.hidden} title="Auto refresh 15s" />
+              <LastUpdatedIndicator value={lastRefreshAt || detail?.last_updated_at} label="Refresh" />
+              <FreshnessBadge status={detail?.data_freshness_status} />
+            </span>
+            <button type="button" onClick={refreshNow} disabled={isRefreshing}>
+              {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
+            </button>
             <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
             <button type="button" onClick={() => navigate("/smart-automation")}>Automazioni unità</button>
           </div>

@@ -32,6 +32,8 @@ class Settings:
     telemetry_humidity_high_pct: float = float(os.getenv("TELEMETRY_HUMIDITY_HIGH_PCT", "85"))
     telemetry_energy_spike_factor: float = float(os.getenv("TELEMETRY_ENERGY_SPIKE_FACTOR", "1.8"))
     telemetry_not_reporting_seconds: int = int(os.getenv("TELEMETRY_NOT_REPORTING_SECONDS", "7200"))
+    data_fresh_seconds: int = int(os.getenv("DATA_FRESH_SECONDS", "120"))
+    data_stale_seconds: int = int(os.getenv("DATA_STALE_SECONDS", "600"))
 
 
 settings = Settings()

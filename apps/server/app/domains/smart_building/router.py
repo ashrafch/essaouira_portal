@@ -214,8 +214,15 @@ def provider_webhook_ingest(
 
 
 @router.get("/devices", response_model=list[DeviceOut])
-def list_devices(request: Request, db: Session = Depends(get_db)):
-    return _service(request, db).list_devices()
+def list_devices(
+    request: Request,
+    db: Session = Depends(get_db),
+    include_freshness: bool = Query(default=False),
+):
+    service = _service(request, db)
+    if include_freshness:
+        return service.list_devices_with_freshness()
+    return service.list_devices()
 
 
 @router.get("/device-health", response_model=DeviceHealthOverviewOut)
@@ -537,9 +544,15 @@ def create_device_event(
 
 @router.get("/alerts", response_model=list[AlertOut])
 def list_alerts(
-    request: Request, db: Session = Depends(get_db), status: str | None = Query(default=None)
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str | None = Query(default=None),
+    include_freshness: bool = Query(default=False),
 ):
-    return _service(request, db).list_alerts(status=status)
+    service = _service(request, db)
+    if include_freshness:
+        return service.list_alerts_with_freshness(status=status)
+    return service.list_alerts(status=status)
 
 
 @router.post("/alerts", response_model=AlertOut)

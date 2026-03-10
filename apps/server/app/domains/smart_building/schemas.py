@@ -52,6 +52,8 @@ class DeviceOut(DeviceBase):
     id: int
     tenant_id: str
     last_seen_at: datetime | None = None
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -141,6 +143,8 @@ class AlertOut(BaseModel):
     title: str
     description: str | None = None
     correlation_id: str | None = None
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
     acknowledged_by: str | None = None
@@ -224,6 +228,8 @@ class SmartUnitDetailOut(BaseModel):
     telemetry_insights_active: list[dict] = Field(default_factory=list)
     environment_summary: dict = Field(default_factory=dict)
     energy_summary: dict = Field(default_factory=dict)
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
 
 
 class DeviceHealthOut(BaseModel):
@@ -240,6 +246,8 @@ class DeviceHealthOut(BaseModel):
     battery_level: int | None = None
     signal_strength: int | None = None
     last_seen_at: datetime | None = None
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
     online: bool | None = None
     needs_attention: bool
     reasons: list[str] = Field(default_factory=list)
@@ -292,6 +300,8 @@ class DeviceTelemetryQueryOut(BaseModel):
     interval: str | None = None
     from_ts: datetime | None = None
     to_ts: datetime | None = None
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
     series: list[DeviceTelemetrySeriesOut] = Field(default_factory=list)
 
 
@@ -736,6 +746,8 @@ class SmartDashboardOut(BaseModel):
     energy_summary: EnergySummaryOut = Field(default_factory=EnergySummaryOut)
     environment_summary: EnvironmentSummaryOut = Field(default_factory=EnvironmentSummaryOut)
     provider_statuses: list[SmartDashboardProviderStatusOut] = Field(default_factory=list)
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
 
 
 class SmartOperationsSummaryOut(BaseModel):
@@ -796,3 +808,5 @@ class SmartOperationsOut(BaseModel):
     units_needing_attention: list[SmartOperationsUnitOut] = Field(default_factory=list)
     issues: list[SmartOperationsIssueOut] = Field(default_factory=list)
     activity: list[SmartDashboardItemOut] = Field(default_factory=list)
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None

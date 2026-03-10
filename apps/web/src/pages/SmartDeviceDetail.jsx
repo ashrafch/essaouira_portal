@@ -9,7 +9,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatusBadge } from "../components/ui";
+import {
+  AppCard,
+  EmptyState,
+  FreshnessBadge,
+  LastUpdatedIndicator,
+  LiveStatusDot,
+  LoadingSkeleton,
+  SectionHeader,
+  StatusBadge,
+} from "../components/ui";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 import {
   getSingleSmartDeviceHealth,
   getSmartDevice,
@@ -36,15 +46,14 @@ function buildDateRange(rangeKey) {
 }
 
 function pickSeries(data, metricType) {
-  return (data?.series || []).find((s) => s.metric_type === metricType) || null;
+  return (data?.series || []).find((series) => series.metric_type === metricType) || null;
 }
 
 function mapPoints(series) {
   if (!series) return [];
-  return (series.points || []).map((p) => ({
-    ts: p.recorded_at,
-    label: new Date(p.recorded_at).toLocaleString(),
-    value: Number(p.value),
+  return (series.points || []).map((point) => ({
+    label: new Date(point.recorded_at).toLocaleString(),
+    value: Number(point.value),
   }));
 }
 
@@ -82,41 +91,54 @@ function SmartDeviceDetail() {
   const [health, setHealth] = useState(null);
   const [telemetry, setTelemetry] = useState(null);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const [deviceData, healthData] = await Promise.all([
-          getSmartDevice(deviceId),
-          getSingleSmartDeviceHealth(deviceId),
-        ]);
-        setDevice(deviceData);
-        setHealth(healthData);
-      } catch (err) {
-        setError(err.message || "Errore caricamento dettaglio dispositivo");
-      } finally {
-        setLoading(false);
-      }
+  async function loadCore(silent = false) {
+    if (!silent) setLoading(true);
+    setError("");
+    try {
+      const [deviceData, healthData] = await Promise.all([
+        getSmartDevice(deviceId),
+        getSingleSmartDeviceHealth(deviceId),
+      ]);
+      setDevice(deviceData);
+      setHealth(healthData);
+    } catch (err) {
+      setError(err.message || "Errore caricamento dettaglio dispositivo");
+    } finally {
+      if (!silent) setLoading(false);
     }
-    load();
+  }
+
+  async function loadTelemetry(silent = false) {
+    if (!silent) setTelemetryLoading(true);
+    try {
+      const params = buildDateRange(range);
+      const data = await getSmartDeviceTelemetry(deviceId, params);
+      setTelemetry(data);
+    } catch (err) {
+      setError(err.message || "Errore caricamento telemetria");
+    } finally {
+      if (!silent) setTelemetryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   useEffect(() => {
-    async function loadTelemetry() {
-      setTelemetryLoading(true);
-      try {
-        const params = buildDateRange(range);
-        const data = await getSmartDeviceTelemetry(deviceId, params);
-        setTelemetry(data);
-      } catch (err) {
-        setError(err.message || "Errore caricamento telemetria");
-      } finally {
-        setTelemetryLoading(false);
-      }
-    }
     loadTelemetry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId, range]);
+
+  const { isRefreshing, lastRefreshAt, refreshNow } = useAutoRefresh({
+    onRefresh: async () => {
+      await Promise.all([loadCore(true), loadTelemetry(true)]);
+    },
+    intervalMs: 15000,
+    enabled: !loading && !error,
+    immediate: false,
+  });
 
   const temperatureSeries = useMemo(() => mapPoints(pickSeries(telemetry, "temperature")), [telemetry]);
   const humiditySeries = useMemo(() => mapPoints(pickSeries(telemetry, "humidity")), [telemetry]);
@@ -130,24 +152,36 @@ function SmartDeviceDetail() {
   return (
     <div>
       <SectionHeader
-        title={`Dispositivo ¬∑ ${device.name}`}
-        subtitle={`${device.provider} ¬∑ ${device.category}`}
-        right={
+        title={`Dispositivo ∑ ${device.name}`}
+        subtitle={`${device.provider} ∑ ${device.category}`}
+        right={(
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <LiveStatusDot active={!document.hidden} title="Auto refresh 15s" />
+              <LastUpdatedIndicator value={lastRefreshAt || telemetry?.last_updated_at || health?.last_updated_at} label="Refresh" />
+              <FreshnessBadge status={telemetry?.data_freshness_status || health?.data_freshness_status} />
+            </span>
+            <button type="button" onClick={refreshNow} disabled={isRefreshing}>
+              {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
+            </button>
             <button type="button" onClick={() => navigate("/smart-devices")}>Torna ai dispositivi</button>
             <button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>
           </div>
-        }
+        )}
       />
 
       <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Connettivit√†</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Connettivit‡</div>
           <StatusBadge status={health.connectivity_status} />
         </AppCard>
         <AppCard>
           <div style={{ fontSize: 12, color: "#64748b" }}>Salute</div>
           <StatusBadge status={health.health_status} />
+        </AppCard>
+        <AppCard>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Freshness</div>
+          <FreshnessBadge status={health.data_freshness_status || telemetry?.data_freshness_status} />
         </AppCard>
         <AppCard>
           <div style={{ fontSize: 12, color: "#64748b" }}>Batteria</div>
@@ -182,7 +216,7 @@ function SmartDeviceDetail() {
       {!telemetryLoading ? (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
           <TelemetryLineCard title="Temperatura" unit="C" color="#0ea5e9" points={temperatureSeries} />
-          <TelemetryLineCard title="Umidit√†" unit="%" color="#22c55e" points={humiditySeries} />
+          <TelemetryLineCard title="Umidit‡" unit="%" color="#22c55e" points={humiditySeries} />
           <TelemetryLineCard title="Potenza" unit="W" color="#f59e0b" points={powerSeries} />
           <TelemetryLineCard title="Energia" unit="kWh" color="#8b5cf6" points={energySeries} />
         </div>

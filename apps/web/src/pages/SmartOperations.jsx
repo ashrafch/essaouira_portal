@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard, StatusBadge } from "../components/ui";
+import {
+  AppCard,
+  EmptyState,
+  FreshnessBadge,
+  LastUpdatedIndicator,
+  LiveStatusDot,
+  LoadingSkeleton,
+  SectionHeader,
+  StatCard,
+  StatusBadge,
+} from "../components/ui";
 import FilterBar from "../components/dashboard/FilterBar";
 import ActivityCard from "../components/dashboard/ActivityCard";
 import {
@@ -9,6 +19,7 @@ import {
   getSmartOperations,
   getUnits,
 } from "../services/api";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 
 function SmartOperations() {
   const navigate = useNavigate();
@@ -35,6 +46,7 @@ function SmartOperations() {
   const issueTypeOptions = [
     "alert.open",
     "device.offline",
+    "device.stale",
     "device.health.warning",
     "device.health.critical",
     "automation.failed",
@@ -58,8 +70,10 @@ function SmartOperations() {
     return params;
   }, [filters]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError("");
     try {
       const params = buildParams();
@@ -74,13 +88,22 @@ function SmartOperations() {
     } catch (err) {
       setError(err.message || "Errore caricamento Smart Operations");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [buildParams]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const { isRefreshing, lastRefreshAt, refreshNow } = useAutoRefresh({
+    onRefresh: () => loadData(true),
+    intervalMs: 20000,
+    enabled: !loading && !error,
+    immediate: false,
+  });
 
   function onFilterChange(field, value) {
     setFilters((prev) => ({
@@ -152,6 +175,14 @@ function SmartOperations() {
         subtitle="Vista operativa action-first: unita con criticita, issue prioritarie e attivita recente."
         right={(
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <LiveStatusDot active={!document.hidden} title="Auto refresh 20s" />
+              <LastUpdatedIndicator value={lastRefreshAt || operations?.last_updated_at} label="Refresh" />
+              <FreshnessBadge status={operations?.data_freshness_status} />
+            </span>
+            <button type="button" onClick={refreshNow} disabled={isRefreshing}>
+              {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
+            </button>
             <button type="button" onClick={() => navigate("/smart-dashboard")}>Smart dashboard</button>
             <button type="button" onClick={() => navigate("/smart-alerts")}>Alert smart</button>
           </div>

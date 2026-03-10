@@ -337,7 +337,7 @@ export function getSmartUnitTimeline(unitId, params = {}) {
 }
 
 export function getSmartDevices() {
-  return apiGet("/smart/devices");
+  return apiGet("/smart/devices", { include_freshness: true });
 }
 
 export function getSmartDevice(deviceId) {
@@ -389,7 +389,7 @@ export function simulateSmartDeviceSync(deviceId) {
 }
 
 export function getSmartAlerts(params = {}) {
-  return apiGet("/smart/alerts", params);
+  return apiGet("/smart/alerts", { include_freshness: true, ...params });
 }
 
 export function createSmartAlert(payload) {

@@ -97,6 +97,8 @@ Backend (`apps/server/.env`):
 - `TELEMETRY_HUMIDITY_HIGH_PCT` (default `85`)
 - `TELEMETRY_ENERGY_SPIKE_FACTOR` (default `1.8`)
 - `TELEMETRY_NOT_REPORTING_SECONDS` (default `7200`)
+- `DATA_FRESH_SECONDS` (default `120`)
+- `DATA_STALE_SECONDS` (default `600`)
 
 Smart provider endpoints:
 - catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
@@ -106,6 +108,7 @@ Smart provider endpoints:
 - health overview: `GET /smart/device-health`
 - health by unit: `GET /smart/units/{id}/device-health`
 - health by device: `GET /smart/devices/{id}/health`
+- devices with freshness metadata: `GET /smart/devices?include_freshness=true`
 - telemetry by device: `GET /smart/telemetry/device/{device_id}?metric_type=&from=&to=&interval=`
 - telemetry by unit: `GET /smart/telemetry/unit/{unit_id}?metric_type=&from=&to=&interval=`
 - telemetry by property: `GET /smart/telemetry/property/{property_id}?metric_type=&from=&to=&interval=`
@@ -113,6 +116,7 @@ Smart provider endpoints:
   - `GET /smart/telemetry-insights?metric_type=&insight_type=&severity=&status=&property_id=&unit_id=`
   - `GET /smart/telemetry-insights/property/{property_id}?metric_type=&insight_type=&severity=&status=`
   - `GET /smart/telemetry-insights/unit/{unit_id}?metric_type=&insight_type=&severity=&status=`
+- alerts with freshness metadata: `GET /smart/alerts?status=&include_freshness=true`
 - smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
 - smart operations mode:
   - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`

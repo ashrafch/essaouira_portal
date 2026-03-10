@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -24,6 +24,9 @@ import {
 import {
   AppCard,
   EmptyState,
+  FreshnessBadge,
+  LastUpdatedIndicator,
+  LiveStatusDot,
   LoadingSkeleton,
   SectionHeader,
   StatCard,
@@ -43,6 +46,7 @@ import {
   getSmartScenarioPacks,
   getUnits,
 } from "../services/api";
+import useAutoRefresh from "../hooks/useAutoRefresh";
 
 const MotionDiv = motion.div;
 
@@ -87,17 +91,23 @@ function SmartDashboard() {
     ];
   }, [dashboard]);
 
-  async function loadDashboardAndPacks(selectedPropertyId = propertyId, selectedUnitId = unitId) {
+  const loadDashboardAndPacks = useCallback(async (selectedPropertyId = propertyId, selectedUnitId = unitId, silent = false) => {
     const params = {};
     if (selectedPropertyId) params.property_id = Number(selectedPropertyId);
     if (selectedUnitId) params.unit_id = Number(selectedUnitId);
+    if (!silent) {
+      setLoading(true);
+    }
     const [dash, enabled] = await Promise.all([
       getSmartDashboard(params),
       getEnabledSmartScenarioPacks(selectedPropertyId ? { property_id: Number(selectedPropertyId) } : {}),
     ]);
     setDashboard(dash);
     setEnabledPacks(enabled || []);
-  }
+    if (!silent) {
+      setLoading(false);
+    }
+  }, [propertyId, unitId]);
 
   async function loadAll(selectedPropertyId = propertyId, selectedUnitId = unitId) {
     setLoading(true);
@@ -111,7 +121,7 @@ function SmartDashboard() {
       setProperties(propsData || []);
       setUnits(unitsData || []);
       setPackDefs(packsData || []);
-      await loadDashboardAndPacks(selectedPropertyId, selectedUnitId);
+      await loadDashboardAndPacks(selectedPropertyId, selectedUnitId, true);
     } catch (err) {
       setError(err.message || "Errore caricamento Smart Dashboard");
     } finally {
@@ -123,6 +133,17 @@ function SmartDashboard() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const refreshData = useCallback(async () => {
+    await loadDashboardAndPacks(propertyId, unitId, true);
+  }, [loadDashboardAndPacks, propertyId, unitId]);
+
+  const { isRefreshing, lastRefreshAt, refreshNow } = useAutoRefresh({
+    onRefresh: refreshData,
+    intervalMs: 30000,
+    enabled: !loading && !error,
+    immediate: false,
+  });
 
   async function applyFilters(nextPropertyId, nextUnitId) {
     setActionError("");
@@ -160,6 +181,14 @@ function SmartDashboard() {
         subtitle="Vista operativa unificata di dispositivi, alert, automazioni e provider"
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <LiveStatusDot active={!document.hidden} title="Auto refresh 30s" />
+              <LastUpdatedIndicator value={lastRefreshAt || dashboard?.last_updated_at} label="Refresh" />
+              <FreshnessBadge status={dashboard?.data_freshness_status} />
+            </span>
+            <button type="button" onClick={refreshNow} disabled={isRefreshing}>
+              {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
+            </button>
             <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
             <button type="button" onClick={() => navigate("/smart-automation")}>Apri automazioni</button>
           </div>
@@ -448,3 +477,4 @@ function SmartDashboard() {
 }
 
 export default SmartDashboard;
+

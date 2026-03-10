@@ -266,6 +266,65 @@ class SmartBuildingService:
     def list_devices(self) -> list[Device]:
         return self._scoped_query(Device).order_by(Device.id.asc()).all()
 
+    def _compute_data_freshness(
+        self,
+        timestamp: datetime | None,
+        *,
+        now: datetime | None = None,
+        offline_after_seconds: int | None = None,
+    ) -> str:
+        if timestamp is None:
+            return "offline"
+        current = now or datetime.now(timezone.utc)
+        ts = self._as_utc_datetime(timestamp)
+        if ts is None:
+            return "offline"
+        age = max(0, int((current - ts).total_seconds()))
+        fresh_limit = max(5, int(settings.data_fresh_seconds))
+        stale_limit = max(fresh_limit + 1, int(settings.data_stale_seconds))
+        offline_limit = max(stale_limit + 1, int(offline_after_seconds or settings.device_offline_timeout_seconds))
+        if age <= fresh_limit:
+            return "fresh"
+        if age <= stale_limit:
+            return "stale"
+        if age > offline_limit:
+            return "offline"
+        return "stale"
+
+    def list_devices_with_freshness(self) -> list[dict[str, object]]:
+        devices = self.list_devices()
+        now = datetime.now(timezone.utc)
+        rows: list[dict[str, object]] = []
+        for device in devices:
+            rows.append(
+                {
+                    "id": device.id,
+                    "tenant_id": device.tenant_id,
+                    "unit_id": device.unit_id,
+                    "zone_name": device.zone_name,
+                    "provider": device.provider,
+                    "external_id": device.external_id,
+                    "name": device.name,
+                    "category": device.category,
+                    "model": device.model,
+                    "manufacturer": device.manufacturer,
+                    "is_active": device.is_active,
+                    "connectivity_status": device.connectivity_status,
+                    "health_status": device.health_status,
+                    "battery_level": device.battery_level,
+                    "signal_strength": device.signal_strength,
+                    "last_seen_at": device.last_seen_at,
+                    "last_updated_at": device.last_seen_at or device.updated_at,
+                    "data_freshness_status": self._compute_data_freshness(
+                        device.last_seen_at or device.updated_at,
+                        now=now,
+                    ),
+                    "created_at": device.created_at,
+                    "updated_at": device.updated_at,
+                }
+            )
+        return rows
+
     def _aggregate_health_summary(
         self, records: list[dict[str, object]], unit_id: int | None = None, unit_name: str = "Unassigned"
     ) -> dict[str, object]:
@@ -922,6 +981,22 @@ class SmartBuildingService:
             property_id=property_id,
             unit_id=unit_id,
         )
+        timestamps: list[datetime] = []
+        timestamps.extend(
+            [
+                self._as_utc_datetime(item.get("occurred_at"))
+                for item in (recent_alerts + recent_executions + recent_automation_failures)
+                if item.get("occurred_at") is not None
+            ]
+        )
+        timestamps.extend(
+            [
+                self._as_utc_datetime(item.get("detected_at"))
+                for item in (telemetry_anomalies + recent_abnormal_readings)
+                if item.get("detected_at") is not None
+            ]
+        )
+        last_updated_at = max([ts for ts in timestamps if ts is not None], default=datetime.now(timezone.utc))
 
         return {
             "filters": {"property_id": property_id, "unit_id": unit_id},
@@ -948,6 +1023,8 @@ class SmartBuildingService:
             "energy_summary": energy_summary,
             "environment_summary": environment_summary,
             "provider_statuses": provider_statuses,
+            "last_updated_at": last_updated_at,
+            "data_freshness_status": self._compute_data_freshness(last_updated_at),
         }
 
     def _scope_unit_ids_for_operations(
@@ -1241,9 +1318,12 @@ class SmartBuildingService:
             for device in devices:
                 if int(device.get("unit_id") or -1) != unit_id_value:
                     continue
-                if not device.get("needs_attention"):
+                freshness = str(device.get("data_freshness_status") or "fresh")
+                if not device.get("needs_attention") and freshness == "fresh":
                     continue
                 issue_type_value = "device.offline" if device.get("connectivity_status") == "offline" else f"device.health.{device.get('health_status') or 'warning'}"
+                if freshness == "stale" and issue_type_value == "device.health.healthy":
+                    issue_type_value = "device.stale"
                 issue_severity = "critical" if issue_type_value == "device.offline" or device.get("health_status") == "critical" else "warning"
                 issue = {
                     "issue_id": f"device-{device['device_id']}-{issue_type_value}",
@@ -1419,6 +1499,19 @@ class SmartBuildingService:
             "unhealthy_devices": len([device for device in devices if device.get("health_status") in {"warning", "critical"}]),
             "automation_failures_recent": len([execution for execution in executions if execution.status in {"failed", "partial"}]),
         }
+        freshness_times = [
+            self._as_utc_datetime(item.get("occurred_at"))
+            for item in (filtered_activity[:40])
+            if item.get("occurred_at") is not None
+        ]
+        freshness_times.extend(
+            [
+                self._as_utc_datetime(issue.get("last_seen_at") or issue.get("occurred_at"))
+                for issue in filtered_issues[:40]
+                if issue.get("last_seen_at") is not None or issue.get("occurred_at") is not None
+            ]
+        )
+        last_updated_at = max([ts for ts in freshness_times if ts is not None], default=datetime.now(timezone.utc))
         return {
             "filters": {
                 "property_id": property_id,
@@ -1431,6 +1524,8 @@ class SmartBuildingService:
             "units_needing_attention": units_attention,
             "issues": filtered_issues[:120],
             "activity": filtered_activity[:80],
+            "last_updated_at": last_updated_at,
+            "data_freshness_status": self._compute_data_freshness(last_updated_at),
         }
 
     def smart_operations(
@@ -2517,6 +2612,7 @@ class SmartBuildingService:
             agg["max_value"] = value if agg["max_value"] is None else max(agg["max_value"], value)
 
         series: list[dict[str, object]] = []
+        max_recorded_at: datetime | None = None
         for (metric, unit_name), buckets in sorted(series_map.items(), key=lambda item: item[0][0]):
             points: list[dict[str, object]] = []
             for bucket_time in sorted(buckets.keys()):
@@ -2524,6 +2620,8 @@ class SmartBuildingService:
                 count = int(agg["count"])
                 if count <= 0:
                     continue
+                if max_recorded_at is None or bucket_time > max_recorded_at:
+                    max_recorded_at = bucket_time
                 sum_value = agg["sum_value"]
                 avg_value = (sum_value / Decimal(str(count))) if count > 0 else None
                 value = sum_value if metric == "energy" else avg_value
@@ -2545,6 +2643,11 @@ class SmartBuildingService:
             "interval": interval.strip().lower() if interval else None,
             "from_ts": from_utc,
             "to_ts": to_utc,
+            "last_updated_at": max_recorded_at,
+            "data_freshness_status": self._compute_data_freshness(
+                max_recorded_at,
+                offline_after_seconds=settings.telemetry_not_reporting_seconds,
+            ),
             "series": series,
         }
 
@@ -2616,6 +2719,7 @@ class SmartBuildingService:
             battery_level=battery_level,
             signal_strength=signal_strength,
         )
+        last_updated_at = self._as_utc_datetime(device.last_seen_at) or self._as_utc_datetime(device.updated_at)
         return {
             "device_id": device.id,
             "unit_id": device.unit_id,
@@ -2628,6 +2732,8 @@ class SmartBuildingService:
             "battery_level": battery_level,
             "signal_strength": signal_strength,
             "last_seen_at": self._as_utc_datetime(device.last_seen_at),
+            "last_updated_at": last_updated_at,
+            "data_freshness_status": self._compute_data_freshness(last_updated_at, now=current_time),
             "online": state.online if state is not None else None,
             "needs_attention": health_status in {"warning", "critical"},
             "reasons": reasons,
@@ -2758,6 +2864,25 @@ class SmartBuildingService:
 
         total_devices = len(devices)
         unknown_state_devices = max(total_devices - online_devices - offline_devices, 0)
+        detail_timestamps: list[datetime] = []
+        detail_timestamps.extend(
+            [self._as_utc_datetime(event.occurred_at) for event in events if event.occurred_at is not None]
+        )
+        detail_timestamps.extend(
+            [
+                self._as_utc_datetime(alert.last_seen_at or alert.first_seen_at)
+                for alert in (open_alerts + resolved_alerts)
+                if (alert.last_seen_at or alert.first_seen_at) is not None
+            ]
+        )
+        detail_timestamps.extend(
+            [
+                self._as_utc_datetime(insight.get("detected_at"))
+                for insight in telemetry_insights_active
+                if insight.get("detected_at") is not None
+            ]
+        )
+        last_updated_at = max([ts for ts in detail_timestamps if ts is not None], default=datetime.now(timezone.utc))
 
         return {
             "unit": unit,
@@ -2779,6 +2904,8 @@ class SmartBuildingService:
             "telemetry_insights_active": telemetry_insights_active,
             "environment_summary": environment_summary,
             "energy_summary": energy_summary,
+            "last_updated_at": last_updated_at,
+            "data_freshness_status": self._compute_data_freshness(last_updated_at),
         }
 
     def get_unit_timeline(
@@ -3473,6 +3600,34 @@ class SmartBuildingService:
         if status:
             query = query.filter(Alert.status == status)
         return query.all()
+
+    def list_alerts_with_freshness(self, status: str | None = None) -> list[dict[str, object]]:
+        rows = self.list_alerts(status=status)
+        now = datetime.now(timezone.utc)
+        payload: list[dict[str, object]] = []
+        for alert in rows:
+            last_updated = self._as_utc_datetime(alert.last_seen_at or alert.first_seen_at)
+            payload.append(
+                {
+                    "id": alert.id,
+                    "tenant_id": alert.tenant_id,
+                    "unit_id": alert.unit_id,
+                    "device_id": alert.device_id,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
+                    "status": alert.status,
+                    "title": alert.title,
+                    "description": alert.description,
+                    "correlation_id": alert.correlation_id,
+                    "first_seen_at": alert.first_seen_at,
+                    "last_seen_at": alert.last_seen_at,
+                    "acknowledged_by": alert.acknowledged_by,
+                    "resolved_at": alert.resolved_at,
+                    "last_updated_at": last_updated,
+                    "data_freshness_status": self._compute_data_freshness(last_updated, now=now),
+                }
+            )
+        return payload
 
     def list_device_commands(
         self, device_id: int, status: str | None = None, limit: int = 50
