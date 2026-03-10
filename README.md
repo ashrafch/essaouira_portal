@@ -92,6 +92,11 @@ Backend (`apps/server/.env`):
 - `DEVICE_BATTERY_CRITICAL_LEVEL` (default `10`)
 - `DEVICE_SIGNAL_WARNING_RSSI` (default `-85`)
 - `TELEMETRY_MIN_INTERVAL_SECONDS` (default `60`, filtro anti-duplicazione campioni ravvicinati)
+- `TELEMETRY_TEMPERATURE_HIGH_C` (default `30`)
+- `TELEMETRY_TEMPERATURE_LOW_C` (default `5`)
+- `TELEMETRY_HUMIDITY_HIGH_PCT` (default `85`)
+- `TELEMETRY_ENERGY_SPIKE_FACTOR` (default `1.8`)
+- `TELEMETRY_NOT_REPORTING_SECONDS` (default `7200`)
 
 Smart provider endpoints:
 - catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
@@ -104,6 +109,10 @@ Smart provider endpoints:
 - telemetry by device: `GET /smart/telemetry/device/{device_id}?metric_type=&from=&to=&interval=`
 - telemetry by unit: `GET /smart/telemetry/unit/{unit_id}?metric_type=&from=&to=&interval=`
 - telemetry by property: `GET /smart/telemetry/property/{property_id}?metric_type=&from=&to=&interval=`
+- telemetry insights:
+  - `GET /smart/telemetry-insights?metric_type=&insight_type=&severity=&status=&property_id=&unit_id=`
+  - `GET /smart/telemetry-insights/property/{property_id}?metric_type=&insight_type=&severity=&status=`
+  - `GET /smart/telemetry-insights/unit/{unit_id}?metric_type=&insight_type=&severity=&status=`
 - smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
 - smart operations mode:
   - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`

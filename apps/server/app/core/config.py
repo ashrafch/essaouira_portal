@@ -27,6 +27,11 @@ class Settings:
     device_battery_critical_level: int = int(os.getenv("DEVICE_BATTERY_CRITICAL_LEVEL", "10"))
     device_signal_warning_rssi: int = int(os.getenv("DEVICE_SIGNAL_WARNING_RSSI", "-85"))
     telemetry_min_interval_seconds: int = int(os.getenv("TELEMETRY_MIN_INTERVAL_SECONDS", "60"))
+    telemetry_temperature_high_c: float = float(os.getenv("TELEMETRY_TEMPERATURE_HIGH_C", "30"))
+    telemetry_temperature_low_c: float = float(os.getenv("TELEMETRY_TEMPERATURE_LOW_C", "5"))
+    telemetry_humidity_high_pct: float = float(os.getenv("TELEMETRY_HUMIDITY_HIGH_PCT", "85"))
+    telemetry_energy_spike_factor: float = float(os.getenv("TELEMETRY_ENERGY_SPIKE_FACTOR", "1.8"))
+    telemetry_not_reporting_seconds: int = int(os.getenv("TELEMETRY_NOT_REPORTING_SECONDS", "7200"))
 
 
 settings = Settings()

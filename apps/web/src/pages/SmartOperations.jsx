@@ -39,6 +39,11 @@ function SmartOperations() {
     "device.health.critical",
     "automation.failed",
     "automation.partial",
+    "telemetry.temperature_abnormal",
+    "telemetry.humidity_abnormal",
+    "telemetry.energy_spike",
+    "telemetry.device_not_reporting",
+    "telemetry.sensor_value_out_of_range",
     "maintenance.smart_related",
     "staff_task.impacted",
   ];

@@ -221,6 +221,9 @@ class SmartUnitDetailOut(BaseModel):
     alerts_open: list[AlertOut]
     alerts_resolved: list[AlertOut]
     events_recent: list[DeviceEventOut]
+    telemetry_insights_active: list[dict] = Field(default_factory=list)
+    environment_summary: dict = Field(default_factory=dict)
+    energy_summary: dict = Field(default_factory=dict)
 
 
 class DeviceHealthOut(BaseModel):
@@ -290,6 +293,38 @@ class DeviceTelemetryQueryOut(BaseModel):
     from_ts: datetime | None = None
     to_ts: datetime | None = None
     series: list[DeviceTelemetrySeriesOut] = Field(default_factory=list)
+
+
+class TelemetryInsightOut(BaseModel):
+    id: int
+    tenant_id: str
+    property_id: int | None = None
+    unit_id: int | None = None
+    device_id: int
+    metric_type: str
+    insight_type: str
+    severity: str
+    status: str
+    value: Decimal | None = None
+    threshold: Decimal | None = None
+    detected_at: datetime | None = None
+    resolved_at: datetime | None = None
+    metadata_json: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EnvironmentSummaryOut(BaseModel):
+    avg_temperature: Decimal | None = None
+    min_temperature: Decimal | None = None
+    max_temperature: Decimal | None = None
+    avg_humidity: Decimal | None = None
+
+
+class EnergySummaryOut(BaseModel):
+    total_energy_kwh: Decimal | None = None
+    avg_power_w: Decimal | None = None
+    energy_spikes: int = 0
 
 
 class SetupSessionOut(BaseModel):
@@ -696,6 +731,10 @@ class SmartDashboardOut(BaseModel):
     recent_alerts: list[SmartDashboardItemOut] = Field(default_factory=list)
     recent_automation_failures: list[SmartDashboardItemOut] = Field(default_factory=list)
     recent_executions: list[SmartDashboardItemOut] = Field(default_factory=list)
+    telemetry_anomalies: list[TelemetryInsightOut] = Field(default_factory=list)
+    recent_abnormal_readings: list[TelemetryInsightOut] = Field(default_factory=list)
+    energy_summary: EnergySummaryOut = Field(default_factory=EnergySummaryOut)
+    environment_summary: EnvironmentSummaryOut = Field(default_factory=EnvironmentSummaryOut)
     provider_statuses: list[SmartDashboardProviderStatusOut] = Field(default_factory=list)
 
 

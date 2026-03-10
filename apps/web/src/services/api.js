@@ -368,6 +368,18 @@ export function getSmartPropertyTelemetry(propertyId, params = {}) {
   return apiGet(`/smart/telemetry/property/${propertyId}`, params);
 }
 
+export function getSmartTelemetryInsights(params = {}) {
+  return apiGet("/smart/telemetry-insights", params);
+}
+
+export function getSmartPropertyTelemetryInsights(propertyId, params = {}) {
+  return apiGet(`/smart/telemetry-insights/property/${propertyId}`, params);
+}
+
+export function getSmartUnitTelemetryInsights(unitId, params = {}) {
+  return apiGet(`/smart/telemetry-insights/unit/${unitId}`, params);
+}
+
 export function createSmartDevice(payload) {
   return apiPost("/smart/devices", payload);
 }

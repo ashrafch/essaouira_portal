@@ -67,6 +67,7 @@ from app.models.smart_building import (
     SetupSession,
     SmartProviderConnection,
     SmartScenarioPackInstall,
+    TelemetryInsight,
 )
 
 
@@ -103,6 +104,13 @@ TELEMETRY_INTERVAL_SECONDS = {
     "1h": 60 * 60,
     "6h": 6 * 60 * 60,
     "1d": 24 * 60 * 60,
+}
+TELEMETRY_INSIGHT_TYPES = {
+    "telemetry.temperature_abnormal",
+    "telemetry.humidity_abnormal",
+    "telemetry.energy_spike",
+    "telemetry.device_not_reporting",
+    "telemetry.sensor_value_out_of_range",
 }
 SMART_MAINTENANCE_KEYWORDS = {
     "smart",
@@ -901,6 +909,19 @@ class SmartBuildingService:
         top_device_issues = [
             item for item in device_records if item.get("needs_attention")
         ][:10]
+        telemetry_anomalies = self.list_telemetry_insights(
+            property_id=property_id,
+            unit_id=unit_id,
+            status="open",
+        )[:12]
+        recent_abnormal_readings = self.list_telemetry_insights(
+            property_id=property_id,
+            unit_id=unit_id,
+        )[:12]
+        environment_summary, energy_summary = self._telemetry_scope_summaries(
+            property_id=property_id,
+            unit_id=unit_id,
+        )
 
         return {
             "filters": {"property_id": property_id, "unit_id": unit_id},
@@ -922,6 +943,10 @@ class SmartBuildingService:
             "recent_alerts": recent_alerts,
             "recent_automation_failures": recent_automation_failures,
             "recent_executions": recent_executions,
+            "telemetry_anomalies": telemetry_anomalies,
+            "recent_abnormal_readings": recent_abnormal_readings,
+            "energy_summary": energy_summary,
+            "environment_summary": environment_summary,
             "provider_statuses": provider_statuses,
         }
 
@@ -1049,6 +1074,18 @@ class SmartBuildingService:
                 continue
             maintenance_by_unit.setdefault(int(ticket.unit_id), []).append(ticket)
 
+        telemetry_open_insights = self.list_telemetry_insights(
+            property_id=property_id,
+            unit_id=unit_id,
+            status="open",
+        )
+        telemetry_by_unit: dict[int, list[dict[str, object]]] = {}
+        for insight in telemetry_open_insights:
+            insight_unit_id = insight.get("unit_id")
+            if insight_unit_id is None:
+                continue
+            telemetry_by_unit.setdefault(int(insight_unit_id), []).append(insight)
+
         task_query = self.db.query(StaffTask)
         if scope_unit_ids:
             task_query = task_query.filter(StaffTask.unit_id.in_(list(scope_unit_ids)))
@@ -1065,7 +1102,7 @@ class SmartBuildingService:
                 continue
             tasks_by_unit.setdefault(int(task.unit_id), []).append(task)
 
-        union_unit_ids = set(health_by_unit.keys()) | set(alerts_by_unit.keys()) | set(executions_by_unit.keys()) | set(maintenance_by_unit.keys())
+        union_unit_ids = set(health_by_unit.keys()) | set(alerts_by_unit.keys()) | set(executions_by_unit.keys()) | set(maintenance_by_unit.keys()) | set(telemetry_by_unit.keys())
         if scope_unit_ids:
             union_unit_ids &= scope_unit_ids
 
@@ -1091,6 +1128,8 @@ class SmartBuildingService:
             failed_exec = sum(1 for execution in unit_executions if execution.status == "failed")
             partial_exec = sum(1 for execution in unit_executions if execution.status == "partial")
             smart_maintenance_open = len(unit_maintenance)
+            telemetry_critical = sum(1 for insight in telemetry_by_unit.get(unit_id_value, []) if insight.get("severity") == "critical")
+            telemetry_warning = sum(1 for insight in telemetry_by_unit.get(unit_id_value, []) if insight.get("severity") == "warning")
 
             score = (
                 (critical_alerts * 60)
@@ -1102,6 +1141,8 @@ class SmartBuildingService:
                 + (failed_exec * 20)
                 + (partial_exec * 10)
                 + (smart_maintenance_open * 15)
+                + (telemetry_critical * 25)
+                + (telemetry_warning * 10)
             )
             reasons: list[str] = []
             if critical_alerts:
@@ -1120,8 +1161,12 @@ class SmartBuildingService:
                 reasons.append(f"{partial_exec} automazioni parziali")
             if smart_maintenance_open:
                 reasons.append(f"{smart_maintenance_open} ticket smart aperti")
+            if telemetry_critical:
+                reasons.append(f"{telemetry_critical} insight telemetry critici")
+            if telemetry_warning:
+                reasons.append(f"{telemetry_warning} insight telemetry warning")
 
-            if critical_alerts > 0 or leak_alerts > 0 or offline_devices > 0 or failed_exec > 0:
+            if critical_alerts > 0 or leak_alerts > 0 or offline_devices > 0 or failed_exec > 0 or telemetry_critical > 0:
                 unit_severity = "critical"
             elif score > 0:
                 unit_severity = "warning"
@@ -1246,6 +1291,31 @@ class SmartBuildingService:
                     "occurred_at": self._as_utc_datetime(execution.started_at),
                     "last_seen_at": self._as_utc_datetime(execution.finished_at or execution.started_at),
                     "refs": {"execution_id": execution.id, "rule_id": execution.rule_id, "scene_id": execution.scene_id, "unit_id": unit_id_value},
+                }
+                issues.append(issue)
+
+            for insight in telemetry_by_unit.get(unit_id_value, []):
+                insight_type = str(insight.get("insight_type") or "telemetry.sensor_value_out_of_range")
+                issue = {
+                    "issue_id": f"telemetry-{insight['id']}",
+                    "issue_type": insight_type,
+                    "severity": insight.get("severity") or "warning",
+                    "status": insight.get("status") or "open",
+                    "title": f"Insight telemetry: {insight_type}",
+                    "description": f"Valore {insight.get('value')} soglia {insight.get('threshold')}",
+                    "property_id": property_obj.id if property_obj else None,
+                    "property_name": property_obj.name if property_obj else None,
+                    "unit_id": unit_id_value,
+                    "unit_name": unit_obj.name if unit_obj else f"Unit {unit_id_value}",
+                    "device_id": insight.get("device_id"),
+                    "alert_id": None,
+                    "execution_id": None,
+                    "maintenance_id": None,
+                    "task_id": None,
+                    "suggested_action": "open_device",
+                    "occurred_at": self._as_utc_datetime(insight.get("detected_at")),
+                    "last_seen_at": self._as_utc_datetime(insight.get("detected_at")),
+                    "refs": {"telemetry_insight_id": insight.get("id"), "device_id": insight.get("device_id"), "unit_id": unit_id_value},
                 }
                 issues.append(issue)
 
@@ -1990,8 +2060,372 @@ class SmartBuildingService:
         created = 0
         for sample in self._prepare_telemetry_samples(device=device, payload=payload, recorded_at=recorded_at):
             self.db.add(DeviceTelemetry(**sample))
+            self._evaluate_telemetry_sample_insights(
+                device=device,
+                metric_type=sample["metric_type"],
+                value=sample["value"],
+                recorded_at=recorded_at,
+            )
             created += 1
         return created
+
+    def _insight_status(self, insight: TelemetryInsight) -> str:
+        return "resolved" if insight.resolved_at is not None else "open"
+
+    def _insight_to_dict(self, insight: TelemetryInsight) -> dict[str, object]:
+        return {
+            "id": insight.id,
+            "tenant_id": insight.tenant_id,
+            "property_id": insight.property_id,
+            "unit_id": insight.unit_id,
+            "device_id": insight.device_id,
+            "metric_type": insight.metric_type,
+            "insight_type": insight.insight_type,
+            "severity": insight.severity,
+            "status": self._insight_status(insight),
+            "value": insight.value,
+            "threshold": insight.threshold,
+            "detected_at": insight.detected_at,
+            "resolved_at": insight.resolved_at,
+            "metadata_json": insight.metadata_json,
+        }
+
+    def _upsert_telemetry_insight(
+        self,
+        *,
+        device: Device,
+        metric_type: str,
+        insight_type: str,
+        severity: str,
+        value: Decimal | None,
+        threshold: Decimal | None,
+        detected_at: datetime,
+        metadata: dict | None = None,
+    ) -> TelemetryInsight:
+        existing_open = (
+            self._scoped_query(TelemetryInsight)
+            .filter(
+                TelemetryInsight.device_id == device.id,
+                TelemetryInsight.metric_type == metric_type,
+                TelemetryInsight.insight_type == insight_type,
+                TelemetryInsight.resolved_at.is_(None),
+            )
+            .order_by(TelemetryInsight.detected_at.desc(), TelemetryInsight.id.desc())
+            .first()
+        )
+        if existing_open is not None:
+            existing_open.severity = severity
+            existing_open.value = value
+            existing_open.threshold = threshold
+            existing_open.metadata_json = self._safe_json_dumps(metadata or {})
+            return existing_open
+
+        unit = self.db.query(Unit).filter(Unit.id == device.unit_id).first() if device.unit_id else None
+        property_id = unit.property_id if unit is not None else None
+        insight = TelemetryInsight(
+            tenant_id=self.tenant_id,
+            property_id=property_id,
+            unit_id=device.unit_id,
+            device_id=device.id,
+            metric_type=metric_type,
+            insight_type=insight_type,
+            severity=severity,
+            value=value,
+            threshold=threshold,
+            detected_at=detected_at,
+            resolved_at=None,
+            metadata_json=self._safe_json_dumps(metadata or {}),
+        )
+        self.db.add(insight)
+        return insight
+
+    def _resolve_telemetry_insight(
+        self,
+        *,
+        device_id: int,
+        metric_type: str,
+        insight_type: str,
+        resolved_at: datetime,
+    ) -> int:
+        open_rows = (
+            self._scoped_query(TelemetryInsight)
+            .filter(
+                TelemetryInsight.device_id == device_id,
+                TelemetryInsight.metric_type == metric_type,
+                TelemetryInsight.insight_type == insight_type,
+                TelemetryInsight.resolved_at.is_(None),
+            )
+            .all()
+        )
+        for row in open_rows:
+            row.resolved_at = resolved_at
+        return len(open_rows)
+
+    def _evaluate_telemetry_sample_insights(
+        self,
+        *,
+        device: Device,
+        metric_type: str,
+        value: Decimal,
+        recorded_at: datetime,
+    ) -> None:
+        metric = (metric_type or "").strip().lower()
+        if metric not in SUPPORTED_TELEMETRY_METRICS:
+            return
+
+        if metric == "temperature":
+            high = Decimal(str(settings.telemetry_temperature_high_c))
+            low = Decimal(str(settings.telemetry_temperature_low_c))
+            if value > high or value < low:
+                severity = "critical" if value > (high + Decimal("3")) or value < (low - Decimal("3")) else "warning"
+                self._upsert_telemetry_insight(
+                    device=device,
+                    metric_type="temperature",
+                    insight_type="telemetry.temperature_abnormal",
+                    severity=severity,
+                    value=value,
+                    threshold=high if value > high else low,
+                    detected_at=recorded_at,
+                    metadata={"range_min": str(low), "range_max": str(high)},
+                )
+            else:
+                self._resolve_telemetry_insight(
+                    device_id=device.id,
+                    metric_type="temperature",
+                    insight_type="telemetry.temperature_abnormal",
+                    resolved_at=recorded_at,
+                )
+
+        if metric == "humidity":
+            high = Decimal(str(settings.telemetry_humidity_high_pct))
+            if value > high:
+                severity = "critical" if value > Decimal("95") else "warning"
+                self._upsert_telemetry_insight(
+                    device=device,
+                    metric_type="humidity",
+                    insight_type="telemetry.humidity_abnormal",
+                    severity=severity,
+                    value=value,
+                    threshold=high,
+                    detected_at=recorded_at,
+                    metadata={"range_max": str(high)},
+                )
+            else:
+                self._resolve_telemetry_insight(
+                    device_id=device.id,
+                    metric_type="humidity",
+                    insight_type="telemetry.humidity_abnormal",
+                    resolved_at=recorded_at,
+                )
+
+        if metric in {"power", "energy"}:
+            lookback_threshold = recorded_at - timedelta(hours=24)
+            previous_rows = (
+                self._scoped_query(DeviceTelemetry)
+                .filter(
+                    DeviceTelemetry.device_id == device.id,
+                    DeviceTelemetry.metric_type == metric,
+                    DeviceTelemetry.recorded_at >= lookback_threshold,
+                    DeviceTelemetry.recorded_at < recorded_at,
+                )
+                .order_by(DeviceTelemetry.recorded_at.desc(), DeviceTelemetry.id.desc())
+                .limit(24)
+                .all()
+            )
+            previous_values = [self._to_decimal(row.value) for row in previous_rows]
+            previous_values = [v for v in previous_values if v is not None]
+            if previous_values:
+                rolling_avg = sum(previous_values, Decimal("0")) / Decimal(str(len(previous_values)))
+                spike_threshold = rolling_avg * Decimal(str(settings.telemetry_energy_spike_factor))
+                if rolling_avg > Decimal("0") and value > spike_threshold:
+                    severity = "critical" if value > (rolling_avg * Decimal("2.5")) else "warning"
+                    self._upsert_telemetry_insight(
+                        device=device,
+                        metric_type=metric,
+                        insight_type="telemetry.energy_spike",
+                        severity=severity,
+                        value=value,
+                        threshold=spike_threshold,
+                        detected_at=recorded_at,
+                        metadata={"rolling_avg": str(rolling_avg), "window_samples": len(previous_values)},
+                    )
+                else:
+                    self._resolve_telemetry_insight(
+                        device_id=device.id,
+                        metric_type=metric,
+                        insight_type="telemetry.energy_spike",
+                        resolved_at=recorded_at,
+                    )
+
+        out_of_range = False
+        if metric == "battery" and (value < Decimal("0") or value > Decimal("100")):
+            out_of_range = True
+        if metric == "humidity" and (value < Decimal("0") or value > Decimal("100")):
+            out_of_range = True
+        if metric == "temperature" and (value < Decimal("-20") or value > Decimal("60")):
+            out_of_range = True
+        if out_of_range:
+            self._upsert_telemetry_insight(
+                device=device,
+                metric_type=metric,
+                insight_type="telemetry.sensor_value_out_of_range",
+                severity="critical",
+                value=value,
+                threshold=None,
+                detected_at=recorded_at,
+                metadata={},
+            )
+        else:
+            self._resolve_telemetry_insight(
+                device_id=device.id,
+                metric_type=metric,
+                insight_type="telemetry.sensor_value_out_of_range",
+                resolved_at=recorded_at,
+            )
+
+    def _ensure_not_reporting_insights(
+        self,
+        *,
+        property_id: int | None = None,
+        unit_id: int | None = None,
+    ) -> None:
+        devices_query = self._scoped_query(Device).filter(Device.is_active.is_(True))
+        if unit_id is not None:
+            devices_query = devices_query.filter(Device.unit_id == unit_id)
+        elif property_id is not None:
+            scoped_units = self._property_units(property_id)
+            scoped_unit_ids = [row.id for row in scoped_units]
+            if scoped_unit_ids:
+                devices_query = devices_query.filter(Device.unit_id.in_(scoped_unit_ids))
+            else:
+                devices_query = devices_query.filter(Device.id == -1)
+        devices = devices_query.all()
+        if not devices:
+            return
+
+        telemetry_latest = (
+            self._scoped_query(DeviceTelemetry)
+            .with_entities(DeviceTelemetry.device_id, func.max(DeviceTelemetry.recorded_at))
+            .group_by(DeviceTelemetry.device_id)
+            .all()
+        )
+        latest_by_device = {int(device_id): self._as_utc_datetime(recorded_at) for device_id, recorded_at in telemetry_latest}
+        now = datetime.now(timezone.utc)
+        stale_cutoff = now - timedelta(seconds=max(60, int(settings.telemetry_not_reporting_seconds)))
+        touched = False
+        for device in devices:
+            latest = latest_by_device.get(device.id)
+            if latest is None or latest < stale_cutoff:
+                age_seconds = int((now - latest).total_seconds()) if latest is not None else None
+                self._upsert_telemetry_insight(
+                    device=device,
+                    metric_type="telemetry",
+                    insight_type="telemetry.device_not_reporting",
+                    severity="critical",
+                    value=Decimal(str(age_seconds)) if age_seconds is not None else None,
+                    threshold=Decimal(str(settings.telemetry_not_reporting_seconds)),
+                    detected_at=now,
+                    metadata={"last_telemetry_at": latest.isoformat() if latest else None},
+                )
+                touched = True
+            else:
+                resolved = self._resolve_telemetry_insight(
+                    device_id=device.id,
+                    metric_type="telemetry",
+                    insight_type="telemetry.device_not_reporting",
+                    resolved_at=now,
+                )
+                if resolved > 0:
+                    touched = True
+        if touched:
+            self.db.commit()
+
+    def list_telemetry_insights(
+        self,
+        *,
+        metric_type: str | None = None,
+        insight_type: str | None = None,
+        severity: str | None = None,
+        status: str | None = None,
+        property_id: int | None = None,
+        unit_id: int | None = None,
+    ) -> list[dict[str, object]]:
+        normalized_metric = (metric_type or "").strip().lower() or None
+        normalized_insight = (insight_type or "").strip().lower() or None
+        normalized_severity = (severity or "").strip().lower() or None
+        normalized_status = (status or "").strip().lower() or None
+
+        if normalized_insight and normalized_insight not in TELEMETRY_INSIGHT_TYPES:
+            raise HTTPException(status_code=400, detail="insight_type non valido")
+        if normalized_status and normalized_status not in {"open", "resolved"}:
+            raise HTTPException(status_code=400, detail="status insight non valido")
+        if property_id is not None:
+            self._property_or_404(property_id)
+        if unit_id is not None:
+            self._ensure_unit_visible(unit_id)
+
+        self._ensure_not_reporting_insights(property_id=property_id, unit_id=unit_id)
+
+        query = self._scoped_query(TelemetryInsight)
+        if property_id is not None:
+            query = query.filter(TelemetryInsight.property_id == property_id)
+        if unit_id is not None:
+            query = query.filter(TelemetryInsight.unit_id == unit_id)
+        if normalized_metric:
+            query = query.filter(TelemetryInsight.metric_type == normalized_metric)
+        if normalized_insight:
+            query = query.filter(TelemetryInsight.insight_type == normalized_insight)
+        if normalized_severity:
+            query = query.filter(TelemetryInsight.severity == normalized_severity)
+        if normalized_status == "open":
+            query = query.filter(TelemetryInsight.resolved_at.is_(None))
+        if normalized_status == "resolved":
+            query = query.filter(TelemetryInsight.resolved_at.is_not(None))
+
+        rows = query.order_by(TelemetryInsight.detected_at.desc(), TelemetryInsight.id.desc()).limit(500).all()
+        return [self._insight_to_dict(row) for row in rows]
+
+    def _telemetry_scope_summaries(
+        self,
+        *,
+        property_id: int | None = None,
+        unit_id: int | None = None,
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        query = self._scoped_query(DeviceTelemetry)
+        if property_id is not None:
+            query = query.filter(DeviceTelemetry.property_id == property_id)
+        if unit_id is not None:
+            query = query.filter(DeviceTelemetry.unit_id == unit_id)
+        since = datetime.now(timezone.utc) - timedelta(hours=24)
+        rows = query.filter(DeviceTelemetry.recorded_at >= since).all()
+
+        temperatures = [self._to_decimal(row.value) for row in rows if row.metric_type == "temperature"]
+        temperatures = [value for value in temperatures if value is not None]
+        humidities = [self._to_decimal(row.value) for row in rows if row.metric_type == "humidity"]
+        humidities = [value for value in humidities if value is not None]
+        powers = [self._to_decimal(row.value) for row in rows if row.metric_type == "power"]
+        powers = [value for value in powers if value is not None]
+        energies = [self._to_decimal(row.value) for row in rows if row.metric_type == "energy"]
+        energies = [value for value in energies if value is not None]
+
+        environment_summary = {
+            "avg_temperature": (sum(temperatures, Decimal("0")) / Decimal(str(len(temperatures)))) if temperatures else None,
+            "min_temperature": min(temperatures) if temperatures else None,
+            "max_temperature": max(temperatures) if temperatures else None,
+            "avg_humidity": (sum(humidities, Decimal("0")) / Decimal(str(len(humidities)))) if humidities else None,
+        }
+        open_spikes = self.list_telemetry_insights(
+            property_id=property_id,
+            unit_id=unit_id,
+            insight_type="telemetry.energy_spike",
+            status="open",
+        )
+        energy_summary = {
+            "total_energy_kwh": sum(energies, Decimal("0")) if energies else None,
+            "avg_power_w": (sum(powers, Decimal("0")) / Decimal(str(len(powers)))) if powers else None,
+            "energy_spikes": len(open_spikes),
+        }
+        return environment_summary, energy_summary
 
     def _parse_telemetry_interval_seconds(self, interval: str | None) -> int | None:
         if interval is None:
@@ -2257,6 +2691,8 @@ class SmartBuildingService:
 
     def get_unit_smart_detail(self, unit_id: int, events_limit: int = 50) -> dict[str, object]:
         unit = self._ensure_unit_visible(unit_id)
+        telemetry_insights_active = self.list_telemetry_insights(unit_id=unit_id, status="open")
+        environment_summary, energy_summary = self._telemetry_scope_summaries(unit_id=unit_id)
 
         devices = (
             self._scoped_query(Device)
@@ -2340,6 +2776,9 @@ class SmartBuildingService:
             "alerts_open": open_alerts,
             "alerts_resolved": resolved_alerts,
             "events_recent": events,
+            "telemetry_insights_active": telemetry_insights_active,
+            "environment_summary": environment_summary,
+            "energy_summary": energy_summary,
         }
 
     def get_unit_timeline(

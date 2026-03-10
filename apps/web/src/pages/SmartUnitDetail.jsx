@@ -13,6 +13,9 @@ import {
 import { AppCard, EmptyState, LoadingSkeleton, SectionHeader, StatCard } from "../components/ui";
 import ActivityCard from "../components/dashboard/ActivityCard";
 import DeviceCard from "../components/smart/DeviceCard";
+import EnergySummaryCard from "../components/smart/EnergySummaryCard";
+import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
+import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
 import TimelineItem from "../components/smart/TimelineItem";
 import {
   getSmartUnitDetail,
@@ -180,6 +183,11 @@ function SmartUnitDetail() {
       </div>
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
+        <EnvironmentSummaryCard summary={detail.environment_summary} title="Environment unit summary (24h)" />
+        <EnergySummaryCard summary={detail.energy_summary} title="Energy unit summary (24h)" />
+      </div>
+
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
         <AppCard>
           <h3 style={{ marginBottom: 10 }}>Alert aperti</h3>
           {detail.alerts_open?.length ? (
@@ -211,6 +219,25 @@ function SmartUnitDetail() {
           </div>
         </AppCard>
       </div>
+
+      <AppCard style={{ marginBottom: 12 }}>
+        <h3 style={{ marginBottom: 10 }}>Telemetry insights attivi</h3>
+        {detail.telemetry_insights_active?.length ? (
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+            {detail.telemetry_insights_active.slice(0, 8).map((insight) => (
+              <TelemetryInsightCard
+                key={insight.id}
+                insight={insight}
+                onOpen={(row) => {
+                  if (row.device_id) navigate(`/smart-devices/${row.device_id}`);
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="Nessun insight telemetry attivo" />
+        )}
+      </AppCard>
 
       <AppCard style={{ marginBottom: 12 }}>
         <h3 style={{ marginBottom: 10 }}>Dispositivi associati all'unità</h3>

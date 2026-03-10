@@ -32,6 +32,9 @@ import {
 import ActivityCard from "../components/dashboard/ActivityCard";
 import FilterBar from "../components/dashboard/FilterBar";
 import HeatmapTile from "../components/dashboard/HeatmapTile";
+import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
+import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
+import EnergySummaryCard from "../components/smart/EnergySummaryCard";
 import {
   enableSmartScenarioPack,
   getEnabledSmartScenarioPacks,
@@ -272,6 +275,11 @@ function SmartDashboard() {
           </AppCard>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
+            <EnvironmentSummaryCard summary={dashboard.environment_summary} title="Environment summary (24h)" />
+            <EnergySummaryCard summary={dashboard.energy_summary} title="Energy summary (24h)" />
+          </div>
+
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
             <AppCard>
               <h3 style={{ marginBottom: 8 }}>Unità con criticità</h3>
               {(dashboard.problematic_units || []).length === 0 ? (
@@ -318,6 +326,31 @@ function SmartDashboard() {
             </AppCard>
 
             <AppCard>
+              <h3 style={{ marginBottom: 8 }}>Telemetry anomalies</h3>
+              {(dashboard.telemetry_anomalies || []).length === 0 ? (
+                <EmptyState title="Nessuna anomalia telemetry aperta" />
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {(dashboard.telemetry_anomalies || []).slice(0, 6).map((insight) => (
+                    <TelemetryInsightCard
+                      key={insight.id}
+                      insight={insight}
+                      onOpen={(row) => {
+                        if (row.unit_id) {
+                          navigate(`/smart-units/${row.unit_id}`);
+                          return;
+                        }
+                        if (row.device_id) {
+                          navigate(`/smart-devices/${row.device_id}`);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </AppCard>
+
+            <AppCard>
               <h3 style={{ marginBottom: 8 }}>Esecuzioni recenti</h3>
               {(dashboard.recent_executions || []).length === 0 ? (
                 <EmptyState title="Nessuna esecuzione recente" />
@@ -330,6 +363,25 @@ function SmartDashboard() {
               )}
             </AppCard>
           </div>
+
+          <AppCard style={{ marginBottom: 12 }}>
+            <h3 style={{ marginBottom: 8 }}>Recent abnormal readings</h3>
+            {(dashboard.recent_abnormal_readings || []).length === 0 ? (
+              <EmptyState title="Nessuna lettura anomala recente" />
+            ) : (
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+                {(dashboard.recent_abnormal_readings || []).slice(0, 8).map((insight) => (
+                  <TelemetryInsightCard
+                    key={`reading-${insight.id}`}
+                    insight={insight}
+                    onOpen={(row) => {
+                      if (row.device_id) navigate(`/smart-devices/${row.device_id}`);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </AppCard>
 
           <AppCard style={{ marginBottom: 12 }}>
             <h3 style={{ marginBottom: 10 }}>Stato connessioni provider</h3>

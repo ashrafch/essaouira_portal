@@ -47,6 +47,7 @@ from app.domains.smart_building.schemas import (
     SmartOperationsIssueOut,
     SmartOperationsOut,
     SmartOperationsUnitOut,
+    TelemetryInsightOut,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
@@ -303,6 +304,65 @@ def get_property_telemetry(
         from_ts=from_ts,
         to_ts=to_ts,
         interval=interval,
+    )
+
+
+@router.get("/telemetry-insights", response_model=list[TelemetryInsightOut])
+def list_telemetry_insights(
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    insight_type: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+):
+    return _service(request, db).list_telemetry_insights(
+        metric_type=metric_type,
+        insight_type=insight_type,
+        severity=severity,
+        status=status,
+        property_id=property_id,
+        unit_id=unit_id,
+    )
+
+
+@router.get("/telemetry-insights/property/{property_id}", response_model=list[TelemetryInsightOut])
+def list_property_telemetry_insights(
+    property_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    insight_type: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+):
+    return _service(request, db).list_telemetry_insights(
+        property_id=property_id,
+        metric_type=metric_type,
+        insight_type=insight_type,
+        severity=severity,
+        status=status,
+    )
+
+
+@router.get("/telemetry-insights/unit/{unit_id}", response_model=list[TelemetryInsightOut])
+def list_unit_telemetry_insights(
+    unit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    metric_type: str | None = Query(default=None),
+    insight_type: str | None = Query(default=None),
+    severity: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+):
+    return _service(request, db).list_telemetry_insights(
+        unit_id=unit_id,
+        metric_type=metric_type,
+        insight_type=insight_type,
+        severity=severity,
+        status=status,
     )
 
 

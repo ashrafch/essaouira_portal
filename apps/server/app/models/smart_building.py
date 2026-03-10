@@ -46,6 +46,7 @@ class Device(TenantScopedMixin, Base):
     alerts = relationship("Alert", back_populates="device", cascade="all, delete-orphan")
     commands = relationship("DeviceCommand", back_populates="device", cascade="all, delete-orphan")
     telemetry = relationship("DeviceTelemetry", back_populates="device", cascade="all, delete-orphan")
+    telemetry_insights = relationship("TelemetryInsight", back_populates="device", cascade="all, delete-orphan")
     scene_actions = relationship("SceneAction", back_populates="target_device")
     automation_rules = relationship("AutomationRule", back_populates="target_device")
 
@@ -289,5 +290,28 @@ class DeviceTelemetry(TenantScopedMixin, Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     device = relationship("Device", back_populates="telemetry")
+    property_ref = relationship("Property")
+    unit_ref = relationship("Unit")
+
+
+class TelemetryInsight(TenantScopedMixin, Base):
+    __tablename__ = "telemetry_insights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
+    unit_id = Column(Integer, ForeignKey("units.id"), nullable=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, index=True)
+    metric_type = Column(String(64), nullable=False, index=True)
+    insight_type = Column(String(64), nullable=False, index=True)
+    severity = Column(String(16), nullable=False, default="warning", index=True)
+    value = Column(Numeric(14, 4), nullable=True)
+    threshold = Column(Numeric(14, 4), nullable=True)
+    detected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    device = relationship("Device", back_populates="telemetry_insights")
     property_ref = relationship("Property")
     unit_ref = relationship("Unit")
