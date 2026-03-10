@@ -27,6 +27,37 @@ set WEB_PORT=8081
 docker compose up --build -d
 ```
 
+Configurazione Home Assistant lab (Docker Desktop + container backend):
+1. copia `.env.example` in `.env` nella root progetto
+2. imposta:
+```bash
+SMART_PROVIDER_MODE=home_assistant
+HOME_ASSISTANT_URL=http://host.docker.internal:8123
+HOME_ASSISTANT_TOKEN=<INSERISCI_TOKEN_LOCALE_NON_COMMITTARE>
+HOME_ASSISTANT_TIMEOUT_SECONDS=10
+HOME_ASSISTANT_INCLUDE_DOMAINS=binary_sensor,sensor,switch,climate,input_boolean,input_number
+```
+3. riavvia backend:
+```bash
+docker compose up -d --build backend
+```
+
+Note sicurezza:
+- `.env` e' ignorato da git, non committare mai token reali
+- usa placeholder vuoto nei file versionati (`.env.example`, `apps/server/.env.example`)
+- per backend fuori Docker puoi usare anche `HOME_ASSISTANT_URL=http://localhost:8123`
+
+Esempio `HOME_ASSISTANT_UNIT_HINTS` (A1/A2/POOL):
+```bash
+HOME_ASSISTANT_UNIT_HINTS={"binary_sensor.a1_door":"A1","binary_sensor.a1_motion":"A1","binary_sensor.a1_leak":"A1","sensor.a1_temperature":"A1","sensor.a1_humidity":"A1","binary_sensor.a2_door":"A2","binary_sensor.a2_motion":"A2","binary_sensor.a2_leak":"A2","sensor.a2_temperature":"A2","binary_sensor.pool_motion":"POOL","sensor.pool_temperature":"POOL"}
+```
+
+Smoke test connessione HA:
+```bash
+curl -H "Authorization: Bearer <TOKEN>" http://localhost:8123/api/states
+curl http://localhost:8081/api/health
+```
+
 Stop:
 
 ```bash

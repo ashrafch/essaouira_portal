@@ -28,6 +28,12 @@ services:
       ADMIN_PASSWORD: owner123
       AUTO_CREATE_SCHEMA: "true"
       AUTO_SEED_DATA: "true"
+      SMART_PROVIDER_MODE: ${SMART_PROVIDER_MODE:-mock}
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
+      HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}
+      HOME_ASSISTANT_TIMEOUT_SECONDS: ${HOME_ASSISTANT_TIMEOUT_SECONDS:-10}
+      HOME_ASSISTANT_INCLUDE_DOMAINS: ${HOME_ASSISTANT_INCLUDE_DOMAINS:-binary_sensor,sensor,switch,climate,input_boolean,input_number}
+      HOME_ASSISTANT_UNIT_HINTS: ${HOME_ASSISTANT_UNIT_HINTS:-{}}
     depends_on:
       db:
         condition: service_healthy
