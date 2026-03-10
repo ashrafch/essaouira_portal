@@ -118,7 +118,19 @@ function SetupWizard() {
     setError("");
     setSuccess("");
     try {
-      const updated = await action();
+      let updated;
+      try {
+        updated = await action();
+      } catch (err) {
+        // Recover from stale/no-active setup session by recreating it once.
+        if ((err?.message || "").includes("Errore API 404")) {
+          const restarted = await setupStart();
+          setSession(restarted.session || restarted);
+          updated = await action();
+        } else {
+          throw err;
+        }
+      }
       setSession(updated.session ? updated.session : updated);
       await refreshReferenceData();
       setSuccess("Step completato con successo.");
