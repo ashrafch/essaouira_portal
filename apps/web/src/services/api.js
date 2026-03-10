@@ -118,6 +118,10 @@ export function updateProperty(propertyId, payload) {
   return apiPut(`/properties/${propertyId}`, payload);
 }
 
+export function deleteProperty(propertyId) {
+  return apiDelete(`/properties/${propertyId}`);
+}
+
 /* --------- BOOKINGS --------- */
 
 export function getBookings() {

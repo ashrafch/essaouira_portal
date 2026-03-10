@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  deleteProperty,
   getProperties,
   getSetupSession,
   getSmartDevices,
@@ -13,6 +14,7 @@ import {
   setupProperty,
   setupStart,
   setupUnits,
+  updateProperty,
 } from "../services/api";
 import {
   AppCard,
@@ -43,6 +45,7 @@ function SetupWizard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [editingPropertyId, setEditingPropertyId] = useState(null);
 
   const [propertyForm, setPropertyForm] = useState({
     property_name: "",
@@ -139,6 +142,69 @@ function SetupWizard() {
     }
   }
 
+  async function handleEditProperty(property) {
+    setEditingPropertyId(property.id);
+    setPropertyForm({
+      property_name: property.name || "",
+      timezone: property.timezone || "Africa/Casablanca",
+      currency: "EUR",
+    });
+  }
+
+  async function handleDeleteProperty(propertyId) {
+    const confirmed = window.confirm(
+      "Eliminare questa property? L'operazione e' bloccata se esistono unita o connessioni collegate.",
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    try {
+      await deleteProperty(propertyId);
+      if (editingPropertyId === propertyId) {
+        setEditingPropertyId(null);
+      }
+      await refreshReferenceData();
+      setSuccess("Property eliminata.");
+    } catch (err) {
+      setError(err.message || "Errore eliminazione property");
+    }
+  }
+
+  async function handlePropertySubmit() {
+    const normalizedCode = propertyForm.property_name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    if (editingPropertyId) {
+      setError("");
+      setSuccess("");
+      try {
+        await updateProperty(editingPropertyId, {
+          name: propertyForm.property_name,
+          code: normalizedCode,
+          timezone: propertyForm.timezone,
+        });
+        setEditingPropertyId(null);
+        setPropertyForm((prev) => ({ ...prev, property_name: "", timezone: "Africa/Casablanca" }));
+        await refreshReferenceData();
+        setSuccess("Property aggiornata.");
+      } catch (err) {
+        setError(err.message || "Errore aggiornamento property");
+      }
+      return;
+    }
+
+    await runStep(async () => ({
+      session: await setupProperty({
+        ...propertyForm,
+        property_code: normalizedCode,
+      }),
+    }));
+  }
+
   if (loading) return <LoadingSkeleton rows={9} height={26} />;
 
   return (
@@ -173,7 +239,7 @@ function SetupWizard() {
         })}
       </FilterBar>
 
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))" }}>
         <AppCard>
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 1 · Property</h3>
           <div style={{ display: "grid", gap: 8 }}>
@@ -195,21 +261,21 @@ function SetupWizard() {
             {selectedPropertyId && <StatusBadge status="healthy" />}
             <button
               type="button"
-              onClick={() =>
-                runStep(async () => ({
-                  session: await setupProperty({
-                    ...propertyForm,
-                    property_code: propertyForm.property_name
-                      .trim()
-                      .toLowerCase()
-                      .replace(/[^a-z0-9]+/g, "-")
-                      .replace(/^-+|-+$/g, ""),
-                  }),
-                }))
-              }
+              onClick={handlePropertySubmit}
             >
-              Salva property
+              {editingPropertyId ? "Aggiorna property" : "Salva property"}
             </button>
+            {editingPropertyId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPropertyId(null);
+                  setPropertyForm((prev) => ({ ...prev, property_name: "", timezone: "Africa/Casablanca" }));
+                }}
+              >
+                Annulla modifica
+              </button>
+            ) : null}
           </div>
         </AppCard>
 
@@ -300,15 +366,16 @@ function SetupWizard() {
           {importedDevices.length === 0 ? (
             <EmptyState title="Nessun dispositivo importato" />
           ) : (
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gap: 8, maxHeight: 420, overflowY: "auto", overflowX: "hidden", paddingRight: 4 }}>
               {importedDevices.map((device) => (
-                <div key={device.id} style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 8, alignItems: "center" }}>
-                  <div style={{ fontSize: 13 }}>
+                <div key={device.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(180px, 220px)", gap: 8, alignItems: "center" }}>
+                  <div style={{ fontSize: 13, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {device.name} <span style={{ color: "#6b7280" }}>({device.external_id})</span>
                   </div>
                   <select
                     value={assignments[device.id] || device.unit_id || ""}
                     onChange={(e) => setAssignments((prev) => ({ ...prev, [device.id]: e.target.value }))}
+                    style={{ width: "100%", minWidth: 0 }}
                   >
                     <option value="">Non assegnato</option>
                     {propertyScopedUnits.map((unit) => (
@@ -378,14 +445,21 @@ function SetupWizard() {
 
         <AppCard>
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 7 · Completa setup</h3>
-          <button type="button" onClick={() => runStep(async () => ({ session: await setupComplete() }))}>
+          <button
+            type="button"
+            onClick={() =>
+              runStep(async () => {
+                await setupComplete();
+                const restarted = await setupStart();
+                return { session: restarted.session || restarted };
+              })
+            }
+          >
             Completa setup
           </button>
-          {session?.status === "completed" ? (
-            <p style={{ color: "#065f46", marginTop: 8 }}>
-              Setup completato. Puoi riprendere il wizard in qualsiasi momento da questa pagina.
-            </p>
-          ) : null}
+          <p style={{ color: "#065f46", marginTop: 8 }}>
+            Alla conferma viene avviata automaticamente una nuova sessione wizard.
+          </p>
         </AppCard>
       </div>
 
@@ -395,7 +469,19 @@ function SetupWizard() {
           <div style={{ display: "grid", gap: 6 }}>
             {properties.map((p) => (
               <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                #{p.id} {p.name} ({p.code})
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <div>
+                    #{p.id} {p.name} ({p.code})
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => handleEditProperty(p)}>
+                      Modifica
+                    </button>
+                    <button type="button" onClick={() => handleDeleteProperty(p.id)}>
+                      Elimina
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

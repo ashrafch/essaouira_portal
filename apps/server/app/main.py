@@ -33,6 +33,12 @@ from app.models.staff_member import StaffMember
 from app.models.pricing_defaults import PricingDefaults
 from app.models.maintenance import MaintenanceTicket
 from app.models.user import User
+from app.models.smart_building import (
+    DeviceTelemetry,
+    SmartProviderConnection,
+    SmartScenarioPackInstall,
+    TelemetryInsight,
+)
 
 
 setup_logging()
@@ -559,6 +565,74 @@ def update_property(
     db.commit()
     db.refresh(prop)
     return prop
+
+
+@app.delete("/properties/{property_id}", status_code=204)
+def delete_property(property_id: int, request: Request, db: Session = Depends(get_db)):
+    _require_owner(request)
+    tenant_id = normalize_tenant_id(getattr(request.state, "tenant_id", None))
+    prop = (
+        db.query(Property)
+        .filter(Property.id == property_id, Property.tenant_id == tenant_id)
+        .first()
+    )
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property non trovata")
+
+    linked_units = db.query(Unit).filter(Unit.property_id == property_id).count()
+    linked_connections = (
+        db.query(SmartProviderConnection)
+        .filter(
+            SmartProviderConnection.tenant_id == tenant_id,
+            SmartProviderConnection.property_id == property_id,
+        )
+        .count()
+    )
+    linked_packs = (
+        db.query(SmartScenarioPackInstall)
+        .filter(
+            SmartScenarioPackInstall.tenant_id == tenant_id,
+            SmartScenarioPackInstall.property_id == property_id,
+        )
+        .count()
+    )
+    linked_telemetry = (
+        db.query(DeviceTelemetry)
+        .filter(
+            DeviceTelemetry.tenant_id == tenant_id,
+            DeviceTelemetry.property_id == property_id,
+        )
+        .count()
+    )
+    linked_insights = (
+        db.query(TelemetryInsight)
+        .filter(
+            TelemetryInsight.tenant_id == tenant_id,
+            TelemetryInsight.property_id == property_id,
+        )
+        .count()
+    )
+
+    blockers = []
+    if linked_units:
+        blockers.append(f"unita collegate: {linked_units}")
+    if linked_connections:
+        blockers.append(f"connessioni provider: {linked_connections}")
+    if linked_packs:
+        blockers.append(f"scenario packs: {linked_packs}")
+    if linked_telemetry:
+        blockers.append(f"telemetry records: {linked_telemetry}")
+    if linked_insights:
+        blockers.append(f"telemetry insights: {linked_insights}")
+    if blockers:
+        raise HTTPException(
+            status_code=400,
+            detail="Impossibile eliminare property con dipendenze attive (" + ", ".join(blockers) + ").",
+        )
+
+    db.delete(prop)
+    db.commit()
+    return
 
 
 # ---------- BOOKING Schemas ----------
