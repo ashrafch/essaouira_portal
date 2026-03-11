@@ -2725,12 +2725,17 @@ class SmartBuildingService:
             "unit_id": device.unit_id,
             "unit_name": unit_name,
             "name": device.name,
+            "external_id": device.external_id,
             "category": device.category,
             "provider": device.provider,
             "connectivity_status": connectivity_status,
             "health_status": health_status,
             "battery_level": battery_level,
             "signal_strength": signal_strength,
+            "power_state": state.power_state if state is not None else None,
+            "motion_detected": state.motion_detected if state is not None else None,
+            "contact_open": state.contact_open if state is not None else None,
+            "leak_detected": state.leak_detected if state is not None else None,
             "last_seen_at": self._as_utc_datetime(device.last_seen_at),
             "last_updated_at": last_updated_at,
             "data_freshness_status": self._compute_data_freshness(last_updated_at, now=current_time),
@@ -3239,6 +3244,35 @@ class SmartBuildingService:
         self.db.commit()
         self.db.refresh(device)
         return device
+
+    def delete_device(self, device_id: int) -> None:
+        self._require_write_access()
+        device = self.get_device_or_404(device_id)
+
+        scene_ref = (
+            self._scoped_query(SceneAction)
+            .filter(SceneAction.target_device_id == device_id)
+            .first()
+        )
+        if scene_ref is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Impossibile eliminare: dispositivo usato in scene automation.",
+            )
+
+        rule_ref = (
+            self._scoped_query(AutomationRule)
+            .filter(AutomationRule.target_device_id == device_id)
+            .first()
+        )
+        if rule_ref is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Impossibile eliminare: dispositivo usato in regole automation.",
+            )
+
+        self.db.delete(device)
+        self.db.commit()
 
     def get_device_state(self, device_id: int) -> DeviceState:
         self.get_device_or_404(device_id)

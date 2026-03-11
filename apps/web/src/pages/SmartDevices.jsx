@@ -3,10 +3,13 @@ import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   createSmartDevice,
+  deleteSmartDevice,
+  getUnits,
   getSmartDeviceHealth,
   pollSmartProvider,
   simulateSmartDeviceSync,
   syncSmartProvider,
+  updateSmartDevice,
 } from "../services/api";
 import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
@@ -26,6 +29,7 @@ const EMPTY_FORM = {
 function SmartDevices() {
   const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
+  const [units, setUnits] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,6 +38,8 @@ function SmartDevices() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [filters, setFilters] = useState({ status: "", connectivity: "" });
   const [syncingAll, setSyncingAll] = useState(false);
+  const [assigningDeviceId, setAssigningDeviceId] = useState(null);
+  const [deletingDeviceId, setDeletingDeviceId] = useState(null);
 
   const loadDevices = useCallback(async () => {
     setLoading(true);
@@ -43,8 +49,10 @@ function SmartDevices() {
         status: filters.status || undefined,
         connectivity: filters.connectivity || undefined,
       });
+      const unitsData = await getUnits();
       setDevices(data?.devices || []);
       setSummary(data?.property_summary || null);
+      setUnits(unitsData || []);
     } catch (err) {
       setError(err.message || "Errore caricamento dispositivi");
     } finally {
@@ -106,6 +114,37 @@ function SmartDevices() {
       setFeedback({ type: "error", message: err.message || "Errore sync dispositivi" });
     } finally {
       setSyncingAll(false);
+    }
+  }
+
+  async function handleAssignUnit(deviceId, unitId) {
+    setAssigningDeviceId(deviceId);
+    setError("");
+    try {
+      await updateSmartDevice(deviceId, { unit_id: unitId });
+      await loadDevices();
+      setFeedback({ type: "success", message: "Assegnazione unità aggiornata." });
+    } catch (err) {
+      setFeedback({ type: "error", message: err.message || "Errore assegnazione unità" });
+    } finally {
+      setAssigningDeviceId(null);
+    }
+  }
+
+  async function handleDeleteDevice(deviceId) {
+    if (!window.confirm("Eliminare il dispositivo? Se usato in scene/regole l'operazione verrà bloccata.")) {
+      return;
+    }
+    setDeletingDeviceId(deviceId);
+    setError("");
+    try {
+      await deleteSmartDevice(deviceId);
+      await loadDevices();
+      setFeedback({ type: "success", message: "Dispositivo eliminato." });
+    } catch (err) {
+      setFeedback({ type: "error", message: err.message || "Errore eliminazione dispositivo" });
+    } finally {
+      setDeletingDeviceId(null);
     }
   }
 
@@ -175,8 +214,13 @@ function SmartDevices() {
             <DeviceCard
               key={d.device_id}
               device={d}
+              units={units}
               onSimulate={handleSimulate}
               onOpenDetail={(id) => navigate(`/smart-devices/${id}`)}
+              onAssignUnit={handleAssignUnit}
+              onDelete={handleDeleteDevice}
+              assigning={assigningDeviceId === d.device_id}
+              deleting={deletingDeviceId === d.device_id}
             />
           ))}
         </div>

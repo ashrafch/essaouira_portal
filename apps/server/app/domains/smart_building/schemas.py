@@ -239,12 +239,17 @@ class DeviceHealthOut(BaseModel):
     property_id: int | None = None
     property_name: str | None = None
     name: str
+    external_id: str
     category: str
     provider: str
     connectivity_status: str
     health_status: str
     battery_level: int | None = None
     signal_strength: int | None = None
+    power_state: str | None = None
+    motion_detected: bool | None = None
+    contact_open: bool | None = None
+    leak_detected: bool | None = None
     last_seen_at: datetime | None = None
     last_updated_at: datetime | None = None
     data_freshness_status: str | None = None

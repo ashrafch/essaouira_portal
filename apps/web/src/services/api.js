@@ -388,6 +388,14 @@ export function createSmartDevice(payload) {
   return apiPost("/smart/devices", payload);
 }
 
+export function updateSmartDevice(deviceId, payload) {
+  return apiPut(`/smart/devices/${deviceId}`, payload);
+}
+
+export function deleteSmartDevice(deviceId) {
+  return apiDelete(`/smart/devices/${deviceId}`);
+}
+
 export function simulateSmartDeviceSync(deviceId) {
   return apiPost(`/smart/devices/${deviceId}/simulate-sync`, {});
 }

@@ -459,6 +459,12 @@ def update_device(
     return _service(request, db).update_device(device_id, payload)
 
 
+@router.delete("/devices/{device_id}", status_code=204)
+def delete_device(device_id: int, request: Request, db: Session = Depends(get_db)):
+    _service(request, db).delete_device(device_id)
+    return None
+
+
 @router.get("/devices/{device_id}/state", response_model=DeviceStateOut)
 def get_device_state(device_id: int, request: Request, db: Session = Depends(get_db)):
     return _service(request, db).get_device_state(device_id)
