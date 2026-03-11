@@ -28,47 +28,49 @@ function DeviceCard({
   })();
 
   return (
-    <AppCard hover>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <div>
-          <div style={{ fontWeight: 800 }}>{device.name}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-            {device.provider} · {device.category} · {device.external_id}
+    <AppCard hover className="smart-device-card">
+      <div className="smart-device-card__content">
+        <div className="smart-device-card__main">
+          <div className="smart-device-card__title">{device.name}</div>
+          <div className="smart-device-card__meta">
+            <span>{device.provider}</span>
+            <span>{device.category}</span>
+            <span className="smart-device-card__external-id">{device.external_id}</span>
           </div>
-          <div style={{ fontSize: 12, color: "#334155", marginTop: 4 }}>
+          <div className="smart-device-card__unit">
             Unita: <strong>{device.unit_name || "Non assegnata"}</strong>
           </div>
           {boolStateLabel ? (
-            <div style={{ marginTop: 6 }}>
-              <span className="ui-status" style={{ background: "#eef2ff", color: "#3730a3", borderColor: "#c7d2fe" }}>
+            <div className="smart-device-card__state">
+              <span className="ui-status smart-device-card__state-chip">
                 {boolStateLabel}
               </span>
             </div>
           ) : null}
-          <div style={{ marginTop: 8 }}>
+          <div className="smart-device-card__health">
             <HealthIndicator
               connectivity={device.connectivity_status}
               health={device.health_status}
               battery={device.battery_level}
             />
           </div>
-          <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="ui-status" style={{ background: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}>
+          <div className="smart-device-card__badges">
+            <span className="ui-status smart-device-card__badge">
               <Signal size={12} /> rssi {device.signal_strength ?? "-"}
             </span>
-            <span className="ui-status" style={{ background: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}>
+            <span className="ui-status smart-device-card__badge">
               <Wifi size={12} /> seen {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : "n/d"}
             </span>
             {device.needs_attention ? <StatusBadge status="warning" /> : null}
           </div>
         </div>
-        <div style={{ display: "grid", gap: 8, alignContent: "start" }}>
+        <div className="smart-device-card__actions">
           {onAssignUnit ? (
             <select
               value={device.unit_id || ""}
               onChange={(e) => onAssignUnit(device.device_id, e.target.value ? Number(e.target.value) : null)}
               disabled={assigning}
-              style={{ minWidth: 170 }}
+              className="smart-device-card__select"
             >
               <option value="">Assegna unita...</option>
               {units.map((unit) => (

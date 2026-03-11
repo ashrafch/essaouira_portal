@@ -259,7 +259,7 @@ function SetupWizard() {
         })}
       </FilterBar>
 
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))" }}>
+      <div className="setup-wizard-grid">
         <AppCard>
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 1 · Property</h3>
           <div style={{ display: "grid", gap: 8 }}>
@@ -389,16 +389,16 @@ function SetupWizard() {
           {importedDevices.length === 0 ? (
             <EmptyState title="Nessun dispositivo importato" />
           ) : (
-            <div style={{ display: "grid", gap: 8, maxHeight: 420, overflowY: "auto", overflowX: "hidden", paddingRight: 4 }}>
+            <div className="setup-wizard-assignments-list">
               {importedDevices.map((device) => (
-                <div key={device.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(180px, 220px)", gap: 8, alignItems: "center" }}>
-                  <div style={{ fontSize: 13, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                <div key={device.id} className="setup-wizard-assignment-row">
+                  <div className="setup-wizard-assignment-label">
                     {device.name} <span style={{ color: "#6b7280" }}>({device.external_id})</span>
                   </div>
                   <select
                     value={assignments[device.id] || device.unit_id || ""}
                     onChange={(e) => setAssignments((prev) => ({ ...prev, [device.id]: e.target.value }))}
-                    style={{ width: "100%", minWidth: 0 }}
+                    className="setup-wizard-assignment-select"
                   >
                     <option value="">Non assegnato</option>
                     {propertyScopedUnits.map((unit) => (
@@ -491,12 +491,12 @@ function SetupWizard() {
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Property disponibili</h3>
           <div style={{ display: "grid", gap: 6 }}>
             {properties.map((p) => (
-              <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <div>
+              <div key={p.id} className="setup-wizard-property-item">
+                <div className="setup-wizard-property-header">
+                  <div className="setup-wizard-property-title">
                     #{p.id} {p.name} ({p.code})
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className="setup-wizard-property-actions">
                     <button type="button" onClick={() => handleEditProperty(p)}>
                       Modifica
                     </button>
