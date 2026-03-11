@@ -2,9 +2,11 @@
 import {
   deleteProperty,
   getProperties,
+  pollSmartProvider,
   getSetupSession,
   getSmartDevices,
   getSmartProviderConnections,
+  syncSmartProvider,
   getUnits,
   setupAssignDevices,
   setupComplete,
@@ -46,6 +48,7 @@ function SetupWizard() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [editingPropertyId, setEditingPropertyId] = useState(null);
+  const [syncingProvider, setSyncingProvider] = useState(false);
 
   const [propertyForm, setPropertyForm] = useState({
     property_name: "",
@@ -205,6 +208,23 @@ function SetupWizard() {
     }));
   }
 
+  async function handleSyncAllImportedDevices() {
+    const provider = providerForm.provider || "home_assistant";
+    setSyncingProvider(true);
+    setError("");
+    setSuccess("");
+    try {
+      await syncSmartProvider(provider);
+      await pollSmartProvider(provider);
+      await refreshReferenceData();
+      setSuccess(`Sincronizzazione completata per provider ${provider}.`);
+    } catch (err) {
+      setError(err.message || "Errore sincronizzazione provider");
+    } finally {
+      setSyncingProvider(false);
+    }
+  }
+
   if (loading) return <LoadingSkeleton rows={9} height={26} />;
 
   return (
@@ -353,6 +373,9 @@ function SetupWizard() {
             }
           >
             Importa dispositivi
+          </button>
+          <button type="button" onClick={handleSyncAllImportedDevices} disabled={syncingProvider}>
+            {syncingProvider ? "Sincronizzo..." : "Sync tutti i dispositivi importati"}
           </button>
           {metadata.import_result ? (
             <div style={{ marginTop: 8, fontSize: 13, color: "#374151" }}>

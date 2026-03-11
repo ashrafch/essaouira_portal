@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import {
   createSmartDevice,
   getSmartDeviceHealth,
+  pollSmartProvider,
   simulateSmartDeviceSync,
+  syncSmartProvider,
 } from "../services/api";
 import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
@@ -31,6 +33,7 @@ function SmartDevices() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [filters, setFilters] = useState({ status: "", connectivity: "" });
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const loadDevices = useCallback(async () => {
     setLoading(true);
@@ -83,16 +86,44 @@ function SmartDevices() {
     }
   }
 
+  async function handleSyncAllDevices() {
+    setError("");
+    setFeedback({ type: "info", message: "" });
+    setSyncingAll(true);
+    try {
+      const providers = [...new Set((devices || []).map((d) => d.provider).filter(Boolean))];
+      const targets = providers.length > 0 ? providers : ["home_assistant"];
+      for (const provider of targets) {
+        await syncSmartProvider(provider);
+        await pollSmartProvider(provider);
+      }
+      await loadDevices();
+      setFeedback({
+        type: "success",
+        message: `Sincronizzazione completata per ${targets.length} provider.`,
+      });
+    } catch (err) {
+      setFeedback({ type: "error", message: err.message || "Errore sync dispositivi" });
+    } finally {
+      setSyncingAll(false);
+    }
+  }
+
   return (
     <div>
       <SectionHeader
         title="Dispositivi Smart"
         subtitle="Inventario dispositivi con stato salute, connettività e qualità segnale"
         right={
-          <button type="button" onClick={openCreateModal}>
-            <Plus size={14} style={{ marginRight: 6 }} />
-            Nuovo dispositivo
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={handleSyncAllDevices} disabled={syncingAll}>
+              {syncingAll ? "Sincronizzo..." : "Sync tutti i dispositivi"}
+            </button>
+            <button type="button" onClick={openCreateModal}>
+              <Plus size={14} style={{ marginRight: 6 }} />
+              Nuovo dispositivo
+            </button>
+          </div>
         }
       />
 

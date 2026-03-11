@@ -392,6 +392,14 @@ export function simulateSmartDeviceSync(deviceId) {
   return apiPost(`/smart/devices/${deviceId}/simulate-sync`, {});
 }
 
+export function syncSmartProvider(provider = "mock") {
+  return apiPost(`/smart/providers/sync?provider=${encodeURIComponent(provider)}`, {});
+}
+
+export function pollSmartProvider(provider = "mock") {
+  return apiPost(`/smart/providers/poll?provider=${encodeURIComponent(provider)}`, {});
+}
+
 export function getSmartAlerts(params = {}) {
   return apiGet("/smart/alerts", { include_freshness: true, ...params });
 }
