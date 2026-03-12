@@ -332,6 +332,22 @@ export function getSmartOperations(params = {}) {
   return apiGet("/smart/operations", params);
 }
 
+export function getSmartCheckinAssistant(params = {}) {
+  return apiGet("/smart/assistant/checkin", params);
+}
+
+export function getSmartCheckinAssistantBooking(bookingId) {
+  return apiGet(`/smart/assistant/checkin/${bookingId}`);
+}
+
+export function getSmartCheckoutAssistant(params = {}) {
+  return apiGet("/smart/assistant/checkout", params);
+}
+
+export function getSmartCheckoutAssistantBooking(bookingId) {
+  return apiGet(`/smart/assistant/checkout/${bookingId}`);
+}
+
 export function getSmartOperationsUnitsNeedingAttention(params = {}) {
   return apiGet("/smart/operations/units-needing-attention", params);
 }

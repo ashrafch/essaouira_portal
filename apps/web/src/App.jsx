@@ -26,6 +26,8 @@ const SmartOperations = lazy(() => import("./pages/SmartOperations.jsx"));
 const SmartDevices = lazy(() => import("./pages/SmartDevices.jsx"));
 const SmartAlerts = lazy(() => import("./pages/SmartAlerts.jsx"));
 const SmartAutomation = lazy(() => import("./pages/SmartAutomation.jsx"));
+const SmartCheckinAssistant = lazy(() => import("./pages/SmartCheckinAssistant.jsx"));
+const SmartCheckoutAssistant = lazy(() => import("./pages/SmartCheckoutAssistant.jsx"));
 const SmartUnitDetail = lazy(() => import("./pages/SmartUnitDetail.jsx"));
 const SmartDeviceDetail = lazy(() => import("./pages/SmartDeviceDetail.jsx"));
 const SetupWizard = lazy(() => import("./pages/SetupWizard.jsx"));
@@ -57,6 +59,8 @@ const ROUTE_COMPONENTS = {
   smartDevices: SmartDevices,
   smartAlerts: SmartAlerts,
   smartAutomation: SmartAutomation,
+  smartCheckinAssistant: SmartCheckinAssistant,
+  smartCheckoutAssistant: SmartCheckoutAssistant,
   smartUnitDetail: SmartUnitDetail,
   smartDeviceDetail: SmartDeviceDetail,
   setupWizard: SetupWizard,

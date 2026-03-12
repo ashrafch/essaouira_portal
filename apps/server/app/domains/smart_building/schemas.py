@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time as dt_time
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -758,6 +758,105 @@ class UnitReadinessOverviewOut(BaseModel):
     needs_attention: int = 0
     blocked: int = 0
     unknown: int = 0
+
+
+class AssistantBookingOut(BaseModel):
+    id: int
+    guest_name: str
+    checkin_date: date
+    checkout_date: date
+    estimated_arrival_time: dt_time | None = None
+    source: str | None = None
+    unit_id: int
+    unit_name: str
+    property_id: int | None = None
+    property_name: str | None = None
+
+
+class AssistantEssentialDeviceOut(BaseModel):
+    device_id: int
+    name: str
+    category: str
+    provider: str
+    connectivity_status: str
+    health_status: str
+    status_label: str
+    is_essential: bool = True
+    ok: bool = False
+    last_seen_at: datetime | None = None
+
+
+class AssistantAlertItemOut(BaseModel):
+    alert_id: int
+    title: str
+    alert_type: str
+    severity: str
+    status: str
+    last_seen_at: datetime | None = None
+    device_id: int | None = None
+
+
+class AssistantMaintenanceItemOut(BaseModel):
+    maintenance_id: int
+    title: str
+    status: str
+    priority: str | None = None
+    blocking: bool = False
+    updated_at: datetime | None = None
+
+
+class AssistantTaskItemOut(BaseModel):
+    task_id: int
+    task_type: str
+    status: str
+    date: date
+    time: dt_time | None = None
+    assignee_name: str | None = None
+    booking_id: int | None = None
+    notes: str | None = None
+
+
+class AssistantExecutionItemOut(BaseModel):
+    execution_id: int
+    status: str
+    trigger_type: str
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    scene_id: int | None = None
+    rule_id: int | None = None
+    error_message: str | None = None
+
+
+class AssistantQuickActionOut(BaseModel):
+    action_type: str
+    label: str
+    scene_id: int | None = None
+    alert_id: int | None = None
+    unit_id: int | None = None
+    booking_id: int | None = None
+    route: str | None = None
+    enabled: bool = True
+
+
+class SmartAssistantItemOut(BaseModel):
+    assistant_type: str
+    booking: AssistantBookingOut
+    assistant_status: str
+    readiness_status: str
+    readiness_score: int
+    assistant_summary: str
+    blocking_reasons: list[str] = Field(default_factory=list)
+    warning_reasons: list[str] = Field(default_factory=list)
+    essential_devices: list[AssistantEssentialDeviceOut] = Field(default_factory=list)
+    devices_still_active: list[AssistantEssentialDeviceOut] = Field(default_factory=list)
+    open_alerts: list[AssistantAlertItemOut] = Field(default_factory=list)
+    maintenance_issues: list[AssistantMaintenanceItemOut] = Field(default_factory=list)
+    staff_tasks: list[AssistantTaskItemOut] = Field(default_factory=list)
+    recent_events: list[dict] = Field(default_factory=list)
+    automation_failures: list[AssistantExecutionItemOut] = Field(default_factory=list)
+    quick_actions: list[AssistantQuickActionOut] = Field(default_factory=list)
+    last_updated_at: datetime | None = None
+    data_freshness_status: str | None = None
 
 
 class SmartDashboardOut(BaseModel):

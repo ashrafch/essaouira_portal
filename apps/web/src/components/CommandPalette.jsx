@@ -41,6 +41,8 @@ function CommandPalette() {
       { label: "Dispositivi Smart", path: "/smart-devices", routeKey: "smartDevices" },
       { label: "Alert Smart", path: "/smart-alerts", routeKey: "smartAlerts" },
       { label: "Automazioni Smart", path: "/smart-automation", routeKey: "smartAutomation" },
+      { label: "Assistant check-in", path: "/smart-assistant/checkin", routeKey: "smartCheckinAssistant" },
+      { label: "Assistant checkout", path: "/smart-assistant/checkout", routeKey: "smartCheckoutAssistant" },
       { label: "Setup Wizard", path: "/setup", routeKey: "setupWizard" },
       { label: "Planner Staff", path: "/staff-planner", routeKey: "staffPlanner" },
       { label: "Unità", path: "/units", routeKey: "units" },
@@ -52,6 +54,8 @@ function CommandPalette() {
   const commonActions = useMemo(
     () => [
       { label: "Vai a Smart Dashboard", type: "navigate", path: "/smart-dashboard" },
+      { label: "Apri Assistant check-in", type: "navigate", path: "/smart-assistant/checkin" },
+      { label: "Apri Assistant checkout", type: "navigate", path: "/smart-assistant/checkout" },
       { label: "Apri Setup Wizard", type: "navigate", path: "/setup" },
       { label: "Crea alert rapido", type: "action", action: "create_alert" },
       { label: "Esegui prima scena disponibile", type: "action", action: "run_first_scene" },

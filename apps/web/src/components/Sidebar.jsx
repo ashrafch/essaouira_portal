@@ -223,6 +223,8 @@ function Sidebar({ className = "", onNavigate = null }) {
         { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices" },
         { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts" },
         { to: "/smart-automation", label: "Automazioni smart", badge: null, routeKey: "smartAutomation" },
+        { to: "/smart-assistant/checkin", label: "Assistant check-in", badge: null, routeKey: "smartCheckinAssistant" },
+        { to: "/smart-assistant/checkout", label: "Assistant checkout", badge: null, routeKey: "smartCheckoutAssistant" },
       ],
     },
     {

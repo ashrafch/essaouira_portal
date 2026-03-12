@@ -230,6 +230,8 @@ Implemented:
 - Telemetry storage + historical query endpoints
 - Telemetry insights (rule-based anomaly detection)
 - Smart Operations Mode (action-first operational read model)
+- Guest Readiness Engine for hospitality readiness scoring
+- Check-in / Checkout Smart Assistant with booking-scoped guided actions
 - UX refresh baseline (cards, timeline, command palette, responsive improvements)
 
 Open areas:

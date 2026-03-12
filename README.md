@@ -148,6 +148,10 @@ npm run build
 - `GET /smart/readiness?property_id=&status=&min_score=&max_score=`
 - `GET /smart/readiness/property/{property_id}?status=&min_score=&max_score=`
 - `GET /smart/readiness/unit/{unit_id}`
+- `GET /smart/assistant/checkin?property_id=&unit_id=&status=&date_from=&date_to=`
+- `GET /smart/assistant/checkin/{booking_id}`
+- `GET /smart/assistant/checkout?property_id=&unit_id=&status=&date_from=&date_to=`
+- `GET /smart/assistant/checkout/{booking_id}`
 - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
 - `GET /smart/operations/units-needing-attention`
 - `GET /smart/operations/issues`
@@ -176,6 +180,8 @@ npm run build
 - `/smart-units/:id`
 - `/smart-alerts`
 - `/smart-automation`
+- `/smart-assistant/checkin`
+- `/smart-assistant/checkout`
 - `/setup`
 - `/properties`
 

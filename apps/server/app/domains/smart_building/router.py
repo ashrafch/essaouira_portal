@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from app.db import get_db
 from app.domains.smart_building.schemas import (
     AlertCreate,
     AlertOut,
+    AssistantQuickActionOut,
     AutomationExecutionOut,
     AutomationRuleCreate,
     AutomationRuleOut,
@@ -44,6 +45,7 @@ from app.domains.smart_building.schemas import (
     SceneUpdate,
     SmartDashboardOut,
     SmartDashboardItemOut,
+    SmartAssistantItemOut,
     SmartOperationsIssueOut,
     SmartOperationsOut,
     SmartOperationsUnitOut,
@@ -124,6 +126,62 @@ def get_single_unit_readiness(
     db: Session = Depends(get_db),
 ):
     return _service(request, db).get_unit_readiness(unit_id)
+
+
+@router.get("/assistant/checkin", response_model=list[SmartAssistantItemOut])
+def get_checkin_assistant(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    status: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+):
+    return _service(request, db).list_checkin_assistant(
+        property_id=property_id,
+        unit_id=unit_id,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get("/assistant/checkin/{booking_id}", response_model=SmartAssistantItemOut)
+def get_checkin_assistant_booking(
+    booking_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).get_checkin_assistant_booking(booking_id)
+
+
+@router.get("/assistant/checkout", response_model=list[SmartAssistantItemOut])
+def get_checkout_assistant(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    unit_id: int | None = Query(default=None),
+    status: str | None = Query(default=None),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+):
+    return _service(request, db).list_checkout_assistant(
+        property_id=property_id,
+        unit_id=unit_id,
+        status=status,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+@router.get("/assistant/checkout/{booking_id}", response_model=SmartAssistantItemOut)
+def get_checkout_assistant_booking(
+    booking_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).get_checkout_assistant_booking(booking_id)
 
 
 @router.get("/operations", response_model=SmartOperationsOut)
