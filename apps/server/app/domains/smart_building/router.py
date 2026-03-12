@@ -48,6 +48,7 @@ from app.domains.smart_building.schemas import (
     SmartOperationsOut,
     SmartOperationsUnitOut,
     TelemetryInsightOut,
+    UnitReadinessOut,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
@@ -80,6 +81,49 @@ def get_smart_dashboard(
     unit_id: int | None = Query(default=None),
 ):
     return _service(request, db).smart_dashboard(property_id=property_id, unit_id=unit_id)
+
+
+@router.get("/readiness", response_model=list[UnitReadinessOut])
+def get_unit_readiness(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+    status: str | None = Query(default=None),
+    min_score: int | None = Query(default=None, ge=0, le=100),
+    max_score: int | None = Query(default=None, ge=0, le=100),
+):
+    return _service(request, db).list_unit_readiness(
+        property_id=property_id,
+        status=status,
+        min_score=min_score,
+        max_score=max_score,
+    )
+
+
+@router.get("/readiness/property/{property_id}", response_model=list[UnitReadinessOut])
+def get_property_readiness(
+    property_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    status: str | None = Query(default=None),
+    min_score: int | None = Query(default=None, ge=0, le=100),
+    max_score: int | None = Query(default=None, ge=0, le=100),
+):
+    return _service(request, db).list_unit_readiness(
+        property_id=property_id,
+        status=status,
+        min_score=min_score,
+        max_score=max_score,
+    )
+
+
+@router.get("/readiness/unit/{unit_id}", response_model=UnitReadinessOut)
+def get_single_unit_readiness(
+    unit_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return _service(request, db).get_unit_readiness(unit_id)
 
 
 @router.get("/operations", response_model=SmartOperationsOut)

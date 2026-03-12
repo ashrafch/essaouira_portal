@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+ï»¿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AppCard,
@@ -13,6 +13,7 @@ import {
 } from "../components/ui";
 import FilterBar from "../components/dashboard/FilterBar";
 import ActivityCard from "../components/dashboard/ActivityCard";
+import ReadinessBadge from "../components/smart/ReadinessBadge";
 import {
   acknowledgeSmartAlert,
   getProperties,
@@ -56,6 +57,8 @@ function SmartOperations() {
     "telemetry.energy_spike",
     "telemetry.device_not_reporting",
     "telemetry.sensor_value_out_of_range",
+    "readiness.blocked",
+    "readiness.needs_attention",
     "maintenance.smart_related",
     "staff_task.impacted",
   ];
@@ -260,6 +263,8 @@ function SmartOperations() {
             <StatCard label="Device offline" value={operations.summary.offline_devices} tone="danger" />
             <StatCard label="Device unhealthy" value={operations.summary.unhealthy_devices} tone="warning" />
             <StatCard label="Automation fail/parziali" value={operations.summary.automation_failures_recent} tone="danger" />
+            <StatCard label="Readiness blocked" value={operations.summary.readiness_blocked_units} tone="danger" />
+            <StatCard label="Readiness non ready" value={operations.summary.readiness_not_ready_units} tone="warning" />
           </div>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
@@ -273,14 +278,20 @@ function SmartOperations() {
                     <div key={unit.unit_id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <strong>{unit.unit_name}</strong>
-                        <StatusBadge status={unit.severity} />
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <StatusBadge status={unit.severity} />
+                          <ReadinessBadge status={unit.readiness_status} />
+                        </div>
                       </div>
                       <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
-                        score {unit.attention_score} · alert {unit.open_alerts} · offline {unit.offline_devices} · fail {unit.automation_failures}
+                        score {unit.attention_score} Â· alert {unit.open_alerts} Â· offline {unit.offline_devices} Â· fail {unit.automation_failures}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>
+                        readiness score {unit.readiness_score}/100
                       </div>
                       {unit.reasons?.length ? (
                         <div style={{ marginTop: 6, fontSize: 12, color: "#334155" }}>
-                          {unit.reasons.join(" · ")}
+                          {unit.reasons.join(" Â· ")}
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -303,7 +314,7 @@ function SmartOperations() {
                     <ActivityCard
                       key={issue.issue_id}
                       title={issue.title}
-                      subtitle={`${issue.issue_type} · ${issue.unit_name || "Unita n/d"}`}
+                      subtitle={`${issue.issue_type} Â· ${issue.unit_name || "Unita n/d"}`}
                       severity={issue.severity}
                       timestamp={issue.last_seen_at || issue.occurred_at}
                       onClick={() => openIssue(issue)}
@@ -355,4 +366,5 @@ function SmartOperations() {
 }
 
 export default SmartOperations;
+
 

@@ -8,6 +8,11 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _as_csv_list(value: str | None, default: str) -> tuple[str, ...]:
+    raw = value if value is not None else default
+    return tuple(item.strip().lower() for item in raw.split(",") if item.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     auth_enabled: bool = _as_bool(os.getenv("AUTH_ENABLED"), True)
@@ -34,6 +39,10 @@ class Settings:
     telemetry_not_reporting_seconds: int = int(os.getenv("TELEMETRY_NOT_REPORTING_SECONDS", "7200"))
     data_fresh_seconds: int = int(os.getenv("DATA_FRESH_SECONDS", "120"))
     data_stale_seconds: int = int(os.getenv("DATA_STALE_SECONDS", "600"))
+    readiness_essential_device_categories: tuple[str, ...] = _as_csv_list(
+        os.getenv("ESSENTIAL_DEVICE_CATEGORIES"),
+        "door_sensor,leak_sensor,climate_controller,smart_light",
+    )
 
 
 settings = Settings()

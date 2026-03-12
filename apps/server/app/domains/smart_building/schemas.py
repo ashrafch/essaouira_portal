@@ -228,6 +228,7 @@ class SmartUnitDetailOut(BaseModel):
     telemetry_insights_active: list[dict] = Field(default_factory=list)
     environment_summary: dict = Field(default_factory=dict)
     energy_summary: dict = Field(default_factory=dict)
+    guest_readiness: dict | None = None
     last_updated_at: datetime | None = None
     data_freshness_status: str | None = None
 
@@ -738,6 +739,27 @@ class SmartDashboardProviderStatusOut(BaseModel):
     last_error: str | None = None
 
 
+class UnitReadinessOut(BaseModel):
+    unit_id: int
+    unit_name: str
+    property_id: int | None = None
+    property_name: str | None = None
+    tenant_id: str
+    readiness_status: str
+    readiness_score: int
+    blocking_reasons: list[str] = Field(default_factory=list)
+    warning_reasons: list[str] = Field(default_factory=list)
+    last_evaluated_at: datetime
+
+
+class UnitReadinessOverviewOut(BaseModel):
+    total_units: int = 0
+    ready: int = 0
+    needs_attention: int = 0
+    blocked: int = 0
+    unknown: int = 0
+
+
 class SmartDashboardOut(BaseModel):
     filters: dict = Field(default_factory=dict)
     kpis: SmartDashboardKpisOut
@@ -750,6 +772,8 @@ class SmartDashboardOut(BaseModel):
     recent_abnormal_readings: list[TelemetryInsightOut] = Field(default_factory=list)
     energy_summary: EnergySummaryOut = Field(default_factory=EnergySummaryOut)
     environment_summary: EnvironmentSummaryOut = Field(default_factory=EnvironmentSummaryOut)
+    readiness_overview: UnitReadinessOverviewOut = Field(default_factory=UnitReadinessOverviewOut)
+    units_not_ready: list[UnitReadinessOut] = Field(default_factory=list)
     provider_statuses: list[SmartDashboardProviderStatusOut] = Field(default_factory=list)
     last_updated_at: datetime | None = None
     data_freshness_status: str | None = None
@@ -763,6 +787,8 @@ class SmartOperationsSummaryOut(BaseModel):
     offline_devices: int
     unhealthy_devices: int
     automation_failures_recent: int
+    readiness_blocked_units: int = 0
+    readiness_not_ready_units: int = 0
 
 
 class SmartOperationsUnitOut(BaseModel):
@@ -782,6 +808,10 @@ class SmartOperationsUnitOut(BaseModel):
     automation_failures: int = 0
     automation_partial: int = 0
     smart_maintenance_open: int = 0
+    readiness_status: str = "UNKNOWN"
+    readiness_score: int = 0
+    readiness_blocking_reasons: list[str] = Field(default_factory=list)
+    readiness_warning_reasons: list[str] = Field(default_factory=list)
     recent_issue_at: datetime | None = None
 
 

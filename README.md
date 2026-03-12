@@ -78,6 +78,8 @@ docker compose up -d --build backend
 Security notes:
 - `.env` is git-ignored: never commit real tokens
 - keep placeholders empty in versioned files (`.env.example`, `apps/server/.env.example`)
+- readiness essentials can be configured with:
+  - `ESSENTIAL_DEVICE_CATEGORIES=door_sensor,leak_sensor,climate_controller,smart_light`
 
 ## Migrations
 
@@ -143,6 +145,9 @@ npm run build
 
 ### Smart Dashboard / Operations
 - `GET /smart/dashboard?property_id=&unit_id=`
+- `GET /smart/readiness?property_id=&status=&min_score=&max_score=`
+- `GET /smart/readiness/property/{property_id}?status=&min_score=&max_score=`
+- `GET /smart/readiness/unit/{unit_id}`
 - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
 - `GET /smart/operations/units-needing-attention`
 - `GET /smart/operations/issues`
@@ -193,4 +198,3 @@ docker compose --profile ops up -d
 - Start feature/fix branches from `dev`
 - Run tests/lint/build before merge
 - Merge to `dev` only after checks pass
-

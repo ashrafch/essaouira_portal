@@ -26,6 +26,7 @@ import EnergySummaryCard from "../components/smart/EnergySummaryCard";
 import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
 import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
 import TimelineItem from "../components/smart/TimelineItem";
+import UnitReadinessPanel from "../components/smart/UnitReadinessPanel";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import {
   getSmartUnitDetail,
@@ -227,6 +228,8 @@ function SmartUnitDetail() {
       </div>
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
+        <UnitReadinessPanel readiness={detail.guest_readiness} />
+
         <AppCard>
           <h3 style={{ marginBottom: 10 }}>Alert aperti</h3>
           {detail.alerts_open?.length ? (

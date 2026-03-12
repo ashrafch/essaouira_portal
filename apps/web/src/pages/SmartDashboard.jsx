@@ -38,6 +38,8 @@ import HeatmapTile from "../components/dashboard/HeatmapTile";
 import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
 import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
 import EnergySummaryCard from "../components/smart/EnergySummaryCard";
+import ReadinessBadge from "../components/smart/ReadinessBadge";
+import ReadinessScoreCard from "../components/smart/ReadinessScoreCard";
 import {
   enableSmartScenarioPack,
   getEnabledSmartScenarioPacks,
@@ -257,6 +259,18 @@ function SmartDashboard() {
               hint="fail/parziali"
               tone="danger"
             />
+            <StatCard label="Ready" value={dashboard.readiness_overview?.ready || 0} tone="success" />
+            <StatCard label="Needs attention" value={dashboard.readiness_overview?.needs_attention || 0} tone="warning" />
+            <StatCard label="Blocked" value={dashboard.readiness_overview?.blocked || 0} tone="danger" />
+          </div>
+
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", marginBottom: 12 }}>
+            <ReadinessScoreCard
+              title="Guest readiness"
+              subtitle="Media stato unità nel perimetro filtrato"
+              score={dashboard.readiness_overview?.total_units ? Math.round(((dashboard.readiness_overview.ready || 0) / dashboard.readiness_overview.total_units) * 100) : 0}
+              status={(dashboard.readiness_overview?.blocked || 0) > 0 ? "BLOCKED" : ((dashboard.readiness_overview?.needs_attention || 0) > 0 ? "NEEDS_ATTENTION" : "READY")}
+            />
           </div>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
@@ -309,6 +323,32 @@ function SmartDashboard() {
           </div>
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>
+            <AppCard>
+              <h3 style={{ marginBottom: 8 }}>Unità non pronte per ospiti</h3>
+              {(dashboard.units_not_ready || []).length === 0 ? (
+                <EmptyState title="Tutte le unità sono pronte" />
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {(dashboard.units_not_ready || []).slice(0, 10).map((row) => (
+                    <div key={`readiness-${row.unit_id}`} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <strong>{row.unit_name}</strong>
+                        <ReadinessBadge status={row.readiness_status} />
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                        score {row.readiness_score}/100
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" onClick={() => navigate(`/smart-units/${row.unit_id}`)}>
+                          Apri unità
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AppCard>
+
             <AppCard>
               <h3 style={{ marginBottom: 8 }}>Unità con criticità</h3>
               {(dashboard.problematic_units || []).length === 0 ? (

@@ -316,6 +316,18 @@ export function getSmartDashboard(params = {}) {
   return apiGet("/smart/dashboard", params);
 }
 
+export function getSmartReadiness(params = {}) {
+  return apiGet("/smart/readiness", params);
+}
+
+export function getSmartPropertyReadiness(propertyId, params = {}) {
+  return apiGet(`/smart/readiness/property/${propertyId}`, params);
+}
+
+export function getSmartUnitReadiness(unitId) {
+  return apiGet(`/smart/readiness/unit/${unitId}`);
+}
+
 export function getSmartOperations(params = {}) {
   return apiGet("/smart/operations", params);
 }
