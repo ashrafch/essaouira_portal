@@ -1,62 +1,19 @@
 # Essaouira Portal
 
-Portale gestionale per appartamenti/BnB a Essaouira.
+Multi-tenant hospitality platform for PMS/Ops + Smart Building.
 
-## Architettura
-
-- `apps/web`: React + Vite (UI)
-- `apps/server`: FastAPI + SQLAlchemy (API)
-- `docker-compose.yml`: stack completo `web + backend + db`
-
-## Avvio con Docker (consigliato)
+## Quick Start (Docker)
 
 ```bash
 docker compose up --build -d
 ```
 
-URL:
+Default URLs:
 - Frontend: `http://localhost:8081`
-- API health: `http://localhost:8081/api/health`
-- API diretta: `http://localhost:8000/health`
-- Login default: `owner` / `owner123`
-- Tenant default login: `default`
-
-Porta frontend configurabile:
-```bash
-set WEB_PORT=8081
-docker compose up --build -d
-```
-
-Configurazione Home Assistant lab (Docker Desktop + container backend):
-1. copia `.env.example` in `.env` nella root progetto
-2. imposta:
-```bash
-SMART_PROVIDER_MODE=home_assistant
-HOME_ASSISTANT_URL=http://host.docker.internal:8123
-HOME_ASSISTANT_TOKEN=<INSERISCI_TOKEN_LOCALE_NON_COMMITTARE>
-HOME_ASSISTANT_TIMEOUT_SECONDS=10
-HOME_ASSISTANT_INCLUDE_DOMAINS=binary_sensor,sensor,switch,climate,input_boolean,input_number
-```
-3. riavvia backend:
-```bash
-docker compose up -d --build backend
-```
-
-Note sicurezza:
-- `.env` e' ignorato da git, non committare mai token reali
-- usa placeholder vuoto nei file versionati (`.env.example`, `apps/server/.env.example`)
-- per backend fuori Docker puoi usare anche `HOME_ASSISTANT_URL=http://localhost:8123`
-
-Esempio `HOME_ASSISTANT_UNIT_HINTS` (A1/A2/POOL):
-```bash
-HOME_ASSISTANT_UNIT_HINTS={"binary_sensor.a1_door":"A1","binary_sensor.a1_motion":"A1","binary_sensor.a1_leak":"A1","sensor.a1_temperature":"A1","sensor.a1_humidity":"A1","binary_sensor.a2_door":"A2","binary_sensor.a2_motion":"A2","binary_sensor.a2_leak":"A2","sensor.a2_temperature":"A2","binary_sensor.pool_motion":"POOL","sensor.pool_temperature":"POOL"}
-```
-
-Smoke test connessione HA:
-```bash
-curl -H "Authorization: Bearer <TOKEN>" http://localhost:8123/api/states
-curl http://localhost:8081/api/health
-```
+- API health via proxy: `http://localhost:8081/api/health`
+- API direct: `http://localhost:8000/health`
+- Default login: `owner / owner123`
+- Default tenant: `default`
 
 Stop:
 
@@ -64,112 +21,99 @@ Stop:
 docker compose down
 ```
 
-Reset completo DB:
+Full DB reset:
 
 ```bash
 docker compose down -v
 ```
 
-## Avvio manuale (senza Docker)
+## Project Structure
 
-1. Database:
+- `apps/web`: React + Vite frontend (PWA-ready)
+- `apps/server`: FastAPI + SQLAlchemy backend
+- `docker-compose.yml`: local stack (`web + backend + db`)
+- `infra/`: Prometheus / Grafana config
+- `docs/`: architecture and refactor documentation
+
+## Local Configuration
+
+Root `.env` (optional, used by Docker Compose):
+- `WEB_PORT` (default `8081`)
+- `API_PORT` (default `8000`)
+- smart provider env vars (see below)
+
+Server env (`apps/server/.env`):
+- auth / RBAC / tenant config
+- smart provider config
+- health + telemetry thresholds
+
+Web env (`apps/web/.env`):
+- `VITE_API_BASE_URL`
+
+## Home Assistant Lab Setup (Local)
+
+1. Copy root env:
+
 ```bash
-docker compose up -d db
+copy .env.example .env
 ```
 
-2. Backend:
+2. Configure:
+
+```bash
+SMART_PROVIDER_MODE=home_assistant
+HOME_ASSISTANT_URL=http://host.docker.internal:8123
+HOME_ASSISTANT_TOKEN=<YOUR_LOCAL_TOKEN_DO_NOT_COMMIT>
+HOME_ASSISTANT_TIMEOUT_SECONDS=10
+HOME_ASSISTANT_INCLUDE_DOMAINS=binary_sensor,sensor,switch,climate,input_boolean,input_number
+HOME_ASSISTANT_UNIT_HINTS={}
+```
+
+3. Rebuild backend:
+
+```bash
+docker compose up -d --build backend
+```
+
+Security notes:
+- `.env` is git-ignored: never commit real tokens
+- keep placeholders empty in versioned files (`.env.example`, `apps/server/.env.example`)
+
+## Migrations
+
 ```bash
 cd apps/server
-python -m venv .venv
-. .venv/Scripts/Activate.ps1
-pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload --port 8000
+alembic -c alembic.ini upgrade head
 ```
 
-3. Frontend:
+Current Alembic head:
+- `0008_telemetry_insights`
+
+## Tests and Build
+
+Backend:
+
+```bash
+cd apps/server
+python -m pytest -q
+```
+
+Frontend:
+
 ```bash
 cd apps/web
-npm install
-copy .env.example .env
-npm run dev
+npm run lint
+npm run build
 ```
 
-## Variabili ambiente
+## Main Backend Endpoints
 
-Backend (`apps/server/.env`):
-- `DATABASE_URL`
-- `CORS_ORIGINS`
-- `AUTH_ENABLED`
-- `AUTH_SECRET_KEY`
-- `AUTH_ALGORITHM`
-- `AUTH_ACCESS_TOKEN_MINUTES`
-- `ADMIN_USERNAME`
-- `ADMIN_PASSWORD`
-- `ADMIN_PASSWORD_HASH` (opzionale, preferibile in produzione)
-- `ADMIN_ROLE` (`owner|manager|operator|viewer`)
-- `ADMIN_TENANT_ID`
-- `PASSWORD_MIN_LENGTH`
-- `AUTO_CREATE_SCHEMA`
-- `AUTO_SEED_DATA`
-- `SMART_PROVIDER_MODE` (`mock|home_assistant`)
-- `HOME_ASSISTANT_URL` (es. `http://homeassistant.local:8123`)
-- `HOME_ASSISTANT_TOKEN` (Long-Lived Access Token HA)
-- `HOME_ASSISTANT_TIMEOUT_SECONDS`
-- `HOME_ASSISTANT_INCLUDE_DOMAINS` (csv, es. `switch,light,climate,lock,sensor,binary_sensor`)
-- `HOME_ASSISTANT_UNIT_HINTS` (json map `entity_id -> unit hint`, es. `{\"switch.unita_luce\":\"unit a\"}`)
-- `DEVICE_OFFLINE_TIMEOUT_SECONDS` (default `1800`)
-- `DEVICE_BATTERY_WARNING_LEVEL` (default `20`)
-- `DEVICE_BATTERY_CRITICAL_LEVEL` (default `10`)
-- `DEVICE_SIGNAL_WARNING_RSSI` (default `-85`)
-- `TELEMETRY_MIN_INTERVAL_SECONDS` (default `60`, filtro anti-duplicazione campioni ravvicinati)
-- `TELEMETRY_TEMPERATURE_HIGH_C` (default `30`)
-- `TELEMETRY_TEMPERATURE_LOW_C` (default `5`)
-- `TELEMETRY_HUMIDITY_HIGH_PCT` (default `85`)
-- `TELEMETRY_ENERGY_SPIKE_FACTOR` (default `1.8`)
-- `TELEMETRY_NOT_REPORTING_SECONDS` (default `7200`)
-- `DATA_FRESH_SECONDS` (default `120`)
-- `DATA_STALE_SECONDS` (default `600`)
+### Core
+- `POST /auth/login`
+- `GET/POST/PUT/DELETE /users` (owner scope)
+- `POST /users/{id}/reset-password`
 
-Smart provider endpoints:
-- catalog sync: `POST /smart/providers/sync?provider=mock|home_assistant`
-- state poll fallback: `POST /smart/providers/poll?provider=mock|home_assistant`
-- webhook ingest: `POST /smart/providers/{provider}/webhook`
-- provider connections: `GET/POST /smart/provider-connections`, `GET/PUT /smart/provider-connections/{id}`
-- health overview: `GET /smart/device-health`
-- health by unit: `GET /smart/units/{id}/device-health`
-- health by device: `GET /smart/devices/{id}/health`
-- devices with freshness metadata: `GET /smart/devices?include_freshness=true`
-- telemetry by device: `GET /smart/telemetry/device/{device_id}?metric_type=&from=&to=&interval=`
-- telemetry by unit: `GET /smart/telemetry/unit/{unit_id}?metric_type=&from=&to=&interval=`
-- telemetry by property: `GET /smart/telemetry/property/{property_id}?metric_type=&from=&to=&interval=`
-- telemetry insights:
-  - `GET /smart/telemetry-insights?metric_type=&insight_type=&severity=&status=&property_id=&unit_id=`
-  - `GET /smart/telemetry-insights/property/{property_id}?metric_type=&insight_type=&severity=&status=`
-  - `GET /smart/telemetry-insights/unit/{unit_id}?metric_type=&insight_type=&severity=&status=`
-- alerts with freshness metadata: `GET /smart/alerts?status=&include_freshness=true`
-- smart dashboard: `GET /smart/dashboard?property_id=&unit_id=`
-- smart operations mode:
-  - `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
-  - `GET /smart/operations/units-needing-attention?property_id=&unit_id=&severity=`
-  - `GET /smart/operations/issues?property_id=&unit_id=&severity=&issue_type=&status=`
-  - `GET /smart/operations/activity?property_id=&unit_id=&severity=`
-- scenario packs:
-  - `GET /smart/scenario-packs`
-  - `GET /smart/scenario-packs/enabled?property_id=`
-  - `POST /smart/scenario-packs/enable`
-
-Property management endpoints:
-- `GET /properties`
-- `POST /properties`
-- `GET /properties/{id}`
-- `PUT /properties/{id}`
-
-Note:
-- `Unit.property_id` collega le unità PMS a una property reale.
-- per retrocompatibilita, migrazione/backfill crea una property di default per tenant e assegna le unità senza property.
-
-Setup wizard endpoints:
+### Setup Wizard
 - `POST /setup/start`
 - `GET /setup/session`
 - `POST /setup/property`
@@ -180,76 +124,73 @@ Setup wizard endpoints:
 - `POST /setup/enable-automations`
 - `POST /setup/complete`
 
-Setup wizard (Milestone 12):
-- step `property` persiste una `Property` reale (`metadata.property_id`)
-- step `connect-provider` persiste una `SmartProviderConnection` (`metadata.provider_connection_id`)
-- step `units` assegna `property_id` alle unità create/esistenti
-- step `import-devices` usa provider connection se disponibile
+### Property / Provider Registry
+- `GET/POST /properties`
+- `GET/PUT /properties/{id}`
+- `GET/POST /smart/provider-connections`
+- `GET/PUT /smart/provider-connections/{id}`
 
-Telemetry (Milestone 14):
-- metriche supportate: `temperature`, `humidity`, `power`, `energy`, `battery`, `signal`, `motion`, `contact`
-- query `interval` supporta bucket `15m`, `1h`, `6h`, `12h`, `1d`
-- aggregazioni per bucket: `min`, `max`, `avg`, `sum` (`value` espone `sum` per `energy`, `avg` per le altre metriche)
+### Smart Inventory / Health
+- `GET /smart/devices`
+- `GET /smart/device-health`
+- `GET /smart/units/{id}/device-health`
+- `GET /smart/devices/{id}/health`
 
-User management:
-- endpoint owner-only: `GET/POST/PUT/DELETE /users`
-- reset password: `POST /users/{id}/reset-password`
-- login payload supporta `tenant_id`
+### Smart Providers
+- `POST /smart/providers/sync?provider=mock|home_assistant`
+- `POST /smart/providers/poll?provider=mock|home_assistant`
+- `POST /smart/providers/{provider}/webhook`
 
-Frontend (`apps/web/.env`):
-- `VITE_API_BASE_URL`
+### Smart Dashboard / Operations
+- `GET /smart/dashboard?property_id=&unit_id=`
+- `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
+- `GET /smart/operations/units-needing-attention`
+- `GET /smart/operations/issues`
+- `GET /smart/operations/activity`
 
-## Migrazioni
+### Telemetry / Insights
+- `GET /smart/telemetry/device/{device_id}`
+- `GET /smart/telemetry/unit/{unit_id}`
+- `GET /smart/telemetry/property/{property_id}`
+- `GET /smart/telemetry-insights`
+- `GET /smart/telemetry-insights/property/{property_id}`
+- `GET /smart/telemetry-insights/unit/{unit_id}`
 
-```bash
-cd apps/server
-set DATABASE_URL=postgresql+psycopg2://essa:essa@localhost:5432/essa
-alembic -c alembic.ini upgrade head
-```
+### Scenario Packs
+- `GET /smart/scenario-packs`
+- `GET /smart/scenario-packs/enabled?property_id=`
+- `POST /smart/scenario-packs/enable`
 
-## Test
+## Frontend Routes (Smart)
 
-Backend:
-```bash
-cd apps/server
-pip install -r requirements-dev.txt
-pytest -q
-```
+- `/smart-dashboard`
+- `/smart-overview`
+- `/smart-operations`
+- `/smart-devices`
+- `/smart-devices/:id`
+- `/smart-units/:id`
+- `/smart-alerts`
+- `/smart-automation`
+- `/setup`
+- `/properties`
 
-Frontend:
-```bash
-cd apps/web
-npm run lint
-npm run build
-```
+## Operational Monitoring (Optional)
 
-## Scalabilita operativa
-
-Monitoraggio (profilo ops):
 ```bash
 docker compose --profile ops up -d
 ```
 
-Servizi:
 - Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (admin/admin)
+- Grafana: `http://localhost:3000` (`admin/admin`)
 
-Backup automatico DB:
-- servizio `db-backup` crea dump gzip ogni 24h
-- retention default 7 giorni
-- volume: `db_backups`
+## Documentation
 
-Staging compose:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
-```
+- Smart refactor spec: [docs/SMART_BUILDING_REFACTOR_SPEC.md](/c:/Users/chouikha/essaouira_portal/docs/SMART_BUILDING_REFACTOR_SPEC.md)
+- Full current-state analysis: [docs/PORTAL_CURRENT_STATE_ANALYSIS.md](/c:/Users/chouikha/essaouira_portal/docs/PORTAL_CURRENT_STATE_ANALYSIS.md)
 
-CI/CD:
-- pipeline CI: `.github/workflows/ci.yml`
-- pipeline staging (manual trigger): `.github/workflows/staging.yml`
+## Branch Workflow
 
-## Workflow branch
+- Start feature/fix branches from `dev`
+- Run tests/lint/build before merge
+- Merge to `dev` only after checks pass
 
-- Aprire sempre un branch feature da `dev`
-- Eseguire test/lint/build
-- Merge su `dev` solo dopo test passati
