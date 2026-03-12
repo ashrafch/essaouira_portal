@@ -271,16 +271,16 @@ function SmartOperations() {
                 <div style={{ display: "grid", gap: 8 }}>
                   {operations.units_needing_attention.map((unit) => (
                     <div key={unit.unit_id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <strong>{unit.unit_name}</strong>
                         <StatusBadge status={unit.severity} />
                       </div>
                       <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
-                        score {unit.attention_score} Â· alert {unit.open_alerts} Â· offline {unit.offline_devices} Â· fail {unit.automation_failures}
+                        score {unit.attention_score} · alert {unit.open_alerts} · offline {unit.offline_devices} · fail {unit.automation_failures}
                       </div>
                       {unit.reasons?.length ? (
                         <div style={{ marginTop: 6, fontSize: 12, color: "#334155" }}>
-                          {unit.reasons.join(" Â· ")}
+                          {unit.reasons.join(" · ")}
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -303,7 +303,7 @@ function SmartOperations() {
                     <ActivityCard
                       key={issue.issue_id}
                       title={issue.title}
-                      subtitle={`${issue.issue_type} Â· ${issue.unit_name || "Unita n/d"}`}
+                      subtitle={`${issue.issue_type} · ${issue.unit_name || "Unita n/d"}`}
                       severity={issue.severity}
                       timestamp={issue.last_seen_at || issue.occurred_at}
                       onClick={() => openIssue(issue)}
@@ -355,3 +355,4 @@ function SmartOperations() {
 }
 
 export default SmartOperations;
+

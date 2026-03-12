@@ -3,19 +3,19 @@ import { AppCard, SeverityBadge } from "../ui";
 
 function ActivityCard({ title, subtitle = "", severity = "info", timestamp = null, right = null }) {
   return (
-    <AppCard hover>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div>
-          <div style={{ fontWeight: 700 }}>{title}</div>
-          {subtitle ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{subtitle}</div> : null}
+    <AppCard hover className="activity-card">
+      <div className="activity-card__content">
+        <div className="activity-card__main">
+          <div className="activity-card__title">{title}</div>
+          {subtitle ? <div className="activity-card__subtitle">{subtitle}</div> : null}
           {timestamp ? (
-            <div style={{ marginTop: 6, fontSize: 12, color: "#64748b", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <div className="activity-card__time">
               <Clock3 size={12} />
               {new Date(timestamp).toLocaleString()}
             </div>
           ) : null}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="activity-card__actions">
           <SeverityBadge severity={severity} />
           {right}
         </div>
