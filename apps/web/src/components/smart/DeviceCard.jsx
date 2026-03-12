@@ -80,21 +80,23 @@ function DeviceCard({
               ))}
             </select>
           ) : null}
-          {onOpenDetail ? (
-            <button type="button" onClick={() => onOpenDetail(device.device_id)}>
-              Apri dettaglio
-            </button>
-          ) : null}
-          {onSimulate ? (
-            <button type="button" onClick={() => onSimulate(device.device_id)}>
-              Simula sync
-            </button>
-          ) : null}
-          {onDelete ? (
-            <button type="button" onClick={() => onDelete(device.device_id)} disabled={deleting}>
-              {deleting ? "Elimino..." : "Elimina"}
-            </button>
-          ) : null}
+          <div className="smart-device-card__action-buttons">
+            {onOpenDetail ? (
+              <button type="button" onClick={() => onOpenDetail(device.device_id)}>
+                Apri dettaglio
+              </button>
+            ) : null}
+            {onSimulate ? (
+              <button type="button" onClick={() => onSimulate(device.device_id)}>
+                Simula sync
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button type="button" onClick={() => onDelete(device.device_id)} disabled={deleting}>
+                {deleting ? "Elimino..." : "Elimina"}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </AppCard>
