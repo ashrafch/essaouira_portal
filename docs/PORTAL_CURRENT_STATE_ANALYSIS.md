@@ -1,6 +1,6 @@
 # PORTAL_CURRENT_STATE_ANALYSIS
 
-Date: March 12, 2026
+Date: March 27, 2026
 
 ## 1. Executive Summary
 
@@ -16,7 +16,7 @@ The project is in a strong "productization" phase, not prototype phase.
 ## 2. Technical Audit Results
 
 Checks executed during this audit:
-- backend tests: `64 passed`
+- backend tests: `70 passed`
 - frontend lint: `pass` (non-blocking baseline-browser-mapping warning)
 - frontend production build: `pass`
 - Alembic head: `0008_telemetry_insights`
@@ -62,6 +62,8 @@ Implemented smart routes:
 - `/smart-units/:id`
 - `/smart-alerts`
 - `/smart-automation`
+- `/smart-assistant/checkin`
+- `/smart-assistant/checkout`
 - `/setup`
 - `/properties`
 
@@ -137,4 +139,3 @@ Priority 3:
 
 The portal is already usable as a serious PMS/Ops + Smart Property platform.
 Current work should focus on hardening, QA completeness, and operational reliability rather than major architectural changes.
-

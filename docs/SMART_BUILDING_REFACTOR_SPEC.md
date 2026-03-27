@@ -211,7 +211,7 @@ The refactor is successful if:
 
 ---
 
-## Implementation status (as of March 12, 2026)
+## Implementation status (as of March 27, 2026)
 
 Implemented:
 - Smart domain foundation (devices, states, events, alerts)

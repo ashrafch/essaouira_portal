@@ -196,8 +196,14 @@ docker compose --profile ops up -d
 
 ## Documentation
 
+- Documentation index: [docs/DOCUMENTATION_INDEX.md](/c:/Users/chouikha/essaouira_portal/docs/DOCUMENTATION_INDEX.md)
 - Smart refactor spec: [docs/SMART_BUILDING_REFACTOR_SPEC.md](/c:/Users/chouikha/essaouira_portal/docs/SMART_BUILDING_REFACTOR_SPEC.md)
 - Full current-state analysis: [docs/PORTAL_CURRENT_STATE_ANALYSIS.md](/c:/Users/chouikha/essaouira_portal/docs/PORTAL_CURRENT_STATE_ANALYSIS.md)
+- Project structure guide: [docs/PROJECT_STRUCTURE_GUIDE.md](/c:/Users/chouikha/essaouira_portal/docs/PROJECT_STRUCTURE_GUIDE.md)
+- Technical operator manual: [docs/TECHNICAL_OPERATOR_MANUAL.md](/c:/Users/chouikha/essaouira_portal/docs/TECHNICAL_OPERATOR_MANUAL.md)
+- End user manual: [docs/END_USER_PORTAL_MANUAL.md](/c:/Users/chouikha/essaouira_portal/docs/END_USER_PORTAL_MANUAL.md)
+- Project flow overview: [docs/PROJECT_FLOW_OVERVIEW.md](/c:/Users/chouikha/essaouira_portal/docs/PROJECT_FLOW_OVERVIEW.md)
+- AI change guide: [docs/AI_CHANGE_GUIDE.md](/c:/Users/chouikha/essaouira_portal/docs/AI_CHANGE_GUIDE.md)
 
 ## Branch Workflow
 
