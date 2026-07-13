@@ -1,11 +1,18 @@
-﻿import { useEffect, useState } from "react";
-import { Menu, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Bell, Menu, Moon, Sun, Wifi, WifiOff } from "lucide-react";
 import { clearAuthSession, getCurrentRole, getCurrentTenant, getCurrentUsername } from "../services/auth";
+import { getDashboardSummary } from "../services/api";
+import { useTheme } from "../hooks/useTheme";
 import CommandPalette from "./CommandPalette";
 import StatusBadge from "./ui/StatusBadge";
+import "./chrome.css";
 
 function Topbar({ onToggleSidebar = null }) {
+  const navigate = useNavigate();
   const [online, setOnline] = useState(navigator.onLine);
+  const [alertsOpen, setAlertsOpen] = useState(0);
+  const { theme, toggleTheme } = useTheme();
   const username = getCurrentUsername() || "Owner";
   const role = getCurrentRole() || "owner";
   const tenant = getCurrentTenant() || "default";
@@ -25,85 +32,100 @@ function Topbar({ onToggleSidebar = null }) {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    getDashboardSummary()
+      .then((summary) => {
+        if (!cancelled && summary?.smart) {
+          setAlertsOpen(summary.smart.alerts_open || 0);
+        }
+      })
+      .catch(() => {
+        /* non-blocking: the bell simply shows no count */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 18px",
-        gap: 10,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+    <div className="topbar">
+      <div className="topbar__left">
         {onToggleSidebar ? (
           <button
             type="button"
-            className="mobile-menu-btn"
+            className="mobile-menu-btn chrome-icon-btn"
             onClick={onToggleSidebar}
-            style={{
-              background: "#fff",
-              color: "#0f172a",
-              border: "1px solid #cbd5e1",
-              padding: 8,
-            }}
-            aria-label="Open menu"
+            aria-label="Apri menu di navigazione"
           >
             <Menu size={16} />
           </button>
         ) : null}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>Operativita giornaliera</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>
+          <div className="topbar__title">Operatività giornaliera</div>
+          <div className="topbar__subtitle">
             Controllo live prenotazioni, staff, costi e manutenzione
           </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+      <div className="topbar__right">
         <CommandPalette />
         <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            borderRadius: 999,
-            padding: "4px 10px",
-            fontSize: 12,
-            fontWeight: 600,
-            background: online ? "#ecfdf5" : "#fef2f2",
-            color: online ? "#065f46" : "#991b1b",
-            border: `1px solid ${online ? "#a7f3d0" : "#fecaca"}`,
-          }}
+          className={`topbar__conn ${online ? "topbar__conn--online" : "topbar__conn--offline"}`}
+          role="status"
         >
-          {online ? <Wifi size={12} /> : <WifiOff size={12} />}
+          {online ? <Wifi size={12} aria-hidden="true" /> : <WifiOff size={12} aria-hidden="true" />}
           {online ? "Online" : "Offline"}
         </span>
-        <StatusBadge status={role} />
-        <div style={{ fontSize: 13, color: "#64748b" }}>
-          <strong>{username}</strong> · tenant <strong>{tenant}</strong>
+        <div className="topbar__meta">
+          <StatusBadge status={role} />
+          <div className="topbar__user">
+            <strong>{username}</strong> · tenant <strong>{tenant}</strong>
+          </div>
         </div>
-        <button
-          type="button"
-          style={{
-            fontSize: 12,
-            borderRadius: 999,
-            border: "1px solid #cbd5e1",
-            background: "#fff",
-            color: "#334155",
-          }}
-          onClick={() => {
-            clearAuthSession();
-            window.location.href = "/login";
-          }}
-        >
-          Logout
-        </button>
+        <div className="topbar__actions">
+          <button
+            type="button"
+            className="chrome-icon-btn topbar__bell"
+            onClick={() => navigate("/smart-alerts")}
+            aria-label={
+              alertsOpen > 0
+                ? `${alertsOpen} alert smart aperti`
+                : "Nessun alert smart aperto"
+            }
+            title="Alert smart"
+          >
+            <Bell size={16} aria-hidden="true" />
+            {alertsOpen > 0 ? (
+              <span className="topbar__bell-count" aria-hidden="true">
+                {alertsOpen > 9 ? "9+" : alertsOpen}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            className="chrome-icon-btn"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Attiva tema chiaro" : "Attiva tema scuro"}
+            title={theme === "dark" ? "Tema chiaro" : "Tema scuro"}
+          >
+            {theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            className="topbar__logout"
+            onClick={() => {
+              clearAuthSession();
+              window.location.href = "/login";
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 export default Topbar;
-

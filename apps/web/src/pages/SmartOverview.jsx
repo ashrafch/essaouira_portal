@@ -30,8 +30,8 @@ function SmartOverview() {
   const healthData = useMemo(() => {
     if (!overview) return [];
     return [
-      { name: "Online", value: overview.online_devices || 0, color: "#10b981" },
-      { name: "Offline", value: overview.offline_devices || 0, color: "#ef4444" },
+      { name: "Online", value: overview.online_devices || 0, color: "var(--color-success)" },
+      { name: "Offline", value: overview.offline_devices || 0, color: "var(--color-danger)" },
     ];
   }, [overview]);
 
@@ -43,7 +43,7 @@ function SmartOverview() {
       />
 
       {loading ? <LoadingSkeleton rows={6} height={32} /> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
 
       {!loading && !error && overview ? (
         <>
@@ -84,12 +84,12 @@ function SmartOverview() {
                       key={u.id}
                       to={`/smart-units/${u.id}`}
                       style={{
-                        border: "1px solid #e2e8f0",
+                        border: "1px solid var(--color-border)",
                         borderRadius: 10,
                         padding: "8px 10px",
                         fontWeight: 600,
-                        color: "#0f766e",
-                        background: "#f8fafc",
+                        color: "var(--color-primary)",
+                        background: "var(--color-surface-soft)",
                       }}
                     >
                       {u.name} · dettaglio smart

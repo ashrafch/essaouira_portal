@@ -26,3 +26,12 @@ export const APP_ROUTES = [
   { path: "/smart-units/:unitId", key: "smartUnitDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/setup", key: "setupWizard", allowedRoles: ["owner"] },
 ];
+
+/**
+ * routeKey -> Set(allowedRoles), derived from APP_ROUTES.
+ * Single source of truth for RBAC: rbac.canAccessRoute() reads from this map,
+ * and App.jsx uses the same allowedRoles for the route guards.
+ */
+export const ROUTE_ROLES = Object.fromEntries(
+  APP_ROUTES.map((route) => [route.key, new Set(route.allowedRoles)])
+);

@@ -1,5 +1,4 @@
-import os
-
+from app.core.config import settings
 from app.domains.smart_building.providers.base import SmartDeviceProvider
 from app.domains.smart_building.providers.home_assistant import HomeAssistantProvider
 from app.domains.smart_building.providers.mock import MockSmartDeviceProvider
@@ -10,7 +9,7 @@ def get_provider(
     *,
     config: dict | None = None,
 ) -> SmartDeviceProvider:
-    selected = (provider_name or os.getenv("SMART_PROVIDER_MODE", "mock")).strip().lower()
+    selected = (provider_name or settings.smart_provider_mode).strip().lower()
     if selected in {"ha", "home_assistant"}:
         cfg = config or {}
         return HomeAssistantProvider(
@@ -21,4 +20,3 @@ def get_provider(
             unit_hints_json=cfg.get("unit_hints_json"),
         )
     return MockSmartDeviceProvider()
-

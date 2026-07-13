@@ -38,7 +38,7 @@ function DeviceCard({
             <span className="smart-device-card__external-id">{device.external_id}</span>
           </div>
           <div className="smart-device-card__unit">
-            Unita: <strong>{device.unit_name || "Non assegnata"}</strong>
+            Unità: <strong>{device.unit_name || "Non assegnata"}</strong>
           </div>
           {boolStateLabel ? (
             <div className="smart-device-card__state">
@@ -72,7 +72,7 @@ function DeviceCard({
               disabled={assigning}
               className="smart-device-card__select"
             >
-              <option value="">Assegna unita...</option>
+              <option value="">Assegna unità...</option>
               {units.map((unit) => (
                 <option key={unit.id} value={unit.id}>
                   {unit.name}

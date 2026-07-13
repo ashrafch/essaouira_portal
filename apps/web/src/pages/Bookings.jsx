@@ -381,11 +381,11 @@ function Bookings() {
   };
 
   const card = {
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: "14px",
     padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const field = {
@@ -398,12 +398,12 @@ function Bookings() {
   const label = {
     fontSize: 12,
     fontWeight: 500,
-    color: "#374151",
+    color: "var(--color-text-muted)",
   };
 
   const input = {
     borderRadius: 8,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "6px 8px",
     fontSize: 13,
   };
@@ -424,19 +424,19 @@ function Bookings() {
     padding: "8px 14px",
     fontSize: 13,
     fontWeight: 600,
-    backgroundColor: "#0f766e",
-    color: "white",
+    backgroundColor: "var(--color-primary)",
+    color: "var(--color-on-primary)",
     cursor: "pointer",
   };
 
   const buttonSecondary = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "8px 14px",
     fontSize: 13,
     fontWeight: 500,
-    backgroundColor: "white",
-    color: "#374151",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-muted)",
     cursor: "pointer",
   };
 
@@ -448,15 +448,15 @@ function Bookings() {
 
   const th = {
     textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontSize: 12,
   };
 
   const td = {
     padding: "8px 4px",
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
     verticalAlign: "top",
   };
 
@@ -467,9 +467,9 @@ function Bookings() {
     borderRadius: 999,
     fontSize: 11,
     fontWeight: 500,
-    backgroundColor: paid ? "#dcfce7" : "#fee2e2",
-    color: paid ? "#166534" : "#b91c1c",
-    border: `1px solid ${paid ? "#16a34a" : "#ef4444"}`,
+    backgroundColor: paid ? "var(--color-success-soft)" : "var(--color-danger-soft)",
+    color: paid ? "var(--color-success-strong)" : "var(--color-danger-strong)",
+    border: `1px solid ${paid ? "var(--color-success)" : "var(--color-danger)"}`,
   });
 
   const header = {
@@ -487,17 +487,17 @@ function Bookings() {
     fontSize: 11,
     backgroundColor: bg,
     color,
-    border: "1px solid rgba(148,163,184,0.5)",
+    border: "1px solid var(--color-border-strong)",
   });
 
   const conflictBox = {
     marginTop: 6,
     padding: "8px 10px",
     borderRadius: 10,
-    background: "#fef2f2",
-    border: "1px solid #fecaca",
+    background: "var(--color-danger-soft)",
+    border: "1px solid var(--color-danger)",
     fontSize: 12,
-    color: "#b91c1c",
+    color: "var(--color-danger-strong)",
     display: "flex",
     alignItems: "flex-start",
     gap: 8,
@@ -507,8 +507,8 @@ function Bookings() {
     width: 20,
     height: 20,
     borderRadius: "999px",
-    background: "#b91c1c",
-    color: "white",
+    background: "var(--color-danger)",
+    color: "var(--color-on-primary)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -530,15 +530,15 @@ function Bookings() {
 
   const pillSource = (src) => {
     if (src === "airbnb") {
-      return chip("#fee2e2", "#b91c1c");
+      return chip("var(--color-danger-soft)", "var(--color-danger-strong)");
     }
     if (src === "booking") {
-      return chip("#e0f2fe", "#0369a1");
+      return chip("var(--color-info-soft)", "var(--color-info-strong)");
     }
     if (src === "direct") {
-      return chip("#dcfce7", "#166534");
+      return chip("var(--color-success-soft)", "var(--color-success-strong)");
     }
-    return chip("#f3f4f6", "#4b5563");
+    return chip("var(--color-surface-soft)", "var(--color-text-muted)");
   };
 
   // --- checkbox styles nuovi ---
@@ -548,14 +548,14 @@ function Bookings() {
     gap: 8,
     padding: "8px 10px",
     borderRadius: 10,
-    border: "1px solid #d1d5db",
-    backgroundColor: "#f9fafb",
+    border: "1px solid var(--color-border-strong)",
+    backgroundColor: "var(--color-surface-soft)",
   };
 
   const checkboxInput = {
     width: 16,
     height: 16,
-    accentColor: "#0f766e",
+    accentColor: "var(--color-primary)",
     cursor: "pointer",
     marginTop: 2,
     flexShrink: 0,
@@ -564,12 +564,12 @@ function Bookings() {
   const checkboxLabelMain = {
     fontSize: 12,
     fontWeight: 600,
-    color: "#111827",
+    color: "var(--color-text)",
   };
 
   const checkboxLabelSub = {
     fontSize: 11,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     marginTop: 2,
     lineHeight: 1.4,
   };
@@ -579,7 +579,7 @@ function Bookings() {
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Prenotazioni</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Gestisci le prenotazioni con informazioni economiche complete e
             controlli immediati di disponibilità.
           </p>
@@ -587,7 +587,7 @@ function Bookings() {
       </div>
 
       {error && (
-        <p style={{ color: "red", fontSize: 12, marginBottom: 8 }}>{error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 8 }}>{error}</p>
       )}
       <FeedbackMessage
         message={feedback.message}
@@ -601,7 +601,7 @@ function Bookings() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.45)",
+            background: "var(--color-overlay)",
             zIndex: 1100,
           }}
         />
@@ -654,17 +654,17 @@ function Bookings() {
               {parsedCheckin && parsedCheckout && (
                 <div style={{ fontSize: 12, marginBottom: 10 }}>
                   <div style={{ marginBottom: 4 }}>
-                    <span style={{ color: "#16a34a", fontWeight: 600 }}>
+                    <span style={{ color: "var(--color-success)", fontWeight: 600 }}>
                       Libere:
                     </span>{" "}
                     {availability.freeUnits.length === 0 ? (
-                      <span style={{ color: "#6b7280" }}>nessuna</span>
+                      <span style={{ color: "var(--color-text-muted)" }}>nessuna</span>
                     ) : (
                       availability.freeUnits.map((u) => (
                         <span
                           key={u.id}
                           style={{
-                            ...chip("#ecfdf5", "#166534"),
+                            ...chip("var(--color-success-soft)", "var(--color-success-strong)"),
                             marginRight: 4,
                           }}
                         >
@@ -675,14 +675,14 @@ function Bookings() {
                   </div>
                   {availability.occupiedUnits.length > 0 && (
                     <div>
-                      <span style={{ color: "#b91c1c", fontWeight: 600 }}>
+                      <span style={{ color: "var(--color-danger-strong)", fontWeight: 600 }}>
                         Occupate:
                       </span>{" "}
                       {availability.occupiedUnits.map((u) => (
                         <span
                           key={u.id}
                           style={{
-                            ...chip("#fee2e2", "#b91c1c"),
+                            ...chip("var(--color-danger-soft)", "var(--color-danger-strong)"),
                             marginRight: 4,
                           }}
                         >
@@ -727,7 +727,7 @@ function Bookings() {
                             ))}
                           </ul>
                         )}
-                        <div style={{ marginTop: 4, color: "#7f1d1d" }}>
+                        <div style={{ marginTop: 4, color: "var(--color-danger-strong)" }}>
                           Puoi cambiare unità oppure modificare il periodo.
                         </div>
                       </div>
@@ -851,7 +851,7 @@ function Bookings() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#6b7280",
+                    color: "var(--color-text-muted)",
                     marginBottom: 8,
                   }}
                 >
@@ -860,7 +860,7 @@ function Bookings() {
               )}
 
               {/* SEZIONE ECONOMICA */}
-              <hr style={{ margin: "10px 0 8px", borderColor: "#e5e7eb" }} />
+              <hr style={{ margin: "10px 0 8px", borderColor: "var(--color-border)" }} />
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
                 Dettagli economici
               </div>
@@ -968,7 +968,7 @@ function Bookings() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#6b7280",
+                    color: "var(--color-text-muted)",
                     marginBottom: 8,
                   }}
                 >
@@ -1072,7 +1072,7 @@ function Bookings() {
               <div style={{ fontSize: 14, fontWeight: 600 }}>
                 Elenco prenotazioni
                 <div
-                  style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}
+                  style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}
                 >
                   Mostrate: {shownCount} / {totalCount}
                 </div>
@@ -1094,7 +1094,7 @@ function Bookings() {
                   + Nuova prenotazione
                 </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: "#6b7280" }}>Unità</span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Unità</span>
                   <select
                     style={{
                       ...input,
@@ -1114,7 +1114,7 @@ function Bookings() {
                   </select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: "#6b7280" }}>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                     Pagamento
                   </span>
                   <select
@@ -1136,7 +1136,7 @@ function Bookings() {
             </div>
 
             {filteredBookings.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#6b7280" }}>
+              <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
                 Nessuna prenotazione per i filtri selezionati.
               </p>
             ) : (
@@ -1206,7 +1206,7 @@ function Bookings() {
                               <span
                                 style={{
                                   fontSize: 11,
-                                  color: "#6b7280",
+                                  color: "var(--color-text-muted)",
                                 }}
                               >
                                 {n} notte{n !== 1 ? "i" : ""}
@@ -1214,7 +1214,7 @@ function Bookings() {
                               {b.has_late_checkout && (
                                 <span
                                   style={{
-                                    ...chip("#fef9c3", "#92400e"),
+                                    ...chip("var(--color-warning-soft)", "var(--color-warning-strong)"),
                                     marginTop: 2,
                                   }}
                                 >
@@ -1259,8 +1259,8 @@ function Bookings() {
                                 ...buttonSecondary,
                                 padding: "4px 10px",
                                 fontSize: 12,
-                                borderColor: "#6366f1",
-                                color: "#4338ca",
+                                borderColor: "var(--color-info)",
+                                color: "var(--color-info-strong)",
                                 marginRight: 4
                               }}
                               onClick={() => openDocument(b)}
@@ -1273,8 +1273,8 @@ function Bookings() {
                                 ...buttonSecondary,
                                 padding: "4px 10px",
                                 fontSize: 12,
-                                borderColor: "#fecaca",
-                                color: "#b91c1c",
+                                borderColor: "var(--color-danger)",
+                                color: "var(--color-danger)",
                               }}
                               onClick={() => handleDelete(b.id)}
                             >

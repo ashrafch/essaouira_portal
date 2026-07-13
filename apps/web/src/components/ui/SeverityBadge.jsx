@@ -1,9 +1,9 @@
 import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 
 const MAP = {
-  info: { bg: "#eff6ff", fg: "#1d4ed8", border: "#bfdbfe", icon: Info },
-  warning: { bg: "#fffbeb", fg: "#92400e", border: "#fde68a", icon: AlertTriangle },
-  critical: { bg: "#fef2f2", fg: "#991b1b", border: "#fecaca", icon: AlertCircle },
+  info: { bg: "var(--color-info-soft)", fg: "var(--color-info-strong)", border: "var(--color-info)", icon: Info },
+  warning: { bg: "var(--color-warning-soft)", fg: "var(--color-warning-strong)", border: "var(--color-warning)", icon: AlertTriangle },
+  critical: { bg: "var(--color-danger-soft)", fg: "var(--color-danger-strong)", border: "var(--color-danger)", icon: AlertCircle },
 };
 
 function SeverityBadge({ severity = "info" }) {

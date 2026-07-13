@@ -77,11 +77,11 @@ function Pricing() {
       };
       const updated = await updateUnit(editingUnit.id, payload);
       setUnits((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      setFeedback({ type: "success", message: "Tariffa unità aggiornata." });
+      setFeedback({ type: "success", message: "Tariffa unitÃ  aggiornata." });
       setUnitModalOpen(false);
       setEditingUnit(null);
     } catch (err) {
-      setFeedback({ type: "error", message: "Errore salvando unità: " + err.message });
+      setFeedback({ type: "error", message: "Errore salvando unitÃ : " + err.message });
     } finally {
       setSavingUnitId(null);
     }
@@ -139,11 +139,11 @@ function Pricing() {
   };
 
   const card = {
-    background: "white",
+    background: "var(--color-surface)",
     borderRadius: 14,
     padding: 14,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const field = {
@@ -156,12 +156,12 @@ function Pricing() {
   const label = {
     fontSize: 11,
     fontWeight: 500,
-    color: "#374151",
+    color: "var(--color-text)",
   };
 
   const input = {
     borderRadius: 8,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "6px 8px",
     fontSize: 13,
   };
@@ -172,8 +172,8 @@ function Pricing() {
     padding: "7px 12px",
     fontSize: 12,
     fontWeight: 600,
-    backgroundColor: "#0f766e",
-    color: "white",
+    backgroundColor: "var(--color-primary)",
+    color: "var(--color-on-primary)",
     cursor: "pointer",
   };
 
@@ -185,15 +185,15 @@ function Pricing() {
 
   const th = {
     textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontSize: 11,
   };
 
   const td = {
     padding: "6px 4px",
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
     verticalAlign: "top",
   };
 
@@ -201,14 +201,14 @@ function Pricing() {
     <div style={page}>
       <div>
         <h1 style={{ marginBottom: 4 }}>Tariffe & Canali</h1>
-        <p style={{ fontSize: 13, color: "#6b7280" }}>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
           Gestisci le tariffe base per ogni appartamento e i valori di default
           per extra come pulizie, tasse e commissioni. Questi valori servono per
           precompilare le prenotazioni e chiudere il cerchio Ricavi / Costi.
         </p>
       </div>
 
-      {error && <p style={{ color: "red", fontSize: 12 }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
@@ -221,23 +221,23 @@ function Pricing() {
         <>
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-              <h2 style={{ fontSize: 14, margin: 0 }}>Tariffe base per unità (ADR di riferimento)</h2>
+              <h2 style={{ fontSize: 14, margin: 0 }}>Tariffe base per unitÃ  (ADR di riferimento)</h2>
               <button type="button" style={buttonPrimary} onClick={openPricingModal}>
                 Configura default pricing
               </button>
             </div>
-            <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
               Questi valori sono la base per il prezzo per notte. Puoi sempre
               sovrascriverli sulla singola prenotazione.
             </p>
             {units.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#6b7280" }}>Nessuna unità configurata.</p>
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Nessuna unitÃ  configurata.</p>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
-                      <th style={th}>Unità</th>
+                      <th style={th}>UnitÃ </th>
                       <th style={th}>Mq</th>
                       <th style={th}>Capienza</th>
                       <th style={th}>Base nightly rate</th>
@@ -273,9 +273,9 @@ function Pricing() {
           {pricing && (
             <div style={card}>
               <h2 style={{ fontSize: 14, marginBottom: 8 }}>Extra & Commissioni (valori di default)</h2>
-              <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-                Cleaning fee: {pricing.default_cleaning_fee ?? "-"} · City tax/notte: {pricing.default_city_tax_per_night ?? "-"}
-                · Commissione: {pricing.default_channel_fee_percent ?? "-"}% · Valuta: {pricing.default_currency || "EUR"}
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
+                Cleaning fee: {pricing.default_cleaning_fee ?? "-"} Â· City tax/notte: {pricing.default_city_tax_per_night ?? "-"}
+                Â· Commissione: {pricing.default_channel_fee_percent ?? "-"}% Â· Valuta: {pricing.default_currency || "EUR"}
               </p>
               <button type="button" style={buttonPrimary} onClick={openPricingModal}>
                 Modifica impostazioni default

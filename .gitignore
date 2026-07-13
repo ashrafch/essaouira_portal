@@ -4,6 +4,7 @@ venv/
 .env.*
 !.env.example
 !.env.staging.example
+!.env.production.example
 __pycache__/
 *.py[cod]
 *.pyo
@@ -13,7 +14,7 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+.pytest_cache/
 
-# Local working notes
-AGENTS.md
+# Legacy local notes directory
 essaouira_portal/

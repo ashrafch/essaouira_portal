@@ -1,4 +1,5 @@
 import { getCurrentRole } from "../services/auth";
+import { ROUTE_ROLES } from "../routes/appRoutes";
 
 export const ALL_ROLES = ["owner", "manager", "operator", "viewer"];
 
@@ -11,71 +12,13 @@ export function getRole() {
   return normalizeRole(getCurrentRole());
 }
 
+/**
+ * Access is derived from APP_ROUTES.allowedRoles (see routes/appRoutes.js),
+ * the same source used by the <ProtectedRoute> guards — no drift possible.
+ * Owner keeps full access, including keys not present in the map.
+ */
 export function canAccessRoute(routeKey, role) {
   const normalized = normalizeRole(role);
   if (normalized === "owner") return true;
-  const permissions = {
-    manager: new Set([
-      "dashboard",
-      "operations",
-      "units",
-      "unitTimeline",
-      "bookings",
-      "calendar",
-      "staff",
-      "staffPlanner",
-      "business",
-      "staffDirectory",
-      "pricing",
-      "maintenance",
-      "expenses",
-      "properties",
-      "smartOverview",
-      "smartDashboard",
-      "smartOperations",
-      "smartDevices",
-      "smartDeviceDetail",
-      "smartAlerts",
-      "smartAutomation",
-      "smartUnitDetail",
-    ]),
-    operator: new Set([
-      "dashboard",
-      "operations",
-      "units",
-      "unitTimeline",
-      "bookings",
-      "calendar",
-      "staff",
-      "staffPlanner",
-      "maintenance",
-      "expenses",
-      "properties",
-      "smartOverview",
-      "smartDashboard",
-      "smartOperations",
-      "smartDevices",
-      "smartDeviceDetail",
-      "smartAlerts",
-      "smartUnitDetail",
-    ]),
-    viewer: new Set([
-      "dashboard",
-      "operations",
-      "units",
-      "unitTimeline",
-      "bookings",
-      "calendar",
-      "business",
-      "properties",
-      "smartOverview",
-      "smartDashboard",
-      "smartOperations",
-      "smartDevices",
-      "smartDeviceDetail",
-      "smartAlerts",
-      "smartUnitDetail",
-    ]),
-  };
-  return permissions[normalized]?.has(routeKey) || false;
+  return ROUTE_ROLES[routeKey]?.has(normalized) || false;
 }

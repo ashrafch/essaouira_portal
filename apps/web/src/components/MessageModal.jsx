@@ -3,7 +3,7 @@ import { useState } from "react";
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(15,23,42,0.4)",
+  backgroundColor: "var(--color-overlay)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -11,12 +11,12 @@ const overlayStyle = {
 };
 
 const modalStyle = {
-  backgroundColor: "white",
+  backgroundColor: "var(--color-surface)",
   borderRadius: 16,
   padding: 24,
   width: "100%",
   maxWidth: 480,
-  boxShadow: "0 20px 40px rgba(15,23,42,0.2)",
+  boxShadow: "var(--shadow-lg)",
   display: "flex",
   flexDirection: "column",
   gap: 16,
@@ -27,7 +27,7 @@ const textareaStyle = {
   minHeight: 120,
   padding: 12,
   borderRadius: 8,
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--color-border-strong)",
   fontSize: 14,
   fontFamily: "inherit",
   resize: "vertical",
@@ -38,7 +38,7 @@ const selectStyle = {
   width: "100%",
   padding: "8px 12px",
   borderRadius: 8,
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--color-border-strong)",
   fontSize: 14,
   marginBottom: 12,
 };
@@ -61,8 +61,8 @@ const btnBase = {
 
 const btnCancel = {
   ...btnBase,
-  backgroundColor: "#f3f4f6",
-  color: "#374151",
+  backgroundColor: "var(--color-surface-soft)",
+  color: "var(--color-text-muted)",
 };
 
 const btnSend = {
@@ -78,7 +78,7 @@ const TEMPLATES = [
   {
     id: "welcome",
     label: "Benvenuto & Posizione",
-    text: `Ciao {guest_name}!\nSiamo felici di accoglierti a Essaouira.\n\nEcco la posizione esatta della struttura:\nhttps://goo.gl/maps/ESEMPIO_POSIZIONE\n\nIl tuo appartamento e: {unit_name}.\nTi aspettiamo per il check-in dalle 15:00.\nA presto!`,
+    text: `Ciao {guest_name}!\nSiamo felici di accoglierti a Essaouira.\n\nEcco la posizione esatta della struttura:\nhttps://goo.gl/maps/ESEMPIO_POSIZIONE\n\nIl tuo appartamento è: {unit_name}.\nTi aspettiamo per il check-in dalle 15:00.\nA presto!`,
   },
   {
     id: "wifi",
@@ -88,7 +88,7 @@ const TEMPLATES = [
   {
     id: "checkout",
     label: "Istruzioni Check-out",
-    text: `Buongiorno {guest_name},\nsperiamo tu abbia passato un ottimo soggiorno.\n\nTi ricordiamo che il check-out e previsto entro le 10:00.\nPer favore lascia le chiavi sul tavolo o alla reception.\n\nGrazie e buon viaggio!`,
+    text: `Buongiorno {guest_name},\nsperiamo tu abbia passato un ottimo soggiorno.\n\nTi ricordiamo che il check-out è previsto entro le 10:00.\nPer favore lascia le chiavi sul tavolo o alla reception.\n\nGrazie e buon viaggio!`,
   },
   {
     id: "custom",
@@ -134,16 +134,22 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
 
   return (
     <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Invia messaggio WhatsApp"
+        style={modalStyle}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div>
           <h2 style={{ fontSize: 18, marginBottom: 4 }}>Invia Messaggio WhatsApp</h2>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             A: <strong>{booking.guest_name}</strong> ({booking.guest_phone || "Nessun numero"})
           </p>
         </div>
 
         <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 6 }}>
             Scegli Template
           </label>
           <select
@@ -161,7 +167,7 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
             ))}
           </select>
 
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 6 }}>
             Anteprima Messaggio (modificabile)
           </label>
           <textarea

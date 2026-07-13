@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { ToastProvider } from "./components/ui";
 import { APP_ROUTES } from "./routes/appRoutes";
 
 const Dashboard = lazy(() => import("./pages/Dashboard.jsx"));
@@ -70,44 +71,46 @@ const ROUTE_COMPONENTS = {
 
 function App() {
   return (
-    <Suspense fallback={<PageFallback />}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/bookings/:bookingId/document"
-          element={
-            <ProtectedRoute allowedRoles={["owner", "manager", "operator", "viewer"]}>
-              <BookingDocument />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          {APP_ROUTES.map((route) => {
-            const Component = ROUTE_COMPONENTS[route.key];
-            return (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={
-                  <ProtectedRoute allowedRoles={route.allowedRoles}>
-                    <Component />
-                  </ProtectedRoute>
-                }
-              />
-            );
-          })}
-        </Route>
-        <Route path="/forbidden" element={<Forbidden />} />
-        <Route path="/404" element={<NotFound />} />
-        <Route path="*" element={<Navigate to="/404" replace />} />
-      </Routes>
-    </Suspense>
+    <ToastProvider>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/bookings/:bookingId/document"
+            element={
+              <ProtectedRoute allowedRoles={["owner", "manager", "operator", "viewer"]}>
+                <BookingDocument />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            {APP_ROUTES.map((route) => {
+              const Component = ROUTE_COMPONENTS[route.key];
+              return (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={
+                    <ProtectedRoute allowedRoles={route.allowedRoles}>
+                      <Component />
+                    </ProtectedRoute>
+                  }
+                />
+              );
+            })}
+          </Route>
+          <Route path="/forbidden" element={<Forbidden />} />
+          <Route path="/404" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/404" replace />} />
+        </Routes>
+      </Suspense>
+    </ToastProvider>
   );
 }
 

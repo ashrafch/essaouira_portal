@@ -13,15 +13,15 @@ function EnergySummaryCard({ summary, title = "Energy summary" }) {
       <h3 style={{ marginBottom: 8 }}>{title}</h3>
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Energia 24h</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Energia 24h</div>
           <strong>{asNumber(summary?.total_energy_kwh)} kWh</strong>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Potenza media</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Potenza media</div>
           <strong>{asNumber(summary?.avg_power_w)} W</strong>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Energy spike</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Energy spike</div>
           <strong>{summary?.energy_spikes ?? 0}</strong>
         </div>
       </div>

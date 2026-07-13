@@ -146,14 +146,14 @@ function SmartDeviceDetail() {
   const energySeries = useMemo(() => mapPoints(pickSeries(telemetry, "energy")), [telemetry]);
 
   if (loading) return <LoadingSkeleton rows={7} height={28} />;
-  if (error) return <p style={{ color: "#b91c1c" }}>{error}</p>;
+  if (error) return <p style={{ color: "var(--color-danger)" }}>{error}</p>;
   if (!device || !health) return <EmptyState title="Dispositivo non trovato" />;
 
   return (
     <div>
       <SectionHeader
-        title={`Dispositivo ∑ ${device.name}`}
-        subtitle={`${device.provider} ∑ ${device.category}`}
+        title={`Dispositivo ¬∑ ${device.name}`}
+        subtitle={`${device.provider} ¬∑ ${device.category}`}
         right={(
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -172,23 +172,23 @@ function SmartDeviceDetail() {
 
       <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Connettivit‡</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Connettivit√†</div>
           <StatusBadge status={health.connectivity_status} />
         </AppCard>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Salute</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Salute</div>
           <StatusBadge status={health.health_status} />
         </AppCard>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Freshness</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Freshness</div>
           <FreshnessBadge status={health.data_freshness_status || telemetry?.data_freshness_status} />
         </AppCard>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Batteria</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Batteria</div>
           <strong>{health.battery_level ?? "n/d"}%</strong>
         </AppCard>
         <AppCard>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Segnale</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Segnale</div>
           <strong>{health.signal_strength ?? "n/d"} dBm</strong>
         </AppCard>
       </div>
@@ -202,7 +202,7 @@ function SmartDeviceDetail() {
                 key={item}
                 type="button"
                 onClick={() => setRange(item)}
-                style={item === range ? { borderColor: "#0f766e", color: "#0f766e" } : undefined}
+                style={item === range ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : undefined}
               >
                 {item}
               </button>
@@ -216,7 +216,7 @@ function SmartDeviceDetail() {
       {!telemetryLoading ? (
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
           <TelemetryLineCard title="Temperatura" unit="C" color="#0ea5e9" points={temperatureSeries} />
-          <TelemetryLineCard title="Umidit‡" unit="%" color="#22c55e" points={humiditySeries} />
+          <TelemetryLineCard title="Umidit√†" unit="%" color="#22c55e" points={humiditySeries} />
           <TelemetryLineCard title="Potenza" unit="W" color="#f59e0b" points={powerSeries} />
           <TelemetryLineCard title="Energia" unit="kWh" color="#8b5cf6" points={energySeries} />
         </div>

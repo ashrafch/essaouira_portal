@@ -28,7 +28,7 @@ function LastUpdatedIndicator({ value, label = "Aggiornato" }) {
 
   const text = formatAgo(dateValue);
   return (
-    <span style={{ fontSize: 12, color: "#64748b" }}>
+    <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
       {label}: {text}
     </span>
   );

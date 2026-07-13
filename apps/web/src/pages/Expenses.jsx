@@ -153,26 +153,26 @@ function Expenses() {
 
   const page = { display: "flex", flexDirection: "column", gap: 16 };
   const header = { display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 };
-  const card = { backgroundColor: "white", borderRadius: 14, padding: 16, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" };
-  const title = { fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 4 };
-  const inputStyle = { padding: "6px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, width: "100%" };
-  const btnPrimary = { padding: "8px 16px", borderRadius: 99, border: "none", backgroundColor: "#0f766e", color: "white", cursor: "pointer", fontWeight: 500 };
-  const btnSecondary = { padding: "6px 10px", borderRadius: 99, border: "1px solid #d1d5db", backgroundColor: "white", color: "#374151", cursor: "pointer", fontSize: 12 };
+  const card = { backgroundColor: "var(--color-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--color-border)", boxShadow: "var(--shadow-sm)" };
+  const title = { fontSize: 14, fontWeight: 600, color: "var(--color-text)", marginBottom: 4 };
+  const inputStyle = { padding: "6px 10px", borderRadius: 8, border: "1px solid var(--color-border-strong)", fontSize: 13, width: "100%" };
+  const btnPrimary = { padding: "8px 16px", borderRadius: 99, border: "none", backgroundColor: "var(--color-primary)", color: "var(--color-on-primary)", cursor: "pointer", fontWeight: 500 };
+  const btnSecondary = { padding: "6px 10px", borderRadius: 99, border: "1px solid var(--color-border-strong)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)", cursor: "pointer", fontSize: 12 };
   const table = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
-  const th = { textAlign: "left", padding: "8px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 12 };
-  const td = { padding: "8px", borderBottom: "1px solid #f3f4f6" };
+  const th = { textAlign: "left", padding: "8px", borderBottom: "1px solid var(--color-border)", color: "var(--color-text-muted)", fontSize: 12 };
+  const td = { padding: "8px", borderBottom: "1px solid var(--color-border)" };
 
   return (
     <div style={page}>
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Spese Generali</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Registra bollette, affitti, tasse e altre spese non legate allo staff.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#6b7280" }}>Periodo:</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Periodo:</span>
           <select style={{ ...inputStyle, width: "auto" }} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>{new Date(2000, i, 1).toLocaleDateString("it-IT", { month: "long" })}</option>
@@ -184,24 +184,24 @@ function Expenses() {
         </div>
       </div>
 
-      {error && <p style={{ color: "#b91c1c", fontSize: 12 }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
         onClose={() => setFeedback({ type: "info", message: "" })}
       />
-      {loading && <p style={{ fontSize: 13, color: "#6b7280" }}>Caricamento spese...</p>}
+      {loading && <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Caricamento spese...</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
         <div style={card}>
-          <div style={{ fontSize: 11, color: "#6b7280" }}>Totale Spese ({new Date(year, month - 1, 1).toLocaleDateString("it-IT", { month: "long" })})</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "#dc2626", marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Totale Spese ({new Date(year, month - 1, 1).toLocaleDateString("it-IT", { month: "long" })})</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-danger)", marginTop: 4 }}>
             EUR {totalExpenses.toFixed(2)}
           </div>
         </div>
         <div style={card}>
-          <div style={{ fontSize: 11, color: "#6b7280" }}>Numero Voci</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Numero Voci</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-text)", marginTop: 4 }}>
             {items.length}
           </div>
         </div>
@@ -216,7 +216,7 @@ function Expenses() {
             </button>
           </div>
           {items.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#6b7280" }}>Nessuna spesa registrata per questo mese.</p>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Nessuna spesa registrata per questo mese.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={table}>
@@ -235,18 +235,18 @@ function Expenses() {
                       <td style={td}>{new Date(item.date).toLocaleDateString("it-IT")}</td>
                       <td style={td}>
                         <div style={{ fontWeight: 500 }}>{item.category}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>{item.description}</div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{item.description}</div>
                       </td>
                       <td style={td}>
-                        {item.unit_id ? <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 99, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{unitMap[item.unit_id]}</span> : <span style={{ fontSize: 11, color: "#9ca3af" }}>Generale</span>}
+                        {item.unit_id ? <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 99, background: "var(--color-info-soft)", color: "var(--color-info-strong)", border: "1px solid var(--color-info)" }}>{unitMap[item.unit_id]}</span> : <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>Generale</span>}
                       </td>
-                      <td style={{ ...td, fontWeight: 600, color: "#dc2626" }}>
+                      <td style={{ ...td, fontWeight: 600, color: "var(--color-danger)" }}>
                         - {Number(item.amount).toFixed(2)} {item.currency}
                       </td>
                       <td style={td}>
                         <div style={{ display: "flex", gap: 4 }}>
                           <button style={btnSecondary} onClick={() => editItem(item)}>Modifica</button>
-                          <button style={{ ...btnSecondary, borderColor: "#fecaca", color: "#dc2626" }} onClick={() => handleDelete(item.id)}>Elimina</button>
+                          <button style={{ ...btnSecondary, borderColor: "var(--color-danger)", color: "var(--color-danger)" }} onClick={() => handleDelete(item.id)}>Elimina</button>
                         </div>
                       </td>
                     </tr>
@@ -269,17 +269,17 @@ function Expenses() {
       >
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div>
-            <label style={{ fontSize: 11, color: "#6b7280" }}>Data</label>
+            <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Data</label>
             <input type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} required />
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "#6b7280" }}>Categoria</label>
+            <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Categoria</label>
             <select style={inputStyle} value={category} onChange={(e) => setCategory(e.target.value)}>
               {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "#6b7280" }}>Descrizione</label>
+            <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Descrizione</label>
             <input
               style={inputStyle}
               placeholder="Es. Bolletta Enel Gennaio"
@@ -289,16 +289,16 @@ function Expenses() {
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "#6b7280" }}>Importo</label>
+              <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Importo</label>
               <input type="number" step="0.01" style={inputStyle} value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
             <div style={{ width: 80 }}>
-              <label style={{ fontSize: 11, color: "#6b7280" }}>Valuta</label>
+              <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Valuta</label>
               <input style={inputStyle} value={currency} onChange={(e) => setCurrency(e.target.value)} />
             </div>
           </div>
           <div>
-            <label style={{ fontSize: 11, color: "#6b7280" }}>Unita (Opzionale)</label>
+            <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Unità (Opzionale)</label>
             <select style={inputStyle} value={unitId} onChange={(e) => setUnitId(e.target.value)}>
               <option value="">-- Generale (Intera Struttura) --</option>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}

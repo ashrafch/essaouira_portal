@@ -1,16 +1,19 @@
+name: essaouira-portal
+
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: essa
-      POSTGRES_USER: essa
-      POSTGRES_PASSWORD: essa
+      POSTGRES_DB: ${POSTGRES_DB:-essa}
+      POSTGRES_USER: ${POSTGRES_USER:-essa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-essa}
     ports:
-      - "5432:5432"
+      # Bound to loopback only: the database is never exposed on the LAN.
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U essa -d essa"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-essa} -d ${POSTGRES_DB:-essa}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -20,14 +23,16 @@ services:
       context: ./apps/server
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+psycopg2://essa:essa@db:5432/essa
-      CORS_ORIGINS: http://localhost:${WEB_PORT:-8081},http://127.0.0.1:${WEB_PORT:-8081},http://localhost:8080,http://127.0.0.1:8080
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-essa}:${POSTGRES_PASSWORD:-essa}@db:5432/${POSTGRES_DB:-essa}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${WEB_PORT:-8081},http://127.0.0.1:${WEB_PORT:-8081},http://localhost:8080,http://127.0.0.1:8080}
       AUTH_ENABLED: "true"
-      AUTH_SECRET_KEY: change-me-strong-secret
-      ADMIN_USERNAME: owner
-      ADMIN_PASSWORD: owner123
-      AUTO_CREATE_SCHEMA: "true"
-      AUTO_SEED_DATA: "true"
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-change-me-strong-secret}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-owner}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-owner123}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-false}
+      AUTO_CREATE_SCHEMA: ${AUTO_CREATE_SCHEMA:-true}
+      AUTO_SEED_DATA: ${AUTO_SEED_DATA:-true}
       SMART_PROVIDER_MODE: ${SMART_PROVIDER_MODE:-mock}
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
       HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}
@@ -38,7 +43,8 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # Loopback only: LAN clients reach the API through the web proxy (/api).
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
@@ -55,7 +61,13 @@ services:
       backend:
         condition: service_healthy
     ports:
+      # Bound on all interfaces: reachable from the LAN at http://<host-ip>:WEB_PORT
       - "${WEB_PORT:-8081}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -65,7 +77,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       - backend
 
@@ -73,12 +85,12 @@ services:
     image: grafana/grafana:11.2.2
     profiles: ["ops"]
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - prometheus
 
@@ -87,11 +99,11 @@ services:
     profiles: ["ops"]
     environment:
       POSTGRES_HOST: db
-      POSTGRES_DB: essa
-      POSTGRES_USER: essa
-      POSTGRES_PASSWORD: essa
-      BACKUP_INTERVAL_HOURS: "24"
-      BACKUP_RETENTION_DAYS: "7"
+      POSTGRES_DB: ${POSTGRES_DB:-essa}
+      POSTGRES_USER: ${POSTGRES_USER:-essa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-essa}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
     volumes:
       - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
       - db_backups:/backups

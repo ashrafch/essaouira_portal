@@ -19,9 +19,9 @@ const USER_ROLES = ["owner", "manager", "operator", "viewer"];
 
 function cardStyle(extra = {}) {
   return {
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--color-border)",
     borderRadius: 12,
-    background: "#fff",
+    background: "var(--color-surface)",
     padding: 14,
     ...extra,
   };
@@ -235,11 +235,11 @@ function AdminControl() {
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Admin & Config</h1>
-      <p style={{ color: "#6b7280" }}>
+      <p style={{ color: "var(--color-text-muted)" }}>
         Owner = superadmin tenant. Qui gestisci configurazioni operative e profili di accesso.
       </p>
       {loading && <p>Caricamento...</p>}
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
@@ -250,7 +250,7 @@ function AdminControl() {
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
           <section style={cardStyle()}>
             <h3 style={{ marginTop: 0 }}>Configurazione rapida</h3>
-            <p style={{ marginTop: -2, color: "#6b7280", fontSize: 13 }}>
+            <p style={{ marginTop: -2, color: "var(--color-text-muted)", fontSize: 13 }}>
               Tutte le modifiche si aprono in modale dedicata.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -262,20 +262,20 @@ function AdminControl() {
 
           <section style={cardStyle({ gridColumn: "1 / -1" })}>
             <h3 style={{ marginTop: 0 }}>Utenti tenant</h3>
-            <p style={{ color: "#6b7280", fontSize: 13 }}>
-              Owner attivi: {ownersCount}. L&apos;ultimo owner attivo non può essere rimosso/disattivato.
+            <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
+              Owner attivi: {ownersCount}. L&apos;ultimo owner attivo non puÃ² essere rimosso/disattivato.
             </p>
             {users.length === 0 ? (
-              <p style={{ color: "#6b7280" }}>Nessun utente.</p>
+              <p style={{ color: "var(--color-text-muted)" }}>Nessun utente.</p>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Username</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Ruolo</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Attivo</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Azioni</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Username</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Ruolo</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Attivo</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Azioni</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -283,17 +283,17 @@ function AdminControl() {
                       const isCurrent = u.username.toLowerCase() === currentUsername;
                       return (
                         <tr key={u.id}>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>
                             {u.username}
                             {isCurrent && (
-                              <span style={{ marginLeft: 6, fontSize: 11, border: "1px solid #d1d5db", borderRadius: 999, padding: "1px 8px", color: "#4b5563" }}>
+                              <span style={{ marginLeft: 6, fontSize: 11, border: "1px solid var(--color-border-strong)", borderRadius: 999, padding: "1px 8px", color: "var(--color-text-muted)" }}>
                                 tu
                               </span>
                             )}
                           </td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{u.role}</td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{u.is_active ? "si" : "no"}</td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{u.role}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{u.is_active ? "si" : "no"}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>
                             <button type="button" onClick={() => openManageUserModal(u)}>Gestisci</button>
                           </td>
                         </tr>
@@ -311,16 +311,16 @@ function AdminControl() {
               <button type="button" onClick={loadData}>Aggiorna dati staff</button>
             </div>
             {staffMembers.length === 0 ? (
-              <p style={{ color: "#6b7280" }}>Nessun membro staff.</p>
+              <p style={{ color: "var(--color-text-muted)" }}>Nessun membro staff.</p>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>ID</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Nome</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Ruolo</th>
-                      <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Attivo</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>ID</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Nome</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Ruolo</th>
+                      <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Attivo</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -331,10 +331,10 @@ function AdminControl() {
                       })
                       .map((m) => (
                         <tr key={m.id}>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.id}</td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.name}</td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.role || "-"}</td>
-                          <td style={{ borderBottom: "1px solid #f3f4f6", padding: 6 }}>{m.is_active ? "si" : "no"}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{m.id}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{m.name}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{m.role || "-"}</td>
+                          <td style={{ borderBottom: "1px solid var(--color-surface-soft)", padding: 6 }}>{m.is_active ? "si" : "no"}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -480,7 +480,7 @@ function AdminControl() {
               <button type="button" onClick={handleUpdateCurrentUser}>Salva profilo</button>
             </div>
 
-            <hr style={{ border: "none", borderTop: "1px solid #e5e7eb" }} />
+            <hr style={{ border: "none", borderTop: "1px solid var(--color-border)" }} />
 
             <div style={{ display: "grid", gap: 6 }}>
               <label>Nuova password</label>

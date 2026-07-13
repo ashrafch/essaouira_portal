@@ -48,9 +48,9 @@ function Units() {
     fontSize: 12,
     padding: "4px 10px",
     borderRadius: 999,
-    background: "#ecfeff",
-    color: "#0f766e",
-    border: "1px solid #a5f3fc",
+    background: "var(--color-info-soft)",
+    color: "var(--color-info-strong)",
+    border: "1px solid var(--color-info)",
   };
 
   const grid = {
@@ -60,11 +60,11 @@ function Units() {
   };
 
   const card = {
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: "14px",
     padding: "14px 16px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
     display: "flex",
     flexDirection: "column",
     gap: 8,
@@ -81,8 +81,8 @@ function Units() {
     fontSize: 11,
     padding: "3px 8px",
     borderRadius: 999,
-    background: "#f3f4f6",
-    color: "#4b5563",
+    background: "var(--color-surface-soft)",
+    color: "var(--color-text-muted)",
   };
 
   const headerRow = {
@@ -96,8 +96,8 @@ function Units() {
     width: 30,
     height: 30,
     borderRadius: "999px",
-    background: "#ecfdf5",
-    color: "#047857",
+    background: "var(--color-success-soft)",
+    color: "var(--color-success-strong)",
     fontSize: 14,
     fontWeight: 600,
     display: "flex",
@@ -105,17 +105,29 @@ function Units() {
     justifyContent: "center",
   });
 
-  const timelineButton = {
-    display: "inline-flex",
+  const actionsRow = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
     marginTop: 8,
+  };
+
+  const actionLink = {
+    display: "inline-flex",
+    alignItems: "center",
     fontSize: 12,
     padding: "6px 10px",
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     textDecoration: "none",
-    color: "#111827",
-    backgroundColor: "#ffffff",
-    alignSelf: "flex-start",
+    color: "var(--color-text)",
+    backgroundColor: "var(--color-surface)",
+  };
+
+  const smartActionLink = {
+    ...actionLink,
+    borderColor: "var(--color-primary)",
+    color: "var(--color-primary)",
   };
 
   return (
@@ -123,12 +135,12 @@ function Units() {
       <div style={layoutHeader}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Appartamenti</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Panoramica delle 6 unità che affacciano sulla piscina della villa.
           </p>
         </div>
 
-        <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>
+        <div style={{ textAlign: "right", fontSize: 12, color: "var(--color-text-muted)" }}>
           <div style={{ marginBottom: 4 }}>
             Totale capacità: <strong>{totalCapacity}</strong> ospiti
           </div>
@@ -141,7 +153,7 @@ function Units() {
       </div>
 
       {error && !fromCache && (
-        <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>
+        <p style={{ color: "var(--color-danger)", fontSize: 13, marginBottom: 12 }}>
           Errore durante il caricamento: {error}
         </p>
       )}
@@ -162,7 +174,7 @@ function Units() {
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "var(--color-text-muted)",
                     }}
                   >
                     ID #{u.id}
@@ -174,7 +186,7 @@ function Units() {
                 <div style={{ fontWeight: 600, fontSize: 15 }}>
                   {u.name || "Unità"}
                 </div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
                   Appartamento vista piscina · ideale per famiglie e gruppi
                 </div>
               </div>
@@ -185,7 +197,7 @@ function Units() {
                 </span>
                 <span style={chip}>{u.capacity} ospiti</span>
                 <span
-                  style={{ ...chip, background: "#ecfdf5", color: "#047857" }}
+                  style={{ ...chip, background: "var(--color-success-soft)", color: "var(--color-success-strong)" }}
                 >
                   Attivo
                 </span>
@@ -195,16 +207,29 @@ function Units() {
                 style={{
                   marginTop: 6,
                   fontSize: 11,
-                  color: "#9ca3af",
+                  color: "var(--color-text-subtle)",
                 }}
               >
                 In futuro qui possiamo mostrare occupazione annua, ricavi,
                 note specifiche dell&apos;unità, ecc.
               </div>
 
-              <Link to={`/units/${u.id}/timeline`} style={timelineButton}>
-                Vedi timeline
-              </Link>
+              <div style={actionsRow}>
+                <Link
+                  to={`/units/${u.id}/timeline`}
+                  style={actionLink}
+                  aria-label={`Timeline PMS di ${u.name || `unità ${u.id}`}`}
+                >
+                  Vedi timeline
+                </Link>
+                <Link
+                  to={`/smart-units/${u.id}`}
+                  style={smartActionLink}
+                  aria-label={`Stato smart e dispositivi di ${u.name || `unità ${u.id}`}`}
+                >
+                  Stato smart
+                </Link>
+              </div>
             </div>
           ))}
         </div>

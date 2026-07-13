@@ -24,6 +24,13 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // ui/index.js re-exports the useToast hook alongside PascalCase
+      // components in the same barrel file; allowlist it so
+      // react-refresh/only-export-components doesn't flag the barrel.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true, allowExportNames: ['useToast'] },
+      ],
     },
   },
 ])

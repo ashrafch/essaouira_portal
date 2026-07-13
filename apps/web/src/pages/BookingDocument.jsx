@@ -1,12 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getBookings, getUnits } from "../services/api";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 // --- STILI SCHERMO ---
 const screenContainerStyle = {
-  backgroundColor: "#525252",
+  backgroundColor: "var(--color-bg)",
   minHeight: "100vh",
   padding: "40px 20px",
   display: "flex",
@@ -21,10 +19,10 @@ const controlsStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  backgroundColor: "white",
+  backgroundColor: "var(--color-surface)",
   padding: "10px 20px",
   borderRadius: "8px",
-  boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+  boxShadow: "var(--shadow-md)",
 };
 
 // --- STILI FOGLIO A4 ---
@@ -36,7 +34,7 @@ const a4PageStyle = {
   color: "#111827",
   fontFamily: "'Times New Roman', serif",
   fontSize: "12pt",
-  boxShadow: "0 0 20px rgba(0,0,0,0.5)", // Ombra solo a schermo
+  boxShadow: "var(--shadow-lg)", // Ombra solo a schermo
   position: "relative",
   boxSizing: "border-box",
   margin: "0 auto",
@@ -46,12 +44,12 @@ const a4PageStyle = {
 const btn = {
   padding: "8px 16px",
   borderRadius: "6px",
-  border: "1px solid #d1d5db",
-  backgroundColor: "white",
+  border: "1px solid var(--color-border-strong)",
+  backgroundColor: "var(--color-surface)",
   cursor: "pointer",
   fontWeight: 600,
   fontSize: "14px",
-  color: "#374151",
+  color: "var(--color-text-muted)",
   display: "flex",
   alignItems: "center",
   gap: "6px",
@@ -59,8 +57,8 @@ const btn = {
 
 const btnPrimary = {
   ...btn,
-  backgroundColor: "#0f766e",
-  color: "white",
+  backgroundColor: "var(--color-primary)",
+  color: "var(--color-on-primary)",
   border: "none",
 };
 
@@ -151,13 +149,18 @@ function BookingDocument() {
     const element = documentRef.current;
     if (!element) return;
     try {
+      // Librerie pesanti caricate solo al momento del download.
+      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff"
       });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new JsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
@@ -170,8 +173,8 @@ function BookingDocument() {
     }
   };
 
-  if (loading) return <div style={{ padding: 20, color: "white" }}>Caricamento documento...</div>;
-  if (!booking) return <div style={{ padding: 20, color: "white" }}>Prenotazione non trovata.</div>;
+  if (loading) return <div style={{ padding: 20, color: "var(--color-text)" }}>Caricamento documento...</div>;
+  if (!booking) return <div style={{ padding: 20, color: "var(--color-text)" }}>Prenotazione non trovata.</div>;
 
   const totalAmount = Number(booking.total_price || 0);
   const cleaning = Number(booking.cleaning_fee || 0);
@@ -190,9 +193,9 @@ function BookingDocument() {
           </button>
           
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: "14px", color: "#6b7280" }}>Documento:</span>
-            <select 
-              style={{ padding: "8px", borderRadius: "6px", border: "1px solid #d1d5db", cursor: "pointer" }} 
+            <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Documento:</span>
+            <select
+              style={{ padding: "8px", borderRadius: "6px", border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
               value={docType} 
               onChange={(e) => setDocType(e.target.value)}
             >
@@ -221,7 +224,7 @@ function BookingDocument() {
             <h1 style={{ margin: 0, fontSize: "24pt", textTransform: "uppercase", letterSpacing: "2px", fontWeight: "bold" }}>
               Villa Essaouira
             </h1>
-            <p style={{ margin: "3mm 0 0 0", fontSize: "10pt", color: "#4b5563", fontFamily: "sans-serif" }}>
+            <p style={{ margin: "3mm 0 0 0", fontSize: "10pt", color: "var(--color-text-on-light)", fontFamily: "sans-serif" }}>
               Gestione Appartamenti Turistici<br />
               Essaouira, Marocco · Tel: +212 600 000 000
             </p>
@@ -236,37 +239,37 @@ function BookingDocument() {
               
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10mm 15mm", marginBottom: "15mm", fontSize: "12pt" }}>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Ospite Principale</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Ospite Principale</div>
                   <div style={{ fontSize: "13pt", fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {booking.guest_name}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Appartamento</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Appartamento</div>
                   <div style={{ fontSize: "13pt", fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {unit ? unit.name : `Unit #${booking.unit_id}`}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Data Arrivo</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Data Arrivo</div>
                   <div style={{ fontSize: "12pt", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {formatDate(booking.checkin_date)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Data Partenza</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Data Partenza</div>
                   <div style={{ fontSize: "12pt", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {formatDate(booking.checkout_date)}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Pax Totali</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Pax Totali</div>
                   <div style={{ fontSize: "12pt", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {(booking.num_adults || 1) + (booking.num_children || 0)} <span style={{fontSize: "10pt"}}>({booking.num_adults} ad, {booking.num_children} ch)</span>
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", marginBottom: "2px" }}>Telefono</div>
+                  <div style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", marginBottom: "2px" }}>Telefono</div>
                   <div style={{ fontSize: "12pt", borderBottom: "1px solid #000", paddingBottom: "2px" }}>
                     {booking.guest_phone || "_________________"}
                   </div>
@@ -283,7 +286,7 @@ function BookingDocument() {
                 <div style={{ borderBottom: "1px dashed #999", height: "8mm", marginBottom: "2mm" }}></div>
               </div>
 
-              <p style={{ fontSize: "10pt", textAlign: "justify", lineHeight: "1.4", marginBottom: "20mm", color: "#374151" }}>
+              <p style={{ fontSize: "10pt", textAlign: "justify", lineHeight: "1.4", marginBottom: "20mm", color: "var(--color-text-on-light)" }}>
                 Il sottoscritto autorizza il trattamento dei propri dati personali per le finalità legate al soggiorno e agli obblighi di legge di Pubblica Sicurezza.
               </p>
 
@@ -312,7 +315,7 @@ function BookingDocument() {
               </div>
 
               <div style={{ marginBottom: "10mm", padding: "5mm", border: "1px solid #e5e7eb", borderRadius: "4px" }}>
-                <strong style={{ fontSize: "9pt", textTransform: "uppercase", color: "#6b7280", display: "block", marginBottom: "2mm" }}>Intestato a:</strong>
+                <strong style={{ fontSize: "9pt", textTransform: "uppercase", color: "var(--color-text-on-light)", display: "block", marginBottom: "2mm" }}>Intestato a:</strong>
                 <div style={{ fontSize: "14pt", fontWeight: "bold" }}>{booking.guest_name}</div>
                 <div style={{ fontSize: "11pt" }}>{booking.guest_email || ""}</div>
               </div>
@@ -328,7 +331,7 @@ function BookingDocument() {
                   <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
                     <td style={{ padding: "4mm 0" }}>
                       <strong>Soggiorno presso {unit ? unit.name : "Appartamento"}</strong><br />
-                      <span style={{ fontSize: "10pt", color: "#6b7280" }}>
+                      <span style={{ fontSize: "10pt", color: "var(--color-text-on-light)" }}>
                         Dal {formatDate(booking.checkin_date)} al {formatDate(booking.checkout_date)}
                         <br />
                         ({(Number(booking.total_price || 0) - Number(booking.cleaning_fee || 0) - Number(booking.city_tax || 0)).toFixed(2)} € tariffa base)

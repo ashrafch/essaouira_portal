@@ -337,8 +337,8 @@ function Calendar() {
 
   const navButton = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
-    backgroundColor: "white",
+    border: "1px solid var(--color-border-strong)",
+    backgroundColor: "var(--color-surface)",
     padding: "4px 8px",
     fontSize: 13,
     cursor: "pointer",
@@ -348,26 +348,26 @@ function Calendar() {
     fontSize: 12,
     padding: "4px 10px",
     borderRadius: 999,
-    background: "#eff6ff",
-    border: "1px solid #bfdbfe",
-    color: "#1d4ed8",
+    background: "var(--color-info-soft)",
+    border: "1px solid var(--color-info)",
+    color: "var(--color-info-strong)",
   };
 
   const badgeOffline = {
     fontSize: 12,
     padding: "4px 10px",
     borderRadius: 999,
-    background: "#fffbeb",
-    border: "1px solid #fbbf24",
-    color: "#92400e",
+    background: "var(--color-warning-soft)",
+    border: "1px solid var(--color-warning)",
+    color: "var(--color-warning-strong)",
   };
 
   const card = {
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: "14px",
     padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const legend = {
@@ -375,7 +375,7 @@ function Calendar() {
     flexWrap: "wrap",
     gap: 10,
     fontSize: 12,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     marginBottom: 10,
   };
 
@@ -408,21 +408,21 @@ function Calendar() {
   const weekdayHeaderCell = {
     fontSize: 11,
     textTransform: "uppercase",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     textAlign: "center",
     paddingBottom: 4,
   };
 
   const dayCell = (isCurrentMonth, isToday) => ({
     borderRadius: 10,
-    border: "1px solid #e5e7eb",
-    backgroundColor: isCurrentMonth ? "#f9fafb" : "#fdfdfd",
+    border: "1px solid var(--color-border)",
+    backgroundColor: isCurrentMonth ? "var(--color-surface-soft)" : "var(--color-surface)",
     position: "relative",
     minHeight: 90,
     padding: "4px 4px 4px 4px",
     fontSize: 11,
     cursor: draggingBooking && !fromCache ? "copy" : "default",
-    boxShadow: isToday ? "0 0 0 2px #0f766e inset" : "none",
+    boxShadow: isToday ? "0 0 0 2px var(--color-primary) inset" : "none",
     overflow: "hidden",
   });
 
@@ -432,7 +432,7 @@ function Calendar() {
     right: 6,
     fontSize: 11,
     fontWeight: 600,
-    color: isCurrentMonth ? "#111827" : "#9ca3af",
+    color: isCurrentMonth ? "var(--color-text)" : "var(--color-text-subtle)",
   });
 
   // 🔧 bottone + centrato
@@ -443,14 +443,14 @@ function Calendar() {
     width: 18,
     height: 18,
     borderRadius: "999px",
-    border: "1px solid #d1d5db",
-    backgroundColor: "white",
+    border: "1px solid var(--color-border-strong)",
+    backgroundColor: "var(--color-surface)",
     fontSize: 12,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    color: "#4b5563",
+    color: "var(--color-text-muted)",
     padding: 0,
     lineHeight: 1,
   };
@@ -464,18 +464,18 @@ function Calendar() {
 
   // 🎨 colori più accesi per le pill
   const bookingPill = (source, isDragging) => {
-    let bg = "#bbf7d0";
-    let border = "#10b981";
-    let color = "#065f46";
+    let bg = "var(--color-success-soft)";
+    let border = "var(--color-success)";
+    let color = "var(--color-success-strong)";
 
     if (source === "airbnb") {
-      bg = "#fed7aa";
-      border = "#f97316";
-      color = "#9a3412";
+      bg = "var(--color-warning-soft)";
+      border = "var(--color-warning)";
+      color = "var(--color-warning-strong)";
     } else if (source === "booking") {
-      bg = "#bfdbfe";
-      border = "#2563eb";
-      color = "#1d4ed8";
+      bg = "var(--color-info-soft)";
+      border = "var(--color-info)";
+      color = "var(--color-info-strong)";
     }
 
     return {
@@ -516,8 +516,8 @@ function Calendar() {
     width: 26,
     minWidth: 26,
     height: 32,
-    borderRight: "1px solid #e5e7eb",
-    backgroundColor: isToday ? "#ecfeff" : "white",
+    borderRight: "1px solid var(--color-border)",
+    backgroundColor: isToday ? "var(--color-info-soft)" : "var(--color-surface)",
     position: "relative",
   });
 
@@ -526,14 +526,14 @@ function Calendar() {
     top: 2,
     left: 4,
     fontSize: 10,
-    color: "#9ca3af",
+    color: "var(--color-text-subtle)",
   };
 
   // 🎨 timeline bar con colori coerenti e più evidenti
   const timelineBar = (source) => {
-    let bg = "#4ade80"; // direct
-    if (source === "airbnb") bg = "#fb923c";
-    if (source === "booking") bg = "#60a5fa";
+    let bg = "var(--color-success)"; // direct
+    if (source === "airbnb") bg = "var(--color-warning)";
+    if (source === "booking") bg = "var(--color-info)";
     return {
       position: "absolute",
       bottom: 4,
@@ -550,13 +550,13 @@ function Calendar() {
       <div style={pageHeader}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Calendario occupazione</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Vista mensile con card prenotazioni per giorno.
             Trascina una prenotazione su un altro giorno per spostarla.
           </p>
         </div>
 
-        <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>
+        <div style={{ textAlign: "right", fontSize: 12, color: "var(--color-text-muted)" }}>
           <div style={{ marginBottom: 4 }}>
             <div style={navControls}>
               <button style={navButton} type="button" onClick={prevMonth}>
@@ -585,22 +585,22 @@ function Calendar() {
         {loading ? (
           <p>Caricamento calendario...</p>
         ) : units.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Nessun appartamento configurato.
           </p>
         ) : (
           <>
             <div style={legend}>
               <span style={legendItem}>
-                <span style={legendDot("#bbf7d0", "#10b981")} />
+                <span style={legendDot("var(--color-success-soft)", "var(--color-success)")} />
                 Diretta
               </span>
               <span style={legendItem}>
-                <span style={legendDot("#fed7aa", "#f97316")} />
+                <span style={legendDot("var(--color-warning-soft)", "var(--color-warning)")} />
                 Airbnb
               </span>
               <span style={legendItem}>
-                <span style={legendDot("#bfdbfe", "#2563eb")} />
+                <span style={legendDot("var(--color-info-soft)", "var(--color-info)")} />
                 Booking.com
               </span>
             </div>
@@ -708,7 +708,7 @@ function Calendar() {
                             <div
                               style={{
                                 fontSize: 10,
-                                color: "#6b7280",
+                                color: "var(--color-text-muted)",
                               }}
                             >
                               +{extraCount} altre
@@ -723,7 +723,7 @@ function Calendar() {
             </div>
 
             {error && !fromCache && (
-              <p style={{ color: "red", fontSize: 12, marginTop: 8 }}>
+              <p style={{ color: "var(--color-danger)", fontSize: 12, marginTop: 8 }}>
                 Errore caricamento: {error}
               </p>
             )}
@@ -746,7 +746,7 @@ function Calendar() {
             <h2 style={{ fontSize: 15, marginBottom: 2 }}>
               Timeline per appartamento
             </h2>
-            <p style={{ fontSize: 12, color: "#6b7280" }}>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
               Occupazione sul mese corrente per una singola unità.
             </p>
           </div>
@@ -769,7 +769,7 @@ function Calendar() {
         </div>
 
         {(!selectedUnitId || units.length === 0) && (
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Nessuna unità selezionata.
           </p>
         )}
@@ -777,7 +777,7 @@ function Calendar() {
         {selectedUnitId && (
           <>
             <div style={timelineWrapper}>
-              <div style={{ fontSize: 12, marginBottom: 4, color: "#6b7280" }}>
+              <div style={{ fontSize: 12, marginBottom: 4, color: "var(--color-text-muted)" }}>
                 {MONTH_LABELS[month]} {year}
               </div>
               <div style={timelineRow}>
@@ -821,7 +821,7 @@ function Calendar() {
                 style={{
                   marginTop: 10,
                   fontSize: 12,
-                  color: "#4b5563",
+                  color: "var(--color-text-muted)",
                   display: "flex",
                   justifyContent: "space-between",
                   flexWrap: "wrap",

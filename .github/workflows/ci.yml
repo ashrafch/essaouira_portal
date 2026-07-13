@@ -42,4 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose config
+      - name: Validate production overlay
+        run: |
+          POSTGRES_PASSWORD=ci AUTH_SECRET_KEY=ci-validation-secret ADMIN_PASSWORD=ci-validation \
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml config
       - run: docker compose build --no-cache

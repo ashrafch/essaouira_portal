@@ -92,7 +92,7 @@ function StaffDirectory() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!name.trim()) {
-      setFeedback({ type: "error", message: "Il nome e' obbligatorio." });
+      setFeedback({ type: "error", message: "Il nome è obbligatorio." });
       return;
     }
     setSaving(true);
@@ -165,16 +165,16 @@ function StaffDirectory() {
   const inactiveCount = members.length - activeCount;
 
   const card = {
-    background: "white",
+    background: "var(--color-surface)",
     borderRadius: 14,
     padding: 14,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const input = {
     borderRadius: 8,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "6px 8px",
     fontSize: 13,
   };
@@ -184,17 +184,17 @@ function StaffDirectory() {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0 }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 0 }}>
             Gestisci membri staff e stato attivo/disattivo. I disattivi non compaiono nei planner operativi.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#166534", background: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: 999, padding: "6px 10px" }}>Attivi: {activeCount}</span>
-          <span style={{ fontSize: 12, color: "#6b7280", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 999, padding: "6px 10px" }}>Disattivi: {inactiveCount}</span>
+          <span style={{ fontSize: 12, color: "var(--color-success-strong)", background: "var(--color-success-soft)", border: "1px solid var(--color-success)", borderRadius: 999, padding: "6px 10px" }}>Attivi: {activeCount}</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)", background: "var(--color-surface-soft)", border: "1px solid var(--color-border)", borderRadius: 999, padding: "6px 10px" }}>Disattivi: {inactiveCount}</span>
         </div>
       </div>
 
-      {error && <p style={{ color: "#b91c1c", fontSize: 12 }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
@@ -209,15 +209,15 @@ function StaffDirectory() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                style={{ borderRadius: 999, border: "none", padding: "8px 12px", background: "#0f766e", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                style={{ borderRadius: 999, border: "none", padding: "8px 12px", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
               >
                 + Nuovo membro
               </button>
-              <label style={{ fontSize: 12, color: "#4b5563", display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "inline-flex", gap: 6, alignItems: "center" }}>
                 <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
                 Mostra disattivi
               </label>
-              <button type="button" onClick={() => loadMembers()} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "6px 10px", background: "#fff", fontSize: 12 }}>
+              <button type="button" onClick={() => loadMembers()} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "6px 10px", background: "var(--color-surface)", fontSize: 12 }}>
                 Aggiorna
               </button>
             </div>
@@ -226,41 +226,41 @@ function StaffDirectory() {
           {loading ? (
             <p style={{ fontSize: 13 }}>Caricamento staff...</p>
           ) : members.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#6b7280" }}>Nessun membro staff registrato.</p>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Nessun membro staff registrato.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Nome</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Ruolo</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Costo/h</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Stato</th>
-                    <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: 6 }}>Azioni</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Nome</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Ruolo</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Costo/h</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Stato</th>
+                    <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Azioni</th>
                   </tr>
                 </thead>
                 <tbody>
                   {members.map((m) => (
                     <tr key={m.id}>
-                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>
                         <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                           {m.color_hex ? <span style={{ width: 10, height: 10, borderRadius: 999, background: m.color_hex }} /> : null}
                           {m.name}
                         </div>
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>{roleLabel(m.role)}</td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>{m.hourly_cost != null ? `EUR ${Number(m.hourly_cost).toFixed(2)}` : "-"}</td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6" }}>
-                        <span style={{ borderRadius: 999, padding: "2px 8px", fontSize: 11, background: m.is_active ? "#dcfce7" : "#f3f4f6", color: m.is_active ? "#166534" : "#6b7280" }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>{roleLabel(m.role)}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>{m.hourly_cost != null ? `EUR ${Number(m.hourly_cost).toFixed(2)}` : "-"}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>
+                        <span style={{ borderRadius: 999, padding: "2px 8px", fontSize: 11, background: m.is_active ? "var(--color-success-soft)" : "var(--color-surface-soft)", color: m.is_active ? "var(--color-success-strong)" : "var(--color-text-muted)" }}>
                           {m.is_active ? "Attivo" : "Disattivo"}
                         </span>
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid #f3f4f6", whiteSpace: "nowrap" }}>
-                        <button type="button" onClick={() => startEdit(m)} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 8px", background: "#fff", fontSize: 12 }}>Modifica</button>{" "}
-                        <button type="button" onClick={() => handleToggleActive(m)} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "4px 8px", background: "#fff", fontSize: 12 }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)", whiteSpace: "nowrap" }}>
+                        <button type="button" onClick={() => startEdit(m)} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>Modifica</button>{" "}
+                        <button type="button" onClick={() => handleToggleActive(m)} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>
                           {m.is_active ? "Disattiva" : "Riattiva"}
                         </button>{" "}
-                        <button type="button" onClick={() => handleDelete(m.id)} style={{ borderRadius: 999, border: "1px solid #fecaca", color: "#b91c1c", padding: "4px 8px", background: "#fff", fontSize: 12 }}>
+                        <button type="button" onClick={() => handleDelete(m.id)} style={{ borderRadius: 999, border: "1px solid var(--color-danger)", color: "var(--color-danger)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>
                           Elimina
                         </button>
                       </td>
@@ -305,7 +305,7 @@ function StaffDirectory() {
                   key={c}
                   type="button"
                   onClick={() => setColorHex(c)}
-                  style={{ width: 20, height: 20, borderRadius: 999, border: colorHex === c ? "2px solid #0f766e" : "1px solid rgba(0,0,0,0.2)", background: c, cursor: "pointer" }}
+                  style={{ width: 20, height: 20, borderRadius: 999, border: colorHex === c ? "2px solid var(--color-primary)" : "1px solid var(--color-border-strong)", background: c, cursor: "pointer" }}
                 />
               ))}
               <input style={{ ...input, maxWidth: 110 }} value={colorHex} onChange={(e) => setColorHex(e.target.value)} placeholder="#0f766e" />
@@ -318,10 +318,10 @@ function StaffDirectory() {
           </div>
 
           <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <button type="submit" disabled={saving} style={{ border: "none", borderRadius: 999, padding: "8px 12px", background: "#0f766e", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+            <button type="submit" disabled={saving} style={{ border: "none", borderRadius: 999, padding: "8px 12px", background: "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 600, cursor: "pointer" }}>
               {saving ? "Salvataggio..." : editingId ? "Salva modifiche" : "Aggiungi membro"}
             </button>
-            <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} style={{ borderRadius: 999, border: "1px solid #d1d5db", padding: "8px 12px", background: "#fff" }}>
+            <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "8px 12px", background: "var(--color-surface)" }}>
               Annulla
             </button>
           </div>

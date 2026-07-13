@@ -1,128 +1,53 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import {
+  Activity,
+  Building2,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  ClipboardList,
+  Cpu,
+  Eye,
+  Gauge,
+  Home,
+  IdCard,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Receipt,
+  Router,
+  Settings,
+  ShieldCheck,
+  Siren,
+  Tags,
+  TrendingUp,
+  Users,
+  Wand2,
+  Wrench,
+  ArrowRightLeft,
+  Workflow,
+} from "lucide-react";
 import { canAccessRoute, getRole } from "../config/rbac";
-import { getBookings, getStaffTasks, getMaintenanceTickets } from "../services/api";
+import { getDashboardSummary } from "../services/api";
+import "./chrome.css";
 
-const wrapper = {
-  padding: "20px 16px",
-  display: "flex",
-  flexDirection: "column",
-  height: "100%",
-  backgroundColor: "#f9fafb",
-};
-
-const brand = {
-  fontSize: "20px",
-  fontWeight: 700,
-  marginBottom: "16px",
-  color: "#111827",
-};
-
-const brandSub = {
-  fontSize: "11px",
-  color: "#6b7280",
-  marginBottom: "16px",
-};
-
-const navContainer = {
-  flex: 1,
-  overflowY: "auto",
-  paddingRight: "4px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
-};
-
-const linkBase = {
-  padding: "8px 12px",
-  borderRadius: "8px",
-  textDecoration: "none",
-  fontSize: "14px",
-  fontWeight: 500,
-  color: "#374151",
-  border: "1px solid transparent",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 6,
-};
-
-const sectionContainer = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-};
-
-const sectionHeaderButtonBase = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  width: "100%",
-  padding: "6px 10px",
-  borderRadius: "8px",
-  border: "none",
-  background: "transparent",
-  cursor: "pointer",
-};
-
-const sectionHeaderLeft = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-};
-
-const sectionTitle = {
-  fontSize: "11px",
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-};
-
-const caret = {
-  fontSize: "11px",
-};
-
-const subLinksWrapper = {
-  marginTop: "4px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "2px",
-};
-
-const footer = {
-  marginTop: "16px",
-  fontSize: "11px",
-  color: "#9ca3af",
-  borderTop: "1px solid #e5e7eb",
-  paddingTop: "10px",
-};
-
-const badgePill = {
-  fontSize: 11,
-  padding: "2px 6px",
-  borderRadius: 999,
-  backgroundColor: "#e5e7eb",
-  color: "#111827",
-  minWidth: 26,
-  textAlign: "center",
-};
-
-function makeLinkStyle({ level }) {
-  const paddingLeft = level === "top" ? "12px" : "26px";
-  const fontSize = level === "top" ? "14px" : "13px";
-
-  return ({ isActive }) => ({
-    ...linkBase,
-    paddingLeft,
-    fontSize,
-    backgroundColor: isActive ? "#0f766e" : "transparent",
-    color: isActive ? "#ffffff" : "#374151",
-    borderColor: isActive ? "#0f766e" : "transparent",
-    boxShadow: isActive
-      ? "0 1px 2px rgba(15,23,42,0.15)"
-      : "none",
-  });
+function makeLinkClass(level) {
+  return ({ isActive }) =>
+    [
+      "sidebar__link",
+      level === "sub" ? "sidebar__link--sub" : "",
+      isActive ? "is-active" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 }
+
+const topLinkClass = makeLinkClass("top");
+const subLinkClass = makeLinkClass("sub");
 
 function Sidebar({ className = "", onNavigate = null }) {
   const location = useLocation();
@@ -143,96 +68,105 @@ function Sidebar({ className = "", onNavigate = null }) {
     openTickets: 0,
   });
 
-  const topLinkStyle = makeLinkStyle({ level: "top" });
-  const subLinkStyle = makeLinkStyle({ level: "sub" });
-
   const sections = [
     {
       id: "bookings",
       title: "Prenotazioni",
+      icon: CalendarRange,
       items: [
-        { to: "/calendar", label: "Calendario", badge: "staysToday", routeKey: "calendar" },
-        { to: "/bookings", label: "Lista prenotazioni", badge: null, routeKey: "bookings" },
+        { to: "/calendar", label: "Calendario", badge: "staysToday", routeKey: "calendar", icon: CalendarDays },
+        { to: "/bookings", label: "Lista prenotazioni", badge: null, routeKey: "bookings", icon: ClipboardList },
         {
           to: "/operations",
           label: "Arrivi & Partenze",
           badge: "arrivalsDepartures",
           routeKey: "operations",
+          icon: ArrowRightLeft,
         },
       ],
     },
     {
       id: "property",
-      title: "Proprieta",
+      title: "Proprietà",
+      icon: Building2,
       items: [
-        { to: "/units", label: "Appartamenti", badge: null, routeKey: "units" },
-        { to: "/properties", label: "Properties", badge: null, routeKey: "properties" },
-        { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null, routeKey: "pricing" },
-        { to: "/expenses", label: "Spese Generali", badge: null, routeKey: "expenses" },
+        { to: "/units", label: "Appartamenti", badge: null, routeKey: "units", icon: Home },
+        { to: "/properties", label: "Properties", badge: null, routeKey: "properties", icon: Building2 },
+        { to: "/tariffe-canali", label: "Tariffe & Canali", badge: null, routeKey: "pricing", icon: Tags },
+        { to: "/expenses", label: "Spese Generali", badge: null, routeKey: "expenses", icon: Receipt },
         {
           to: "/business",
           label: "Business (Ricavi & Costi)",
           badge: null,
           routeKey: "business",
+          icon: TrendingUp,
         },
       ],
     },
     {
       id: "staff",
       title: "Operations & Staff",
+      icon: Users,
       items: [
         {
           to: "/staff-planner",
           label: "Planner staff",
           badge: "staffTasksToday",
           routeKey: "staffPlanner",
+          icon: CalendarClock,
         },
         {
           to: "/staff",
           label: "Task staff & pulizie",
           badge: "staffTasksToday",
           routeKey: "staff",
+          icon: ClipboardCheck,
         },
         {
           to: "/staff-anagrafica",
           label: "Anagrafica staff",
           badge: null,
           routeKey: "staffDirectory",
+          icon: IdCard,
         },
       ],
     },
     {
       id: "facility",
       title: "Facility",
+      icon: Wrench,
       items: [
         {
           to: "/maintenance",
           label: "Manutenzioni",
           badge: "openTickets",
           routeKey: "maintenance",
+          icon: Wrench,
         },
       ],
     },
     {
       id: "smart",
       title: "Smart Building",
+      icon: Cpu,
       items: [
-        { to: "/smart-dashboard", label: "Smart dashboard", badge: null, routeKey: "smartDashboard" },
-        { to: "/smart-operations", label: "Smart operations", badge: null, routeKey: "smartOperations" },
-        { to: "/smart-overview", label: "Smart overview", badge: null, routeKey: "smartOverview" },
-        { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices" },
-        { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts" },
-        { to: "/smart-automation", label: "Automazioni smart", badge: null, routeKey: "smartAutomation" },
-        { to: "/smart-assistant/checkin", label: "Assistant check-in", badge: null, routeKey: "smartCheckinAssistant" },
-        { to: "/smart-assistant/checkout", label: "Assistant checkout", badge: null, routeKey: "smartCheckoutAssistant" },
+        { to: "/smart-dashboard", label: "Smart dashboard", badge: null, routeKey: "smartDashboard", icon: Gauge },
+        { to: "/smart-operations", label: "Smart operations", badge: null, routeKey: "smartOperations", icon: Activity },
+        { to: "/smart-overview", label: "Smart overview", badge: null, routeKey: "smartOverview", icon: Eye },
+        { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices", icon: Router },
+        { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts", icon: Siren },
+        { to: "/smart-automation", label: "Automazioni smart", badge: null, routeKey: "smartAutomation", icon: Workflow },
+        { to: "/smart-assistant/checkin", label: "Assistant check-in", badge: null, routeKey: "smartCheckinAssistant", icon: LogIn },
+        { to: "/smart-assistant/checkout", label: "Assistant checkout", badge: null, routeKey: "smartCheckoutAssistant", icon: LogOut },
       ],
     },
     {
       id: "admin",
       title: "Admin",
+      icon: Settings,
       items: [
-        { to: "/setup", label: "Setup Wizard", badge: null, routeKey: "setupWizard" },
-        { to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl" },
+        { to: "/setup", label: "Setup Wizard", badge: null, routeKey: "setupWizard", icon: Wand2 },
+        { to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl", icon: ShieldCheck },
       ],
     },
   ];
@@ -243,59 +177,30 @@ function Sidebar({ className = "", onNavigate = null }) {
     }))
     .filter((section) => section.items.length > 0);
 
-  // carico badge ogni volta che cambio pagina
+  // Badge counts: one lightweight call to the server-side summary, instead of
+  // fetching all bookings + tasks + tickets and counting client-side on every
+  // navigation. Refreshes when the route changes.
   useEffect(() => {
+    let cancelled = false;
     async function loadStats() {
       try {
-        const todayStr = new Date().toISOString().slice(0, 10);
-
-        let maintenanceCount = 0;
-        try {
-            // Recupera i ticket per il badge
-            const tickets = await getMaintenanceTickets();
-            // Conta solo quelli aperti (todo o in_progress)
-            if (Array.isArray(tickets)) {
-              maintenanceCount = tickets.filter(t => t.status !== 'done').length;
-            }
-        } catch {
-            // Ignora errori se la tabella non esiste ancora
-            console.log("Tabella maintenance forse non pronta");
-        }
-
-        const [bookings, tasksToday] = await Promise.all([
-          getBookings(),
-          getStaffTasks({ date: todayStr }),
-        ]);
-
-        let arrivals = 0;
-        let departures = 0;
-        let stays = 0;
-
-        for (const b of bookings || []) {
-          const checkin = b.checkin_date;
-          const checkout = b.checkout_date;
-
-          if (checkin === todayStr) arrivals += 1;
-          if (checkout === todayStr) departures += 1;
-
-          if (checkin <= todayStr && checkout > todayStr) {
-            stays += 1;
-          }
-        }
-
+        const summary = await getDashboardSummary();
+        if (cancelled || !summary) return;
         setTodayStats({
-          arrivals,
-          departures,
-          stays,
-          staffTasks: (tasksToday || []).length,
-          openTickets: maintenanceCount,
+          arrivals: summary.arrivals_today || 0,
+          departures: summary.departures_today || 0,
+          stays: summary.in_house || 0,
+          staffTasks: summary.staff_tasks_today || 0,
+          openTickets: summary.maintenance_open || 0,
         });
       } catch (err) {
         console.error("Errore caricando badge sidebar:", err);
       }
     }
-
     loadStats();
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname]);
 
   // apre le sezioni che contengono la route corrente
@@ -327,7 +232,7 @@ function Sidebar({ className = "", onNavigate = null }) {
       const { arrivals, departures } = todayStats;
       if (!arrivals && !departures) return null;
       return (
-        <span style={badgePill}>
+        <span className="sidebar__badge">
           {arrivals}/{departures}
         </span>
       );
@@ -336,123 +241,121 @@ function Sidebar({ className = "", onNavigate = null }) {
     if (type === "staysToday") {
       const { stays } = todayStats;
       if (!stays) return null;
-      return <span style={badgePill}>{stays}</span>;
+      return <span className="sidebar__badge">{stays}</span>;
     }
 
     if (type === "staffTasksToday") {
       const { staffTasks } = todayStats;
       if (!staffTasks) return null;
-      return <span style={badgePill}>{staffTasks}</span>;
+      return <span className="sidebar__badge">{staffTasks}</span>;
     }
 
     if (type === "openTickets") {
-        const { openTickets } = todayStats;
-        if (!openTickets) return null;
-        // Rosso per i problemi aperti
-        return <span style={{...badgePill, backgroundColor: "#fee2e2", color: "#b91c1c"}}>{openTickets}</span>;
+      const { openTickets } = todayStats;
+      if (!openTickets) return null;
+      // Rosso per i problemi aperti
+      return <span className="sidebar__badge sidebar__badge--danger">{openTickets}</span>;
     }
 
     return null;
   }
 
   return (
-    <div
-      className={className}
-      style={{
-        ...wrapper,
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%)",
-      }}
-    >
-      <div>
-        <div style={brand}>Portale Essaouira</div>
-        <div style={brandSub}>Gestione villa & appartamenti</div>
+    <div className={`sidebar ${className}`.trim()}>
+      <div className="sidebar__brand-block">
+        <div className="sidebar__brand-row">
+          <span className="sidebar__brand-mark" aria-hidden="true">
+            E
+            <span className="sidebar__brand-mark-dot" />
+          </span>
+          <div className="sidebar__brand-text">
+            <div className="sidebar__brand">Portale Essaouira</div>
+            <div className="sidebar__brand-sub">Gestione villa & appartamenti</div>
+          </div>
+        </div>
       </div>
 
-      <div style={navContainer}>
+      <nav className="sidebar__nav" aria-label="Navigazione principale">
         {/* DASHBOARD SINGOLA */}
         <NavLink
           to="/"
           end
-          style={topLinkStyle}
+          className={topLinkClass}
           onClick={() => {
             if (onNavigate) onNavigate();
           }}
         >
-          <span>Dashboard</span>
+          <span className="sidebar__link-content">
+            <LayoutDashboard size={15} className="sidebar__link-icon" aria-hidden="true" />
+            <span>Dashboard</span>
+          </span>
         </NavLink>
 
         {/* SEZIONI COLLASSABILI */}
         {routeFilteredSections.map((section) => {
-          const isOpen = openSections[section.id];
+          const isOpen = Boolean(openSections[section.id]);
           const path = location.pathname;
           const hasActiveChild = section.items.some((item) =>
             path.startsWith(item.to)
           );
-
-          const headerStyle = {
-            ...sectionHeaderButtonBase,
-            backgroundColor: hasActiveChild ? "#e0f2fe" : "transparent",
-          };
-
-          const titleStyle = {
-            ...sectionTitle,
-            color: hasActiveChild ? "#0f172a" : "#6b7280",
-          };
+          const SectionIcon = section.icon;
 
           return (
-            <div key={section.id} style={sectionContainer}>
+            <div key={section.id} className="sidebar__section">
               <button
                 type="button"
-                style={headerStyle}
+                className={`sidebar__section-toggle ${hasActiveChild ? "is-active" : ""}`.trim()}
+                aria-expanded={isOpen}
+                aria-controls={`sidebar-section-${section.id}`}
                 onClick={() => toggleSection(section.id)}
               >
-                <div style={sectionHeaderLeft}>
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "999px",
-                      backgroundColor: hasActiveChild
-                        ? "#0f766e"
-                        : "#cbd5f5",
-                    }}
-                  />
-                  <span style={titleStyle}>{section.title}</span>
-                </div>
-                <span style={caret}>{isOpen ? "?" : "?"}</span>
+                <span className="sidebar__section-left">
+                  {SectionIcon ? (
+                    <SectionIcon size={15} className="sidebar__section-icon" aria-hidden="true" />
+                  ) : null}
+                  <span className="sidebar__section-title">{section.title}</span>
+                </span>
+                <span className="sidebar__section-caret" aria-hidden="true">
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </span>
               </button>
 
               {isOpen && (
-                <div style={subLinksWrapper}>
-                  {section.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      style={subLinkStyle}
-                      onClick={() => {
-                        if (onNavigate) onNavigate();
-                      }}
-                    >
-                      <span>{item.label}</span>
-                      {renderBadge(item.badge)}
-                    </NavLink>
-                  ))}
+                <div className="sidebar__sublinks" id={`sidebar-section-${section.id}`}>
+                  {section.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={subLinkClass}
+                        onClick={() => {
+                          if (onNavigate) onNavigate();
+                        }}
+                      >
+                        <span className="sidebar__link-content">
+                          {ItemIcon ? (
+                            <ItemIcon size={14} className="sidebar__link-icon" aria-hidden="true" />
+                          ) : null}
+                          <span>{item.label}</span>
+                        </span>
+                        {renderBadge(item.badge)}
+                      </NavLink>
+                    );
+                  })}
                 </div>
               )}
             </div>
           );
         })}
-      </div>
+      </nav>
 
-      <div style={footer}>
+      <div className="sidebar__footer">
         <div>{role} dashboard</div>
-        <div>v0.1 · local dev</div>
+        <div>v1.0 · local dev</div>
       </div>
     </div>
   );
 }
 
 export default Sidebar;
-
-

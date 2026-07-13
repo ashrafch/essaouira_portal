@@ -1,8 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { CalendarRange, Cpu } from "lucide-react";
+import { PageHeader } from "../components/ui";
 import { getUnitSchedule } from "../services/api";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/**
+ * Sub-navigation shared by the two unit views (PMS timeline / smart detail):
+ * makes /units/:id/timeline and /smart-units/:id feel like one unit page
+ * with two tabs. Real links (middle-click friendly), tokens only.
+ */
+function UnitViewTabs({ unitId, active }) {
+  const tabs = [
+    { key: "timeline", label: "Timeline PMS", to: `/units/${unitId}/timeline`, icon: CalendarRange },
+    { key: "smart", label: "Smart & dispositivi", to: `/smart-units/${unitId}`, icon: Cpu },
+  ];
+  return (
+    <nav className="ui-tablist" aria-label="Viste unità">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = tab.key === active;
+        return (
+          <Link
+            key={tab.key}
+            to={tab.to}
+            className={isActive ? "ui-tab is-active" : "ui-tab"}
+            aria-current={isActive ? "page" : undefined}
+            style={{ textDecoration: "none" }}
+          >
+            <Icon size={14} aria-hidden="true" />
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 function UnitTimeline() {
   const { unitId } = useParams();
@@ -141,38 +175,38 @@ function UnitTimeline() {
       case "cleaning":
         return {
           label: "Pulizie",
-          color: "#0f766e",
-          shadow: "0 0 0 3px rgba(45,212,191,0.45)",
+          color: "var(--color-primary)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-primary) 45%, transparent)",
         };
       case "checkin":
         return {
           label: "Check-in",
-          color: "#1d4ed8",
-          shadow: "0 0 0 3px rgba(59,130,246,0.45)",
+          color: "var(--color-info)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-info) 45%, transparent)",
         };
       case "checkout":
         return {
           label: "Check-out",
-          color: "#7c2d12",
-          shadow: "0 0 0 3px rgba(251,146,60,0.5)",
+          color: "var(--color-warning-strong)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-warning) 50%, transparent)",
         };
       case "breakfast":
         return {
           label: "Colazioni",
-          color: "#a16207",
-          shadow: "0 0 0 3px rgba(234,179,8,0.45)",
+          color: "var(--color-warning-strong)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-warning) 45%, transparent)",
         };
       case "maintenance":
         return {
           label: "Manutenzione",
-          color: "#b91c1c",
-          shadow: "0 0 0 3px rgba(248,113,113,0.5)",
+          color: "var(--color-danger)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-danger) 50%, transparent)",
         };
       default:
         return {
           label: "Altro",
-          color: "#4b5563",
-          shadow: "0 0 0 3px rgba(148,163,184,0.5)",
+          color: "var(--color-text-muted)",
+          shadow: "0 0 0 3px color-mix(in srgb, var(--color-text-muted) 50%, transparent)",
         };
     }
   }
@@ -276,30 +310,21 @@ function UnitTimeline() {
     gap: 16,
   };
 
-  const header = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 8,
-  };
-
   const pill = {
     fontSize: 11,
     padding: "3px 10px",
     borderRadius: 999,
-    background: "#ecfeff",
-    color: "#0f766e",
-    border: "1px solid #a5f3fc",
+    background: "var(--color-info-soft)",
+    color: "var(--color-primary)",
+    border: "1px solid var(--color-info)",
   };
 
   const card = {
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: "14px",
     padding: "16px 18px",
-    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const rangeControls = {
@@ -311,7 +336,7 @@ function UnitTimeline() {
 
   const input = {
     borderRadius: 8,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "6px 8px",
     fontSize: 13,
   };
@@ -340,7 +365,7 @@ function UnitTimeline() {
     position: "relative",
     height: 26,
     borderRadius: 999,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "var(--color-surface-soft)",
     overflow: "hidden",
   };
 
@@ -350,14 +375,14 @@ function UnitTimeline() {
     bottom: 4,
     borderRadius: 999,
     background:
-      "linear-gradient(90deg, rgba(34,197,94,0.15), rgba(22,163,74,0.45))",
-    border: "1px solid rgba(34,197,94,0.5)",
+      "linear-gradient(90deg, color-mix(in srgb, var(--color-success) 15%, transparent), color-mix(in srgb, var(--color-success) 45%, transparent))",
+    border: "1px solid color-mix(in srgb, var(--color-success) 50%, transparent)",
     display: "flex",
     alignItems: "center",
     paddingLeft: 8,
     paddingRight: 8,
     fontSize: 12,
-    color: "#064e3b",
+    color: "var(--color-success-strong)",
     overflow: "hidden",
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
@@ -376,20 +401,7 @@ function UnitTimeline() {
     alignItems: "center",
     justifyContent: "center",
     fontSize: 10,
-    color: "#ffffff",
-  };
-
-  const backButton = {
-    borderRadius: 999,
-    border: "1px solid #d1d5db",
-    padding: "6px 10px",
-    fontSize: 12,
-    backgroundColor: "#ffffff",
-    color: "#374151",
-    cursor: "pointer",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
+    color: "var(--color-on-primary)",
   };
 
   const legendRow = {
@@ -398,7 +410,7 @@ function UnitTimeline() {
     gap: 8,
     marginTop: 10,
     fontSize: 11,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
   };
 
   const kpiGrid = {
@@ -409,7 +421,7 @@ function UnitTimeline() {
   };
 
   const kpiCard = {
-    background: "#f9fafb",
+    background: "var(--color-surface-soft)",
     borderRadius: "12px",
     padding: "10px 12px",
   };
@@ -426,11 +438,11 @@ function UnitTimeline() {
 
   const segmentBtn = (active) => ({
     borderRadius: 999,
-    border: active ? "1px solid #0f766e" : "1px solid #d1d5db",
+    border: active ? "1px solid var(--color-primary)" : "1px solid var(--color-border-strong)",
     padding: "4px 10px",
     fontSize: 12,
-    backgroundColor: active ? "#0f766e" : "#ffffff",
-    color: active ? "#ffffff" : "#374151",
+    backgroundColor: active ? "var(--color-primary)" : "var(--color-surface)",
+    color: active ? "var(--color-on-primary)" : "var(--color-text)",
     cursor: "pointer",
   });
 
@@ -439,7 +451,7 @@ function UnitTimeline() {
   const modalOverlay = {
     position: "fixed",
     inset: 0,
-    backgroundColor: "rgba(15,23,42,0.35)",
+    backgroundColor: "var(--color-overlay)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -447,13 +459,13 @@ function UnitTimeline() {
   };
 
   const modalCard = {
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: 16,
     padding: "18px 20px",
     width: "100%",
     maxWidth: 420,
-    boxShadow: "0 20px 40px rgba(15,23,42,0.2)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-lg)",
+    border: "1px solid var(--color-border)",
   };
 
   function Modal({ title, onClose, children }) {
@@ -472,12 +484,12 @@ function UnitTimeline() {
             <button
               style={{
                 borderRadius: 999,
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--color-border)",
                 padding: "4px 8px",
-                background: "#f9fafb",
+                background: "var(--color-surface-soft)",
                 cursor: "pointer",
                 fontSize: 14,
-                color: "#4b5563",
+                color: "var(--color-text-muted)",
               }}
               onClick={onClose}
             >
@@ -509,49 +521,46 @@ function UnitTimeline() {
 
   return (
     <div style={wrapper}>
-      <div style={header}>
-        <div>
-          <button style={backButton} onClick={() => navigate(-1)}>
-            ← Torna agli appartamenti
-          </button>
-          <h1 style={{ margin: "6px 0 2px", fontSize: 20 }}>
-            Timeline appartamento – {unitName}
-          </h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
-            Vista orizzontale delle prenotazioni e dei task staff per questa
-            unità.
-          </p>
-        </div>
+      <PageHeader
+        title={unitName || `Unità #${unitId}`}
+        subtitle="Timeline PMS: vista orizzontale delle prenotazioni e dei task staff per questa unità."
+        breadcrumb={[
+          { label: "Appartamenti", href: "/units" },
+          { label: unitName || `Unità #${unitId}` },
+        ]}
+        actions={
+          <div>
+            <div style={{ marginBottom: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
+              Intervallo visualizzato
+            </div>
+            <div style={rangeControls}>
+              <input
+                type="date"
+                style={input}
+                value={fromDate || ""}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+              <span>→</span>
+              <input
+                type="date"
+                style={input}
+                value={toDate || ""}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
+            <div style={{ textAlign: "right", marginTop: 4 }}>
+              <span style={pill}>
+                Giorni nel range: <strong>{totalDays || "—"}</strong>
+              </span>
+            </div>
+          </div>
+        }
+      />
 
-        <div>
-          <div style={{ marginBottom: 4, fontSize: 12, color: "#6b7280" }}>
-            Intervallo visualizzato
-          </div>
-          <div style={rangeControls}>
-            <input
-              type="date"
-              style={input}
-              value={fromDate || ""}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
-            <span>→</span>
-            <input
-              type="date"
-              style={input}
-              value={toDate || ""}
-              onChange={(e) => setToDate(e.target.value)}
-            />
-          </div>
-          <div style={{ textAlign: "right", marginTop: 4 }}>
-            <span style={pill}>
-              Giorni nel range: <strong>{totalDays || "—"}</strong>
-            </span>
-          </div>
-        </div>
-      </div>
+      <UnitViewTabs unitId={unitId} active="timeline" />
 
       {error && (
-        <p style={{ color: "red", fontSize: 12 }}>Errore: {error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12 }}>Errore: {error}</p>
       )}
 
       {loading ? (
@@ -561,7 +570,7 @@ function UnitTimeline() {
           {/* KPI unità */}
           <div style={kpiGrid}>
             <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                 Occupazione nel periodo
               </div>
               <div
@@ -569,7 +578,7 @@ function UnitTimeline() {
               >
                 {kpi.nightsOccupied}/{kpi.nightsTotal} notti
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                 {kpi.nightsTotal > 0
                   ? `${kpi.occupancyRate.toFixed(1)}% occupazione`
                   : "Nessuna notte nel range"}
@@ -577,7 +586,7 @@ function UnitTimeline() {
             </div>
 
             <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                 Revenue stimato unità
               </div>
               <div
@@ -585,13 +594,13 @@ function UnitTimeline() {
               >
                 € {kpi.revenue.toFixed(2)}
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                 Calcolato da total_price o nightly_rate
               </div>
             </div>
 
             <div style={kpiCard}>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                 Task staff per l&apos;unità
               </div>
               <div
@@ -599,7 +608,7 @@ function UnitTimeline() {
               >
                 {kpi.staffCount} task
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                 Costo stimato: € {kpi.staffCost.toFixed(2)}
               </div>
             </div>
@@ -632,7 +641,7 @@ function UnitTimeline() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                 Tipo task:
               </span>
               <select
@@ -656,7 +665,7 @@ function UnitTimeline() {
           {(viewMode === "both" || viewMode === "bookings") && (
             <div style={timelineRow}>
               <div>
-                <span style={tag("#dcfce7", "#166534")}>Prenotazioni</span>
+                <span style={tag("var(--color-success-soft)", "var(--color-success-strong)")}>Prenotazioni</span>
               </div>
               <div style={track}>
                 {bookings.map((b) => {
@@ -682,7 +691,7 @@ function UnitTimeline() {
                 style={{
                   textAlign: "right",
                   fontSize: 12,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                 }}
               >
                 {rangeStart && rangeEnd
@@ -698,7 +707,7 @@ function UnitTimeline() {
           {(viewMode === "both" || viewMode === "staff") && (
             <div style={{ ...timelineRow, marginTop: 10 }}>
               <div>
-                <span style={tag("#e0f2fe", "#0369a1")}>Task staff</span>
+                <span style={tag("var(--color-info-soft)", "var(--color-info-strong)")}>Task staff</span>
               </div>
               <div style={track}>
                 {staffClusters.map((cluster) => {
@@ -739,7 +748,7 @@ function UnitTimeline() {
                 style={{
                   textAlign: "right",
                   fontSize: 12,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                 }}
               >
                 {staffFiltered.length > 0
@@ -761,8 +770,8 @@ function UnitTimeline() {
                     gap: 6,
                     padding: "4px 8px",
                     borderRadius: 999,
-                    backgroundColor: "#f9fafb",
-                    border: "1px solid #e5e7eb",
+                    backgroundColor: "var(--color-surface-soft)",
+                    border: "1px solid var(--color-border)",
                   }}
                 >
                   <span
@@ -790,7 +799,7 @@ function UnitTimeline() {
           title="Dettaglio prenotazione"
           onClose={() => setSelectedBooking(null)}
         >
-          <div style={{ fontSize: 13, color: "#374151" }}>
+          <div style={{ fontSize: 13, color: "var(--color-text)" }}>
             <div style={{ marginBottom: 6 }}>
               <strong>Ospite:</strong>{" "}
               {selectedBooking.guest_name || "—"}
@@ -830,10 +839,10 @@ function UnitTimeline() {
               type="button"
               style={{
                 borderRadius: 999,
-                border: "1px solid #d1d5db",
+                border: "1px solid var(--color-border-strong)",
                 padding: "6px 12px",
-                background: "#ffffff",
-                color: "#374151",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
                 cursor: "pointer",
               }}
               onClick={() => setSelectedBooking(null)}
@@ -846,8 +855,8 @@ function UnitTimeline() {
                 borderRadius: 999,
                 border: "none",
                 padding: "6px 12px",
-                background: "#0f766e",
-                color: "white",
+                background: "var(--color-primary)",
+                color: "var(--color-on-primary)",
                 cursor: "pointer",
               }}
               onClick={() => {
@@ -867,7 +876,7 @@ function UnitTimeline() {
           title="Task staff in questo giorno"
           onClose={() => setSelectedCluster(null)}
         >
-          <div style={{ fontSize: 13, color: "#374151" }}>
+          <div style={{ fontSize: 13, color: "var(--color-text)" }}>
             <div style={{ marginBottom: 6 }}>
               <strong>Data:</strong> {formatDate(selectedCluster.date)}
             </div>
@@ -879,9 +888,9 @@ function UnitTimeline() {
                 maxHeight: 260,
                 overflowY: "auto",
                 borderRadius: 10,
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--color-border)",
                 padding: "6px 8px",
-                background: "#f9fafb",
+                background: "var(--color-surface-soft)",
               }}
             >
               {selectedCluster.tasks.map((t) => {
@@ -892,7 +901,7 @@ function UnitTimeline() {
                     key={t.id}
                     style={{
                       padding: "6px 4px",
-                      borderBottom: "1px solid #e5e7eb",
+                      borderBottom: "1px solid var(--color-border)",
                       fontSize: 12,
                       display: "flex",
                       flexDirection: "column",
@@ -931,8 +940,8 @@ function UnitTimeline() {
                             fontSize: 11,
                             padding: "2px 8px",
                             borderRadius: 999,
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
+                            border: "1px solid var(--color-border-strong)",
+                            background: "var(--color-surface)",
                           }}
                         >
                           {t.status}
@@ -952,7 +961,7 @@ function UnitTimeline() {
                     )}
                     {t.notes && (
                       <div
-                        style={{ color: "#6b7280", fontSize: 11 }}
+                        style={{ color: "var(--color-text-muted)", fontSize: 11 }}
                         title={t.notes}
                       >
                         {t.notes}
@@ -976,10 +985,10 @@ function UnitTimeline() {
               type="button"
               style={{
                 borderRadius: 999,
-                border: "1px solid #d1d5db",
+                border: "1px solid var(--color-border-strong)",
                 padding: "6px 12px",
-                background: "#ffffff",
-                color: "#374151",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
                 cursor: "pointer",
               }}
               onClick={() => setSelectedCluster(null)}
@@ -992,8 +1001,8 @@ function UnitTimeline() {
                 borderRadius: 999,
                 border: "none",
                 padding: "6px 12px",
-                background: "#0f766e",
-                color: "white",
+                background: "var(--color-primary)",
+                color: "var(--color-on-primary)",
                 cursor: "pointer",
               }}
               onClick={() => {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -18,11 +19,14 @@ import {
   getBookings,
   getAdvancedKpis,
   getTodayAlerts,
+  getDashboardSummary,
+  ownerMonthlyReportCsvUrl,
 } from "../services/api";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 function Dashboard() {
+  const navigate = useNavigate();
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -34,6 +38,7 @@ function Dashboard() {
   const [todaysArrivals, setTodaysArrivals] = useState([]);
   const [advancedKpis, setAdvancedKpis] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -42,19 +47,22 @@ function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        // Carichiamo in parallelo: Analisi Finanziaria, Task di oggi, Prenotazioni
-        const [pnlData, tasksData, bookingsData, advancedData, alertsData] = await Promise.all([
+        // Carichiamo in parallelo: Analisi Finanziaria, Task di oggi, Prenotazioni,
+        // e il riepilogo operativo unificato (PMS + Smart).
+        const [pnlData, tasksData, bookingsData, advancedData, alertsData, summaryData] = await Promise.all([
           getMonthPnL(year, month),
           getStaffTasks({ date: todayStr }),
           getBookings(),
           getAdvancedKpis(year, month),
           getTodayAlerts(),
+          getDashboardSummary().catch(() => null),
         ]);
 
         setPnl(pnlData);
         setTodaysTasks(tasksData || []);
         setAdvancedKpis(advancedData);
         setAlerts(alertsData || []);
+        setSummary(summaryData);
 
         // Filtra arrivi di oggi lato client
         const arrivals = (bookingsData || []).filter(
@@ -107,11 +115,11 @@ function Dashboard() {
   const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" };
   
   const kpiCard = (borderLeftColor) => ({
-    backgroundColor: "white",
+    backgroundColor: "var(--color-surface)",
     borderRadius: "12px",
     padding: "20px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
     borderLeft: `5px solid ${borderLeftColor}`,
     display: "flex", flexDirection: "column", justifyContent: "space-between"
   });
@@ -119,23 +127,23 @@ function Dashboard() {
   const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px" };
   
   const chartCard = {
-    backgroundColor: "white", borderRadius: "16px", padding: "24px",
-    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)", border: "1px solid #e5e7eb",
+    backgroundColor: "var(--color-surface)", borderRadius: "16px", padding: "24px",
+    boxShadow: "var(--shadow-sm)", border: "1px solid var(--color-border)",
     minHeight: "350px", display: "flex", flexDirection: "column"
   };
 
   const operationCard = {
-    backgroundColor: "white", borderRadius: "16px", padding: "24px",
-    border: "1px solid #e5e7eb", flex: 1
+    backgroundColor: "var(--color-surface)", borderRadius: "16px", padding: "24px",
+    border: "1px solid var(--color-border)", flex: 1
   };
 
   const selectStyle = {
-    padding: "8px 12px", borderRadius: "8px", border: "1px solid #d1d5db",
-    fontSize: "14px", cursor: "pointer", backgroundColor: "white"
+    padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-border-strong)",
+    fontSize: "14px", cursor: "pointer", backgroundColor: "var(--color-surface)"
   };
 
   if (loading) return <div style={{ padding: 20 }}>Caricamento Dashboard...</div>;
-  if (error) return <div style={{ padding: 20, color: "#dc2626" }}>{error}</div>;
+  if (error) return <div style={{ padding: 20, color: "var(--color-danger)" }}>{error}</div>;
 
   return (
     <div style={pageStyle}>
@@ -143,10 +151,10 @@ function Dashboard() {
       {/* HEADER */}
       <div style={headerStyle}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "700", color: "#111827" }}>
+          <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "700", color: "var(--color-text)" }}>
             Dashboard
           </h1>
-          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "14px" }}>
+          <p style={{ margin: "4px 0 0", color: "var(--color-text-muted)", fontSize: "14px" }}>
             Panoramica di {new Date(year, month - 1).toLocaleDateString("it-IT", { month: 'long', year: 'numeric' })}
           </p>
         </div>
@@ -162,31 +170,73 @@ function Dashboard() {
           <select style={selectStyle} value={year} onChange={(e) => setYear(Number(e.target.value))}>
             {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <a
+            href={ownerMonthlyReportCsvUrl(year, month)}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+              textDecoration: "none", cursor: "pointer",
+              background: "var(--color-primary)", color: "var(--color-on-primary)",
+            }}
+          >
+            Scarica report
+          </a>
         </div>
       </div>
 
+      {/* FASCIA OPERATIVA OGGI — ponte tra PMS/Ops e Smart, tessere cliccabili */}
       <div style={gridKPI}>
-        <div style={kpiCard("#1d4ed8")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>RevPAR</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+        {[
+          { label: "Arrivi oggi", value: summary?.arrivals_today ?? todaysArrivals.length, to: "/operations", tone: "var(--color-info)" },
+          { label: "Partenze oggi", value: summary?.departures_today ?? 0, to: "/operations", tone: "var(--color-info)" },
+          { label: "In casa", value: summary?.in_house ?? 0, to: "/bookings", tone: "var(--color-primary)" },
+          { label: "Task staff oggi", value: summary?.staff_tasks_today ?? tasksTotal, to: "/staff-planner", tone: "var(--color-primary)" },
+          { label: "Manutenzioni aperte", value: summary?.maintenance_open ?? 0, to: "/maintenance", tone: (summary?.maintenance_open ?? 0) > 0 ? "var(--color-danger)" : "var(--color-border-strong)" },
+          { label: "Alert smart aperti", value: summary?.smart?.alerts_open ?? 0, to: "/smart-alerts", tone: (summary?.smart?.alerts_open ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
+          { label: "Unità da attenzionare", value: summary?.smart?.units_needing_attention ?? 0, to: "/smart-operations", tone: (summary?.smart?.units_needing_attention ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
+          { label: "Dispositivi online", value: summary?.smart ? `${summary.smart.devices_online}/${summary.smart.devices_total}` : "—", to: "/smart-devices", tone: "var(--color-accent, var(--color-primary))" },
+        ].map((tile) => (
+          <button
+            key={tile.label}
+            type="button"
+            onClick={() => navigate(tile.to)}
+            style={{
+              ...kpiCard(tile.tone),
+              textAlign: "left", cursor: "pointer", font: "inherit", width: "100%",
+            }}
+          >
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+              {tile.label}
+            </div>
+            <div className="tabular-nums" style={{ fontSize: "26px", fontWeight: 700, color: "var(--color-text)", marginTop: "8px" }}>
+              {tile.value}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div style={gridKPI}>
+        <div style={kpiCard("var(--color-info)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>RevPAR</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
             EUR {advancedKpis?.revpar?.toLocaleString?.() ?? 0}
           </div>
         </div>
-        <div style={kpiCard("#0ea5e9")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Share Direct</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+        <div style={kpiCard("var(--color-info)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Share Direct</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
             {advancedKpis?.direct_share_percent ?? 0}%
           </div>
         </div>
-        <div style={kpiCard("#7c3aed")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Pipeline 30g</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+        <div style={kpiCard("var(--color-info)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Pipeline 30g</div>
+          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
             EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.() ?? 0}
           </div>
         </div>
-        <div style={kpiCard("#f97316")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Alert operativi</div>
-          <div style={{ marginTop: "8px", fontSize: 13, color: "#111827" }}>
+        <div style={kpiCard("var(--color-warning)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Alert operativi</div>
+          <div style={{ marginTop: "8px", fontSize: 13, color: "var(--color-text)" }}>
             {alerts.length === 0
               ? "Nessun alert attivo"
               : `${alerts.length} alert da verificare`}
@@ -196,14 +246,14 @@ function Dashboard() {
 
       {alerts.length > 0 && (
         <div style={{ ...chartCard, minHeight: "auto" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: 12, color: "#374151" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: 12, color: "var(--color-text)" }}>
             Alert Oggi
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {alerts.map((alert) => (
-              <div key={alert.code} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, background: "#fff" }}>
+              <div key={alert.code} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10, background: "var(--color-surface)" }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{alert.title} ({alert.count})</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>{alert.details}</div>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{alert.details}</div>
               </div>
             ))}
           </div>
@@ -212,29 +262,29 @@ function Dashboard() {
 
       {/* 1. KPI FINANZIARI */}
       <div style={gridKPI}>
-        <div style={kpiCard("#0f766e")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Ricavi Totali</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+        <div style={kpiCard("var(--color-primary)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Ricavi Totali</div>
+          <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
             € {pnl?.revenue_total.toLocaleString()}
           </div>
         </div>
-        <div style={kpiCard("#dc2626")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Costi Totali</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginTop: "8px" }}>
+        <div style={kpiCard("var(--color-danger)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Costi Totali</div>
+          <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
             € {pnl?.costs_total.toLocaleString()}
           </div>
         </div>
-        <div style={kpiCard(pnl?.profit >= 0 ? "#16a34a" : "#dc2626")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Profitto Netto</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "#16a34a" : "#dc2626", marginTop: "8px" }}>
+        <div style={kpiCard(pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Profitto Netto</div>
+          <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)", marginTop: "8px" }}>
             € {pnl?.profit.toLocaleString()}
           </div>
         </div>
-        <div style={kpiCard("#f59e0b")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase" }}>Occupazione & ADR</div>
+        <div style={kpiCard("var(--color-warning)")}>
+          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Occupazione & ADR</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
-             <span style={{ fontSize: "28px", fontWeight: "700", color: "#111827" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
-             <span style={{ fontSize: "14px", color: "#6b7280" }}>
+             <span style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
+             <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
                (€ {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
              </span>
           </div>
@@ -245,7 +295,7 @@ function Dashboard() {
       <div style={gridCharts}>
         {/* Grafico a Torta: Fonti */}
         <div style={chartCard}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "var(--color-text)" }}>
             Provenienza Ricavi
           </h3>
           <div style={{ flex: 1, minHeight: "250px" }}>
@@ -268,14 +318,14 @@ function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>Nessun dato</div>
+              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--color-text-subtle)" }}>Nessun dato</div>
             )}
           </div>
         </div>
 
         {/* Grafico a Barre: Costi */}
         <div style={chartCard}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "#374151" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "var(--color-text)" }}>
             Top 5 Categorie di Spesa
           </h3>
           <div style={{ flex: 1, minHeight: "250px" }}>
@@ -286,11 +336,11 @@ function Dashboard() {
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 12}} />
                   <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => `€ ${value.toLocaleString()}`} />
-                  <Bar dataKey="Importo" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="Importo" fill="var(--color-danger)" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>Nessun costo</div>
+              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--color-text-subtle)" }}>Nessun costo</div>
             )}
           </div>
         </div>
@@ -303,25 +353,25 @@ function Dashboard() {
         <div style={operationCard}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>Arrivi di Oggi</h3>
-            <span style={{ backgroundColor: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "99px", fontSize: "12px", fontWeight: "600" }}>
+            <span style={{ backgroundColor: "var(--color-info-soft)", color: "var(--color-info-strong)", padding: "2px 8px", borderRadius: "99px", fontSize: "12px", fontWeight: "600" }}>
               {todayStr}
             </span>
           </div>
           
           {todaysArrivals.length === 0 ? (
-            <p style={{ color: "#9ca3af", fontSize: "14px", fontStyle: "italic" }}>Nessun check-in previsto per oggi.</p>
+            <p style={{ color: "var(--color-text-subtle)", fontSize: "14px", fontStyle: "italic" }}>Nessun check-in previsto per oggi.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {todaysArrivals.map(booking => (
-                <div key={booking.id} style={{ display: "flex", alignItems: "center", gap: "12px", paddingBottom: "12px", borderBottom: "1px solid #f3f4f6" }}>
-                  <div style={{ width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ecfdf5", color: "#047857", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "14px" }}>
+                <div key={booking.id} style={{ display: "flex", alignItems: "center", gap: "12px", paddingBottom: "12px", borderBottom: "1px solid var(--color-border)" }}>
+                  <div style={{ width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "var(--color-success-soft)", color: "var(--color-success-strong)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "14px" }}>
                     IN
                   </div>
                   <div>
-                    <div style={{ fontWeight: "600", fontSize: "14px", color: "#111827" }}>{booking.guest_name}</div>
-                    <div style={{ fontSize: "12px", color: "#6b7280" }}>Unit #{booking.unit_id} · {booking.num_adults} pax</div>
+                    <div style={{ fontWeight: "600", fontSize: "14px", color: "var(--color-text)" }}>{booking.guest_name}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Unit #{booking.unit_id} · {booking.num_adults} pax</div>
                   </div>
-                  <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "#0f766e" }}>
+                  <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "var(--color-primary)" }}>
                     {booking.estimated_arrival_time ? booking.estimated_arrival_time.slice(0,5) : "Orario n/d"}
                   </div>
                 </div>
@@ -335,25 +385,25 @@ function Dashboard() {
           <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "600" }}>Avanzamento Staff</h3>
           
           <div style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "#4b5563" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--color-text-muted)" }}>
               <span>Task completati</span>
               <strong>{tasksCompleted} / {tasksTotal}</strong>
             </div>
-            <div style={{ width: "100%", height: "10px", backgroundColor: "#f3f4f6", borderRadius: "99px", overflow: "hidden" }}>
-              <div style={{ width: `${taskProgress}%`, height: "100%", backgroundColor: taskProgress === 100 ? "#16a34a" : "#0f766e", transition: "width 0.5s ease" }}></div>
+            <div style={{ width: "100%", height: "10px", backgroundColor: "var(--color-surface-soft)", borderRadius: "99px", overflow: "hidden" }}>
+              <div style={{ width: `${taskProgress}%`, height: "100%", backgroundColor: taskProgress === 100 ? "var(--color-success)" : "var(--color-primary)", transition: "width 0.5s ease" }}></div>
             </div>
           </div>
 
           {tasksTotal > 0 && tasksCompleted < tasksTotal ? (
-            <div style={{ fontSize: "13px", color: "#d97706", backgroundColor: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d" }}>
+            <div style={{ fontSize: "13px", color: "var(--color-warning-strong)", backgroundColor: "var(--color-warning-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-warning)" }}>
               ⚠️ Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attività da completare oggi.
             </div>
           ) : tasksTotal > 0 ? (
-            <div style={{ fontSize: "13px", color: "#047857", backgroundColor: "#ecfdf5", padding: "10px", borderRadius: "8px", border: "1px solid #6ee7b7" }}>
+            <div style={{ fontSize: "13px", color: "var(--color-success-strong)", backgroundColor: "var(--color-success-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-success)" }}>
               ✅ Ottimo lavoro! Tutte le attività di oggi sono completate.
             </div>
           ) : (
-            <div style={{ fontSize: "13px", color: "#6b7280" }}>Nessun task programmato per oggi.</div>
+            <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Nessun task programmato per oggi.</div>
           )}
         </div>
 

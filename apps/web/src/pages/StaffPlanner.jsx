@@ -23,7 +23,7 @@ const titleBlock = {
 
 const subtitleStyle = {
   fontSize: 13,
-  color: "#6b7280",
+  color: "var(--color-text-muted)",
 };
 
 const dateWrapper = {
@@ -34,22 +34,22 @@ const dateWrapper = {
 
 const dateLabel = {
   fontSize: 13,
-  color: "#6b7280",
+  color: "var(--color-text-muted)",
 };
 
 const dateInput = {
   padding: "6px 10px",
   borderRadius: 8,
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--color-border-strong)",
   fontSize: 13,
 };
 
 const boardWrapper = {
   marginTop: 8,
-  backgroundColor: "#f9fafb",
+  backgroundColor: "var(--color-surface-soft)",
   borderRadius: 16,
   padding: 16,
-  border: "1px solid #e5e7eb",
+  border: "1px solid var(--color-border)",
 };
 
 const boardInner = {
@@ -59,10 +59,10 @@ const boardInner = {
 };
 
 const columnWrapper = {
-  backgroundColor: "#f3f4f6",
+  backgroundColor: "var(--color-surface-soft)",
   borderRadius: 14,
   padding: 14,
-  border: "1px solid #e5e7eb",
+  border: "1px solid var(--color-border)",
   display: "flex",
   flexDirection: "column",
   gap: 8,
@@ -77,12 +77,12 @@ const columnHeaderRow = {
 const columnTitle = {
   fontSize: 14,
   fontWeight: 600,
-  color: "#111827",
+  color: "var(--color-text)",
 };
 
 const columnCount = {
   fontSize: 11,
-  color: "#9ca3af",
+  color: "var(--color-text-subtle)",
 };
 
 const taskList = {
@@ -93,11 +93,11 @@ const taskList = {
 };
 
 const taskCard = {
-  backgroundColor: "#ffffff",
+  backgroundColor: "var(--color-surface)",
   borderRadius: 12,
   padding: 10,
-  border: "1px solid #e5e7eb",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+  border: "1px solid var(--color-border)",
+  boxShadow: "var(--shadow-sm)",
   display: "flex",
   flexDirection: "column",
   gap: 6,
@@ -113,21 +113,21 @@ const taskTitleRow = {
 const taskTitle = {
   fontSize: 13,
   fontWeight: 600,
-  color: "#111827",
+  color: "var(--color-text)",
 };
 
 const taskMeta = {
   fontSize: 12,
-  color: "#6b7280",
+  color: "var(--color-text-muted)",
 };
 
 const statusPill = {
   fontSize: 11,
   padding: "2px 8px",
   borderRadius: 999,
-  backgroundColor: "#e0edff",
-  color: "#1d4ed8",
-  border: "1px solid #bfdbfe",
+  backgroundColor: "var(--color-info-soft)",
+  color: "var(--color-info-strong)",
+  border: "1px solid var(--color-info)",
 };
 
 const metaRow = {
@@ -140,21 +140,21 @@ const metaChip = {
   fontSize: 11,
   padding: "3px 8px",
   borderRadius: 999,
-  backgroundColor: "#f9fafb",
-  border: "1px solid #e5e7eb",
-  color: "#6b7280",
+  backgroundColor: "var(--color-surface-soft)",
+  border: "1px solid var(--color-border)",
+  color: "var(--color-text-muted)",
 };
 
 const notesStyle = {
   fontSize: 11,
-  color: "#9ca3af",
+  color: "var(--color-text-subtle)",
   marginTop: 2,
 };
 
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  backgroundColor: "rgba(15,23,42,0.25)",
+  backgroundColor: "var(--color-overlay)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -162,12 +162,12 @@ const overlayStyle = {
 };
 
 const modalStyle = {
-  backgroundColor: "white",
+  backgroundColor: "var(--color-surface)",
   borderRadius: 16,
   padding: 20,
   width: "100%",
   maxWidth: 420,
-  boxShadow: "0 10px 30px rgba(15,23,42,0.25)",
+  boxShadow: "var(--shadow-lg)",
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -181,13 +181,13 @@ const modalRow = {
 
 const modalLabel = {
   fontSize: 12,
-  color: "#6b7280",
+  color: "var(--color-text-muted)",
 };
 
 const modalInput = {
   padding: "6px 10px",
   borderRadius: 8,
-  border: "1px solid #d1d5db",
+  border: "1px solid var(--color-border-strong)",
   fontSize: 13,
 };
 
@@ -214,15 +214,15 @@ const buttonBase = {
 
 const buttonGhost = {
   ...buttonBase,
-  backgroundColor: "white",
-  borderColor: "#d1d5db",
-  color: "#374151",
+  backgroundColor: "var(--color-surface)",
+  borderColor: "var(--color-border-strong)",
+  color: "var(--color-text-muted)",
 };
 
 const buttonPrimary = {
   ...buttonBase,
-  backgroundColor: "#0f766e",
-  color: "white",
+  backgroundColor: "var(--color-primary)",
+  color: "var(--color-on-primary)",
 };
 
 const categories = [
@@ -409,11 +409,11 @@ function StaffPlanner() {
 
                 <div style={taskList}>
                   {loading && colTasks.length === 0 ? (
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                    <span style={{ fontSize: 12, color: "var(--color-text-subtle)" }}>
                       Caricamento...
                     </span>
                   ) : colTasks.length === 0 ? (
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                    <span style={{ fontSize: 12, color: "var(--color-text-subtle)" }}>
                       Nessuna task.
                     </span>
                   ) : (
@@ -554,7 +554,7 @@ function StaffPlanner() {
             </div>
 
             {saveError && (
-              <div style={{ fontSize: 12, color: "red" }}>{saveError}</div>
+              <div style={{ fontSize: 12, color: "var(--color-danger)" }}>{saveError}</div>
             )}
 
             <div style={modalFooter}>

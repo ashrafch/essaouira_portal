@@ -77,7 +77,7 @@ function SmartAutomation() {
         subtitle="Scene, regole e trace di esecuzione per controllo operativo e troubleshooting"
         right={<button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>}
       />
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
       {loading ? (
         <LoadingSkeleton rows={7} height={24} />
       ) : (
@@ -90,10 +90,10 @@ function SmartAutomation() {
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {scenes.map((s) => (
-                    <div key={s.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <div key={s.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{s.name}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>{s.description || "Nessuna descrizione"}</div>
+                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{s.description || "Nessuna descrizione"}</div>
                       </div>
                       <button type="button" onClick={() => handleRunScene(s.id)}>Esegui scena</button>
                     </div>
@@ -109,10 +109,10 @@ function SmartAutomation() {
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {rules.map((r) => (
-                    <div key={r.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <div key={r.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 8, display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{r.name}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                           {r.trigger_type} ? {r.action_type}
                         </div>
                       </div>

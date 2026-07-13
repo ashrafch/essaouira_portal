@@ -9,10 +9,10 @@ import {
 } from "../services/api";
 
 const PRIORITY_COLORS = {
-  low: "#d1fae5", // verde chiaro
-  medium: "#fef3c7", // giallo
-  high: "#fee2e2", // rosso chiaro
-  urgent: "#fca5a5", // rosso scuro
+  low: "var(--color-success-soft)", // verde chiaro
+  medium: "var(--color-warning-soft)", // giallo
+  high: "var(--color-danger-soft)", // rosso chiaro
+  urgent: "var(--color-danger)", // rosso scuro
 };
 
 const TYPE_LABELS = {
@@ -160,15 +160,15 @@ function Maintenance() {
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
           <h1 style={{ margin: 0 }}>Manutenzioni & Migliorie</h1>
-          <p style={{ color: "#6b7280", fontSize: 13, margin: "4px 0 0" }}>
+          <p style={{ color: "var(--color-text-muted)", fontSize: 13, margin: "4px 0 0" }}>
             Gestisci guasti, acquisti e lavori da fare nella struttura.
           </p>
         </div>
         <button
           onClick={() => openModal()}
           style={{
-            backgroundColor: "#0f766e",
-            color: "white",
+            backgroundColor: "var(--color-primary)",
+            color: "var(--color-on-primary)",
             border: "none",
             borderRadius: 8,
             padding: "8px 16px",
@@ -181,7 +181,7 @@ function Maintenance() {
       </div>
 
       {loading && (
-        <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 12 }}>
           Caricamento ticket manutenzione...
         </p>
       )}
@@ -194,7 +194,7 @@ function Maintenance() {
             style={{
               minWidth: 300,
               width: 300,
-              backgroundColor: "#f3f4f6",
+              backgroundColor: "var(--color-surface-soft)",
               borderRadius: 12,
               padding: 12,
               display: "flex",
@@ -207,7 +207,7 @@ function Maintenance() {
                 fontWeight: 700,
                 textTransform: "uppercase",
                 fontSize: 12,
-                color: "#4b5563",
+                color: "var(--color-text-muted)",
                 display: "flex",
                 justifyContent: "space-between",
               }}
@@ -227,18 +227,18 @@ function Maintenance() {
                 <div
                   key={t.id}
                   style={{
-                    backgroundColor: "white",
+                    backgroundColor: "var(--color-surface)",
                     padding: 12,
                     borderRadius: 8,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    boxShadow: "var(--shadow-sm)",
                     borderLeft: `4px solid ${
                       t.priority === "urgent"
-                        ? "#dc2626"
+                        ? "var(--color-danger)"
                         : t.priority === "high"
-                        ? "#f87171"
+                        ? "var(--color-danger)"
                         : t.priority === "medium"
-                        ? "#fbbf24"
-                        : "#34d399"
+                        ? "var(--color-warning)"
+                        : "var(--color-success)"
                     }`,
                   }}
                 >
@@ -248,7 +248,7 @@ function Maintenance() {
                         fontSize: 10,
                         textTransform: "uppercase",
                         fontWeight: 600,
-                        color: "#6b7280",
+                        color: "var(--color-text-muted)",
                       }}
                     >
                       {TYPE_LABELS[t.ticket_type] || t.ticket_type}
@@ -269,16 +269,16 @@ function Maintenance() {
                     </div>
                   </div>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.title}</div>
-                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 8 }}>
                     {t.unit_id ? `🏠 ${unitMap[t.unit_id]}` : "🏢 Struttura Generale"}
                   </div>
                   {t.assigned_to_id && (
-                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 2 }}>
                       👤 {staffMap[t.assigned_to_id]}
                     </div>
                   )}
                   {t.cost > 0 && (
-                    <div style={{ fontSize: 11, color: "#059669", fontWeight: 500 }}>
+                    <div style={{ fontSize: 11, color: "var(--color-success)", fontWeight: 500 }}>
                       💰 {t.cost} {t.currency}
                     </div>
                   )}
@@ -288,7 +288,7 @@ function Maintenance() {
                     {status !== "todo" && (
                       <button
                         onClick={() => moveStatus(t, "todo")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid #ccc", cursor: "pointer" }}
+                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
                       >
                         ← Da Fare
                       </button>
@@ -296,7 +296,7 @@ function Maintenance() {
                     {status !== "in_progress" && (
                       <button
                         onClick={() => moveStatus(t, "in_progress")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid #ccc", cursor: "pointer" }}
+                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
                       >
                         In Corso
                       </button>
@@ -304,7 +304,7 @@ function Maintenance() {
                     {status !== "done" && (
                       <button
                         onClick={() => moveStatus(t, "done")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid #ccc", cursor: "pointer" }}
+                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
                       >
                         Fatto →
                       </button>
@@ -323,7 +323,7 @@ function Maintenance() {
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(0,0,0,0.4)",
+            backgroundColor: "var(--color-overlay)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -332,7 +332,7 @@ function Maintenance() {
           onClick={() => setIsModalOpen(false)}
         >
           <div
-            style={{ backgroundColor: "white", padding: 24, borderRadius: 12, width: 400 }}
+            style={{ backgroundColor: "var(--color-surface)", padding: 24, borderRadius: 12, width: 400 }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{ marginTop: 0 }}>{editingId ? "Modifica Ticket" : "Nuovo Ticket"}</h2>
@@ -341,21 +341,21 @@ function Maintenance() {
                 placeholder="Titolo (es. Lampadina fulminata)"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
+                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
                 required
               />
               <textarea
                 placeholder="Descrizione dettagliata..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc", minHeight: 60 }}
+                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", minHeight: 60 }}
               />
               
               <div style={{ display: "flex", gap: 10 }}>
                 <select
                   value={formData.ticket_type}
                   onChange={(e) => setFormData({ ...formData, ticket_type: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc", flex: 1 }}
+                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
                 >
                   <option value="repair">Riparazione</option>
                   <option value="improvement">Miglioria</option>
@@ -364,7 +364,7 @@ function Maintenance() {
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc", flex: 1 }}
+                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
                 >
                   <option value="low">Bassa</option>
                   <option value="medium">Media</option>
@@ -376,7 +376,7 @@ function Maintenance() {
               <select
                 value={formData.unit_id}
                 onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
+                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
               >
                 <option value="">-- Struttura Generale --</option>
                 {units.map((u) => (
@@ -387,7 +387,7 @@ function Maintenance() {
               <select
                 value={formData.assigned_to_id}
                 onChange={(e) => setFormData({ ...formData, assigned_to_id: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
+                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
               >
                 <option value="">-- Assegna a Staff --</option>
                 {staff.map((s) => (
@@ -402,13 +402,13 @@ function Maintenance() {
                   step="0.01"
                   value={formData.cost}
                   onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc", flex: 1 }}
+                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
                 />
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
-                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", border: "1px solid #ccc", background: "white", borderRadius: 6, cursor: "pointer" }}>Annulla</button>
-                <button type="submit" style={{ padding: "8px 16px", border: "none", background: "#0f766e", color: "white", borderRadius: 6, cursor: "pointer" }}>Salva</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", border: "1px solid var(--color-border-strong)", background: "var(--color-surface)", borderRadius: 6, cursor: "pointer" }}>Annulla</button>
+                <button type="submit" style={{ padding: "8px 16px", border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 6, cursor: "pointer" }}>Salva</button>
               </div>
             </form>
           </div>

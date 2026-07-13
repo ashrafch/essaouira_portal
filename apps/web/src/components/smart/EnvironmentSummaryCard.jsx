@@ -13,15 +13,15 @@ function EnvironmentSummaryCard({ summary, title = "Environment summary" }) {
       <h3 style={{ marginBottom: 8 }}>{title}</h3>
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Temp media</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Temp media</div>
           <strong>{asNumber(summary?.avg_temperature)} C</strong>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Temp min/max</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Temp min/max</div>
           <strong>{asNumber(summary?.min_temperature)} / {asNumber(summary?.max_temperature)} C</strong>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Umidità media</div>
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Umidità media</div>
           <strong>{asNumber(summary?.avg_humidity)} %</strong>
         </div>
       </div>

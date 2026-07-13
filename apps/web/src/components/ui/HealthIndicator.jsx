@@ -6,7 +6,7 @@ function HealthIndicator({ connectivity = "unknown", health = "unknown", battery
       <StatusBadge status={connectivity} />
       <StatusBadge status={health} />
       {battery != null ? (
-        <span className="ui-status" style={{ background: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}>
+        <span className="ui-status" style={{ background: "var(--color-surface-soft)", color: "var(--color-text-muted)", borderColor: "var(--color-border-strong)" }}>
           battery {battery}%
         </span>
       ) : null}

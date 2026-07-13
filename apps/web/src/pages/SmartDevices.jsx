@@ -166,7 +166,7 @@ function SmartDevices() {
         }
       />
 
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
@@ -175,7 +175,7 @@ function SmartDevices() {
 
       <FilterBar>
         <label style={{ minWidth: 190 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Stato salute</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Stato salute</span>
           <select value={filters.status} onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}>
             <option value="">Tutti</option>
             <option value="healthy">healthy</option>
@@ -184,7 +184,7 @@ function SmartDevices() {
           </select>
         </label>
         <label style={{ minWidth: 190 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Connettività</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Connettività</span>
           <select value={filters.connectivity} onChange={(e) => setFilters((prev) => ({ ...prev, connectivity: e.target.value }))}>
             <option value="">Tutte</option>
             <option value="online">online</option>
@@ -243,7 +243,7 @@ function SmartDevices() {
             </select>
           </div>
           <AppCard style={{ marginTop: 4 }}>
-            <div style={{ fontSize: 12, color: "#64748b" }}>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
               Suggerimento: usa `external_id` coerente con il provider per semplificare sync e mapping automatico.
             </div>
           </AppCard>

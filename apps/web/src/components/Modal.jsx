@@ -25,7 +25,7 @@ function Modal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 23, 42, 0.45)",
+        background: "var(--color-overlay)",
         zIndex: 1200,
         display: "flex",
         alignItems: "center",
@@ -34,21 +34,24 @@ function Modal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === "string" ? title : undefined}
         onClick={(event) => event.stopPropagation()}
         style={{
           width: "min(100%, " + width + "px)",
           maxHeight: "92vh",
           overflowY: "auto",
-          background: "#fff",
+          background: "var(--color-surface)",
           borderRadius: 14,
-          border: "1px solid #e5e7eb",
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+          border: "1px solid var(--color-border)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         <div
           style={{
             padding: "14px 16px",
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid var(--color-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -60,8 +63,9 @@ function Modal({
             type="button"
             onClick={onClose}
             style={{
-              border: "1px solid #d1d5db",
-              background: "#fff",
+              border: "1px solid var(--color-border-strong)",
+              background: "var(--color-surface)",
+              color: "var(--color-text-muted)",
               borderRadius: 999,
               padding: "4px 10px",
               fontSize: 12,
@@ -76,7 +80,7 @@ function Modal({
           <div
             style={{
               padding: 16,
-              borderTop: "1px solid #e5e7eb",
+              borderTop: "1px solid var(--color-border)",
               display: "flex",
               gap: 8,
               justifyContent: "flex-end",

@@ -166,7 +166,7 @@ function SmartOperations() {
       return <button type="button" onClick={() => navigate(`/smart-devices/${issue.device_id}`)}>Apri device</button>;
     }
     if (issue.unit_id) {
-      return <button type="button" onClick={() => navigate(`/smart-units/${issue.unit_id}`)}>Apri unita</button>;
+      return <button type="button" onClick={() => navigate(`/smart-units/${issue.unit_id}`)}>Apri unità</button>;
     }
     return <button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>;
   }
@@ -175,7 +175,7 @@ function SmartOperations() {
     <div>
       <SectionHeader
         title="Smart Operations Mode"
-        subtitle="Vista operativa action-first: unita con criticita, issue prioritarie e attivita recente."
+        subtitle="Vista operativa action-first: unità con criticità, issue prioritarie e attività recente."
         right={(
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -194,7 +194,7 @@ function SmartOperations() {
 
       <FilterBar>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Property</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Property</span>
           <select value={filters.property_id} onChange={(event) => onFilterChange("property_id", event.target.value)}>
             <option value="">Tutte</option>
             {properties.map((property) => (
@@ -205,7 +205,7 @@ function SmartOperations() {
           </select>
         </label>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Unita</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Unità</span>
           <select value={filters.unit_id} onChange={(event) => onFilterChange("unit_id", event.target.value)}>
             <option value="">Tutte</option>
             {filteredUnits.map((unit) => (
@@ -216,7 +216,7 @@ function SmartOperations() {
           </select>
         </label>
         <label style={{ minWidth: 140 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Severita</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Severita</span>
           <select value={filters.severity} onChange={(event) => onFilterChange("severity", event.target.value)}>
             <option value="">Tutte</option>
             <option value="critical">critical</option>
@@ -225,7 +225,7 @@ function SmartOperations() {
           </select>
         </label>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Tipo issue</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Tipo issue</span>
           <select value={filters.issue_type} onChange={(event) => onFilterChange("issue_type", event.target.value)}>
             <option value="">Tutti</option>
             {issueTypeOptions.map((value) => (
@@ -236,7 +236,7 @@ function SmartOperations() {
           </select>
         </label>
         <label style={{ minWidth: 140 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Stato</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Stato</span>
           <select value={filters.status} onChange={(event) => onFilterChange("status", event.target.value)}>
             <option value="">Tutti</option>
             <option value="open">open</option>
@@ -250,13 +250,13 @@ function SmartOperations() {
       </FilterBar>
 
       {loading ? <LoadingSkeleton rows={8} height={26} /> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-      {actionError ? <p style={{ color: "#b91c1c" }}>{actionError}</p> : null}
+      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      {actionError ? <p style={{ color: "var(--color-danger)" }}>{actionError}</p> : null}
 
       {!loading && !error && operations ? (
         <>
           <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
-            <StatCard label="Unita da attenzionare" value={operations.summary.units_needing_attention} tone="warning" />
+            <StatCard label="Unità da attenzionare" value={operations.summary.units_needing_attention} tone="warning" />
             <StatCard label="Issue aperte" value={operations.summary.open_issues} tone="warning" />
             <StatCard label="Issue critical" value={operations.summary.critical_issues} tone="danger" />
             <StatCard label="Alert aperti" value={operations.summary.open_alerts} tone="warning" />
@@ -269,13 +269,13 @@ function SmartOperations() {
 
           <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))" }}>
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Unita che richiedono intervento</h3>
+              <h3 style={{ marginBottom: 8 }}>Unità che richiedono intervento</h3>
               {(operations.units_needing_attention || []).length === 0 ? (
-                <EmptyState title="Nessuna unita da attenzionare" />
+                <EmptyState title="Nessuna unità da attenzionare" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {operations.units_needing_attention.map((unit) => (
-                    <div key={unit.unit_id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+                    <div key={unit.unit_id} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <strong>{unit.unit_name}</strong>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -283,19 +283,19 @@ function SmartOperations() {
                           <ReadinessBadge status={unit.readiness_status} />
                         </div>
                       </div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
                         score {unit.attention_score} · alert {unit.open_alerts} · offline {unit.offline_devices} · fail {unit.automation_failures}
                       </div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#475569" }}>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
                         readiness score {unit.readiness_score}/100
                       </div>
                       {unit.reasons?.length ? (
-                        <div style={{ marginTop: 6, fontSize: 12, color: "#334155" }}>
+                        <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-text)" }}>
                           {unit.reasons.join(" · ")}
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button type="button" onClick={() => navigate(`/smart-units/${unit.unit_id}`)}>Apri unita</button>
+                        <button type="button" onClick={() => navigate(`/smart-units/${unit.unit_id}`)}>Apri unità</button>
                         <button type="button" onClick={() => navigate("/smart-alerts")}>Apri alert</button>
                       </div>
                     </div>
@@ -314,7 +314,7 @@ function SmartOperations() {
                     <ActivityCard
                       key={issue.issue_id}
                       title={issue.title}
-                      subtitle={`${issue.issue_type} · ${issue.unit_name || "Unita n/d"}`}
+                      subtitle={`${issue.issue_type} · ${issue.unit_name || "Unità n/d"}`}
                       severity={issue.severity}
                       timestamp={issue.last_seen_at || issue.occurred_at}
                       onClick={() => openIssue(issue)}
@@ -326,9 +326,9 @@ function SmartOperations() {
             </AppCard>
 
             <AppCard>
-              <h3 style={{ marginBottom: 8 }}>Attivita recente</h3>
+              <h3 style={{ marginBottom: 8 }}>Attività recente</h3>
               {(operations.activity || []).length === 0 ? (
-                <EmptyState title="Nessuna attivita recente" />
+                <EmptyState title="Nessuna attività recente" />
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {operations.activity.map((item) => (

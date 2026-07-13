@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, Rocket } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { AlertTriangle, CalendarRange, Cpu, Rocket } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -17,7 +17,7 @@ import {
   LastUpdatedIndicator,
   LiveStatusDot,
   LoadingSkeleton,
-  SectionHeader,
+  PageHeader,
   StatCard,
 } from "../components/ui";
 import ActivityCard from "../components/dashboard/ActivityCard";
@@ -34,6 +34,38 @@ import {
   getSmartUnitTelemetry,
   getSmartUnitTimeline,
 } from "../services/api";
+
+/**
+ * Sub-navigation shared by the two unit views (PMS timeline / smart detail):
+ * makes /units/:id/timeline and /smart-units/:id feel like one unit page
+ * with two tabs. Real links (middle-click friendly), tokens only.
+ */
+function UnitViewTabs({ unitId, active }) {
+  const tabs = [
+    { key: "timeline", label: "Timeline PMS", to: `/units/${unitId}/timeline`, icon: CalendarRange },
+    { key: "smart", label: "Smart & dispositivi", to: `/smart-units/${unitId}`, icon: Cpu },
+  ];
+  return (
+    <nav className="ui-tablist" aria-label="Viste unità" style={{ marginBottom: 16 }}>
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = tab.key === active;
+        return (
+          <Link
+            key={tab.key}
+            to={tab.to}
+            className={isActive ? "ui-tab is-active" : "ui-tab"}
+            aria-current={isActive ? "page" : undefined}
+            style={{ textDecoration: "none" }}
+          >
+            <Icon size={14} aria-hidden="true" />
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 const RANGE_OPTIONS = {
   "24h": { hours: 24, interval: "15m" },
@@ -189,15 +221,33 @@ function SmartUnitDetail() {
   const energySeries = useMemo(() => mapPoints(pickSeries(telemetry, "energy")), [telemetry]);
 
   if (loading) return <LoadingSkeleton rows={8} height={28} />;
-  if (error) return <p style={{ color: "#b91c1c" }}>{error}</p>;
-  if (!detail || !summary) return <EmptyState title="Nessun dato unità smart" />;
+  if (error)
+    return (
+      <div>
+        <UnitViewTabs unitId={unitId} active="smart" />
+        <p style={{ color: "var(--color-danger)" }}>{error}</p>
+      </div>
+    );
+  if (!detail || !summary)
+    return (
+      <div>
+        <UnitViewTabs unitId={unitId} active="smart" />
+        <EmptyState title="Nessun dato unità smart" />
+      </div>
+    );
+
+  const unitLabel = detail.unit?.name || `Unità #${unitId}`;
 
   return (
     <div>
-      <SectionHeader
-        title={`Unità Smart · ${detail.unit.name}`}
-        subtitle="Control center dell'unità: salute dispositivi, alert e timeline operativa"
-        right={
+      <PageHeader
+        title={unitLabel}
+        subtitle="Smart & dispositivi: salute dispositivi, telemetria, alert e timeline operativa dell'unità"
+        breadcrumb={[
+          { label: "Appartamenti", href: "/units" },
+          { label: unitLabel },
+        ]}
+        actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <LiveStatusDot active={!document.hidden} title="Auto refresh 15s" />
@@ -212,6 +262,8 @@ function SmartUnitDetail() {
           </div>
         }
       />
+
+      <UnitViewTabs unitId={unitId} active="smart" />
 
       <div className="ui-grid-cards" style={{ marginBottom: 12 }}>
         <StatCard label="Dispositivi" value={summary.total_devices} />
@@ -320,7 +372,7 @@ function SmartUnitDetail() {
                 key={item}
                 type="button"
                 onClick={() => setRange(item)}
-                style={item === range ? { borderColor: "#0f766e", color: "#0f766e" } : undefined}
+                style={item === range ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : undefined}
               >
                 {item}
               </button>

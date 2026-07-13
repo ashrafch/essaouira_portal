@@ -76,10 +76,10 @@ function SmartDashboard() {
   const chartHealth = useMemo(() => {
     if (!dashboard) return [];
     return [
-      { name: "Online", value: dashboard.kpis.online_devices, color: "#10b981" },
-      { name: "Offline", value: dashboard.kpis.offline_devices, color: "#ef4444" },
-      { name: "Warning", value: dashboard.kpis.warning_devices, color: "#f59e0b" },
-      { name: "Critical", value: dashboard.kpis.critical_devices, color: "#dc2626" },
+      { name: "Online", value: dashboard.kpis.online_devices, color: "var(--color-success)" },
+      { name: "Offline", value: dashboard.kpis.offline_devices, color: "var(--color-danger)" },
+      { name: "Warning", value: dashboard.kpis.warning_devices, color: "var(--color-warning)" },
+      { name: "Critical", value: dashboard.kpis.critical_devices, color: "var(--color-danger-strong)" },
     ];
   }, [dashboard]);
 
@@ -199,7 +199,7 @@ function SmartDashboard() {
 
       <FilterBar>
         <label style={{ minWidth: 220 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Property</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Property</span>
           <select
             value={propertyId}
             onChange={(e) => {
@@ -218,7 +218,7 @@ function SmartDashboard() {
           </select>
         </label>
         <label style={{ minWidth: 220 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Unità</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Unità</span>
           <select
             value={unitId}
             onChange={(e) => {
@@ -238,8 +238,8 @@ function SmartDashboard() {
       </FilterBar>
 
       {loading ? <LoadingSkeleton rows={8} height={30} /> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-      {actionError ? <p style={{ color: "#b91c1c" }}>{actionError}</p> : null}
+      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      {actionError ? <p style={{ color: "var(--color-danger)" }}>{actionError}</p> : null}
 
       {!loading && !error && dashboard ? (
         <>
@@ -298,7 +298,7 @@ function SmartDashboard() {
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="value" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -330,12 +330,12 @@ function SmartDashboard() {
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {(dashboard.units_not_ready || []).slice(0, 10).map((row) => (
-                    <div key={`readiness-${row.unit_id}`} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+                    <div key={`readiness-${row.unit_id}`} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <strong>{row.unit_name}</strong>
                         <ReadinessBadge status={row.readiness_status} />
                       </div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
                         score {row.readiness_score}/100
                       </div>
                       <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -356,7 +356,7 @@ function SmartDashboard() {
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {(dashboard.problematic_units || []).map((item) => (
-                    <div key={`${item.unit_id || "na"}-${item.unit_name}`} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+                    <div key={`${item.unit_id || "na"}-${item.unit_name}`} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10 }}>
                       <strong>{item.unit_name}</strong>
                       <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <StatusBadge status={item.offline_devices > 0 ? "offline" : "online"} />
@@ -459,19 +459,19 @@ function SmartDashboard() {
             ) : (
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
                 {dashboard.provider_statuses.map((item) => (
-                  <div key={item.connection_id} style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+                  <div key={item.connection_id} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                       <strong>{item.provider_name}</strong>
                       <StatusBadge status={item.status || "offline"} />
                     </div>
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-text-muted)" }}>
                       property #{item.property_id} · attiva {item.is_active ? "sì" : "no"}
                     </div>
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                    <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
                       ultimo sync: {item.last_sync_at ? new Date(item.last_sync_at).toLocaleString() : "n/d"}
                     </div>
                     {item.last_error ? (
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>{item.last_error}</div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-danger)" }}>{item.last_error}</div>
                     ) : null}
                   </div>
                 ))}
@@ -489,14 +489,14 @@ function SmartDashboard() {
                   <MotionDiv
                     key={pack.key}
                     whileHover={{ y: -2 }}
-                    style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 10, background: "#f8fafc" }}
+                    style={{ border: "1px solid var(--color-border)", borderRadius: 12, padding: 10, background: "var(--color-surface-soft)" }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                       <strong>{pack.name}</strong>
                       <StatusBadge status={enabled ? "healthy" : "offline"} />
                     </div>
-                    <p style={{ margin: "6px 0", fontSize: 13, color: "#64748b" }}>{pack.description}</p>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Include: {(pack.includes || []).join(", ")}</div>
+                    <p style={{ margin: "6px 0", fontSize: 13, color: "var(--color-text-muted)" }}>{pack.description}</p>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Include: {(pack.includes || []).join(", ")}</div>
                     <button
                       type="button"
                       onClick={() => handleEnablePack(pack.key)}

@@ -1,13 +1,8 @@
-import { clearAuthSession } from "./auth";
+import { clearAuthSession, getAccessToken } from "./auth";
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
-const TOKEN_KEY = "essaouira_portal_token";
 let unauthorizedHandled = false;
-
-function getAccessToken() {
-  return window.localStorage.getItem(TOKEN_KEY);
-}
 
 function getAuthHeaders() {
   const token = getAccessToken();
@@ -528,4 +523,20 @@ export function setupEnableAutomations(payload) {
 
 export function setupComplete() {
   return apiPost("/setup/complete", {});
+}
+
+/* --------- DASHBOARD & REPORTS --------- */
+
+// Single lightweight call powering sidebar badges + the mission-control home.
+export function getDashboardSummary() {
+  return apiGet("/dashboard/summary");
+}
+
+export function getOwnerMonthlyReport(year, month) {
+  return apiGet("/analytics/report/monthly", { year, month });
+}
+
+// Direct URL for the CSV download (opened in a new tab / anchor href).
+export function ownerMonthlyReportCsvUrl(year, month) {
+  return `${BASE_URL}/analytics/report/monthly.csv${buildQuery({ year, month })}`;
 }

@@ -11,7 +11,7 @@ function iconForInsight(insightType) {
 
 function TelemetryInsightCard({ insight, onOpen }) {
   return (
-    <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, padding: 10, background: "#ffffff" }}>
+    <div style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10, background: "var(--color-surface)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
         <strong style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           {iconForInsight(insight.insight_type)}
@@ -22,13 +22,13 @@ function TelemetryInsightCard({ insight, onOpen }) {
           <SeverityBadge severity={insight.severity || "warning"} />
         </div>
       </div>
-      <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>
+      <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-text-muted)" }}>
         device #{insight.device_id} · unità {insight.unit_id || "n/d"} · metric {insight.metric_type}
       </div>
-      <div style={{ marginTop: 4, fontSize: 12, color: "#334155" }}>
+      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text)" }}>
         valore {insight.value ?? "n/d"} · soglia {insight.threshold ?? "n/d"}
       </div>
-      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+      <div style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-muted)" }}>
         rilevato: {insight.detected_at ? new Date(insight.detected_at).toLocaleString() : "n/d"}
       </div>
       {onOpen ? (

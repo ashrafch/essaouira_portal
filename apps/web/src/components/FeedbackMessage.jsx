@@ -2,10 +2,10 @@ function FeedbackMessage({ message, type = "info", onClose }) {
   if (!message) return null;
   const palette =
     type === "success"
-      ? { bg: "#ecfdf5", border: "#86efac", text: "#166534" }
+      ? { bg: "var(--color-success-soft)", border: "var(--color-success)", text: "var(--color-success-strong)" }
       : type === "error"
-      ? { bg: "#fef2f2", border: "#fca5a5", text: "#b91c1c" }
-      : { bg: "#eff6ff", border: "#93c5fd", text: "#1d4ed8" };
+      ? { bg: "var(--color-danger-soft)", border: "var(--color-danger)", text: "var(--color-danger-strong)" }
+      : { bg: "var(--color-info-soft)", border: "var(--color-info)", text: "var(--color-info-strong)" };
 
   return (
     <div
@@ -29,7 +29,7 @@ function FeedbackMessage({ message, type = "info", onClose }) {
           onClick={onClose}
           style={{
             border: "1px solid " + palette.border,
-            background: "#fff",
+            background: "var(--color-surface)",
             color: palette.text,
             borderRadius: 999,
             padding: "2px 8px",

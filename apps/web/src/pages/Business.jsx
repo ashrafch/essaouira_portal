@@ -149,30 +149,30 @@ function Business() {
   };
 
   const card = {
-    background: "white",
+    background: "var(--color-surface)",
     borderRadius: 14,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const cardTitle = {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 0.04,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     marginBottom: 4,
   };
 
   const cardValue = {
     fontSize: 20,
     fontWeight: 600,
-    color: "#111827",
+    color: "var(--color-text)",
   };
 
   const cardSub = {
     fontSize: 11,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     marginTop: 2,
   };
 
@@ -180,7 +180,7 @@ function Business() {
     fontSize: 13,
     fontWeight: 600,
     marginBottom: 6,
-    color: "#111827",
+    color: "var(--color-text)",
   };
 
   const sectionRow = {
@@ -197,30 +197,30 @@ function Business() {
 
   const th = {
     textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontSize: 11,
   };
 
   const td = {
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
     verticalAlign: "top",
   };
 
   const clickableRow = (active) => ({
     cursor: "pointer",
-    backgroundColor: active ? "#ecfdf5" : "transparent",
+    backgroundColor: active ? "var(--color-primary-soft)" : "transparent",
   });
 
   const smallButton = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "4px 10px",
     fontSize: 11,
-    color: "gray",
-    background: "#f9fafb",
+    color: "var(--color-text-muted)",
+    background: "var(--color-surface-soft)",
     cursor: "pointer",
   };
 
@@ -229,7 +229,7 @@ function Business() {
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Business & Analytics</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Panoramica mensile di ricavi, costi e performance degli
             appartamenti.
           </p>
@@ -238,7 +238,7 @@ function Business() {
           <label
             style={{
               fontSize: 11,
-              color: "#6b7280",
+              color: "var(--color-text-muted)",
               marginRight: 6,
             }}
           >
@@ -254,7 +254,7 @@ function Business() {
             }}
             style={{
               borderRadius: 8,
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--color-border-strong)",
               padding: "6px 8px",
               fontSize: 13,
             }}
@@ -271,7 +271,7 @@ function Business() {
       </div>
 
       {error && (
-        <p style={{ color: "red", fontSize: 12, marginBottom: 4 }}>{error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
       )}
 
       {loading || !pnl ? (
@@ -309,7 +309,7 @@ function Business() {
               <div
                 style={{
                   ...cardValue,
-                  color: pnl.profit >= 0 ? "#15803d" : "#b91c1c",
+                  color: pnl.profit >= 0 ? "var(--color-success)" : "var(--color-danger)",
                 }}
               >
                 {pnl.profit.toFixed(2)} €
@@ -325,7 +325,7 @@ function Business() {
             <div style={card}>
               <div style={sectionTitle}>Ricavi per sorgente</div>
               {Object.keys(pnl.revenue_by_source || {}).length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessun ricavo per il mese selezionato.
                 </p>
               ) : (
@@ -353,7 +353,7 @@ function Business() {
             <div style={card}>
               <div style={sectionTitle}>Ricavi per unità</div>
               {pnl.revenue_by_unit.length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessuna prenotazione nel mese selezionato.
                 </p>
               ) : (
@@ -384,7 +384,7 @@ function Business() {
             <div style={card}>
               <div style={sectionTitle}>Costi per categoria</div>
               {pnl.costs_by_category.length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessun costo registrato nel mese selezionato.
                 </p>
               ) : (
@@ -398,7 +398,7 @@ function Business() {
                       gap: 8,
                     }}
                   >
-                    <p style={{ fontSize: 11, color: "#6b7280" }}>
+                    <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                       Il valore in tabella è il{" "}
                       <strong>totale dei costi</strong> per ciascuna
                       categoria nel mese selezionato.
@@ -463,7 +463,7 @@ function Business() {
                                   ...td,
                                   textAlign: "right",
                                   fontSize: 11,
-                                  color: "#4b5563",
+                                  color: "var(--color-text-muted)",
                                 }}
                               >
                                 {perc.toFixed(1)}%
@@ -480,7 +480,7 @@ function Business() {
 
             <div style={card}>
               <div style={sectionTitle}>Dettaglio costi del mese</div>
-              <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 6 }}>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6 }}>
                 Stai visualizzando:{" "}
                 <strong>
                   {selectedCostCategory === "all"
@@ -512,7 +512,7 @@ function Business() {
               </p>
 
               {visibleCostLines.length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessun costo registrato per il filtro selezionato.
                 </p>
               ) : (

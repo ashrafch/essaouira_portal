@@ -112,7 +112,7 @@ function SmartAlerts() {
           </div>
         }
       />
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
       <FeedbackMessage
         message={feedback.message}
         type={feedback.type}
@@ -121,7 +121,7 @@ function SmartAlerts() {
 
       <FilterBar>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Stato</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Stato</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Tutti</option>
             <option value="open">Aperti</option>

@@ -63,7 +63,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
   const pageTitle = assistantType === "checkin" ? "Check-in Smart Assistant" : "Checkout Smart Assistant";
   const pageSubtitle = assistantType === "checkin"
     ? "Vista guidata per validare arrivi imminenti con readiness, task e segnali smart."
-    : "Vista guidata per chiudere il soggiorno e riportare l'unita in eco/off mode.";
+    : "Vista guidata per chiudere il soggiorno e riportare l'unità in eco/off mode.";
 
   const filteredUnits = useMemo(() => {
     if (!filters.property_id) return units;
@@ -178,7 +178,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
 
       <FilterBar>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Property</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Property</span>
           <select value={filters.property_id} onChange={(event) => updateFilter("property_id", event.target.value)}>
             <option value="">Tutte</option>
             {properties.map((property) => (
@@ -189,7 +189,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
           </select>
         </label>
         <label style={{ minWidth: 180 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Unita</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Unità</span>
           <select value={filters.unit_id} onChange={(event) => updateFilter("unit_id", event.target.value)}>
             <option value="">Tutte</option>
             {filteredUnits.map((unit) => (
@@ -200,7 +200,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
           </select>
         </label>
         <label style={{ minWidth: 160 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Stato</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Stato</span>
           <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
             <option value="">Tutti</option>
             <option value="READY">READY</option>
@@ -210,18 +210,18 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
           </select>
         </label>
         <label style={{ minWidth: 160 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Dal</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Dal</span>
           <input type="date" value={filters.date_from} onChange={(event) => updateFilter("date_from", event.target.value)} />
         </label>
         <label style={{ minWidth: 160 }}>
-          <span style={{ fontSize: 12, color: "#64748b" }}>Al</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Al</span>
           <input type="date" value={filters.date_to} onChange={(event) => updateFilter("date_to", event.target.value)} />
         </label>
       </FilterBar>
 
       {loading ? <LoadingSkeleton rows={8} height={28} /> : null}
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-      {actionError ? <p style={{ color: "#b91c1c" }}>{actionError}</p> : null}
+      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      {actionError ? <p style={{ color: "var(--color-danger)" }}>{actionError}</p> : null}
 
       {!loading && !error ? (
         <>
@@ -246,7 +246,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <div style={{ display: "grid", gap: 4 }}>
                         <h3 style={{ margin: 0 }}>{item.booking.guest_name}</h3>
-                        <div style={{ color: "#64748b", fontSize: 14 }}>
+                        <div style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
                           {item.booking.unit_name}
                           {item.booking.property_name ? ` · ${item.booking.property_name}` : ""}
                           {assistantType === "checkin"
@@ -256,7 +256,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
                             ? ` · ETA ${asTimeLabel(item.booking.estimated_arrival_time)}`
                             : ""}
                         </div>
-                        <div style={{ color: "#0f172a", fontSize: 14 }}>{item.assistant_summary}</div>
+                        <div style={{ color: "var(--color-text)", fontSize: 14 }}>{item.assistant_summary}</div>
                       </div>
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
                         <ReadinessBadge status={item.assistant_status} />
@@ -377,7 +377,7 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
                       </div>
 
                       <div>
-                        <h4 style={{ margin: "0 0 8px" }}>Eventi recenti unita</h4>
+                        <h4 style={{ margin: "0 0 8px" }}>Eventi recenti unità</h4>
                         {item.recent_events.length === 0 ? (
                           <EmptyState title="Nessun evento recente" />
                         ) : (

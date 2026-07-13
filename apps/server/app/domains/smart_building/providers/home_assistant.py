@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from typing import Any
 from urllib import error, request
 
+from app.core.config import settings
 from app.domains.smart_building.providers.base import (
     ProviderCommandRequest,
     ProviderCommandResult,
@@ -37,20 +37,20 @@ class HomeAssistantProvider(SmartDeviceProvider):
         include_domains: str | None = None,
         unit_hints_json: str | None = None,
     ) -> None:
-        self._base_url = (base_url or os.getenv("HOME_ASSISTANT_URL", "")).strip().rstrip("/")
-        self._token = (token or os.getenv("HOME_ASSISTANT_TOKEN", "")).strip()
-        timeout_raw = os.getenv("HOME_ASSISTANT_TIMEOUT_SECONDS", "8").strip()
+        self._base_url = (base_url or settings.home_assistant_url).strip().rstrip("/")
+        self._token = (token or settings.home_assistant_token).strip()
+        timeout_raw = settings.home_assistant_timeout_seconds.strip()
         effective_timeout = timeout_seconds if timeout_seconds is not None else timeout_raw
         try:
             self._timeout = max(2, min(int(effective_timeout), 30))
         except (TypeError, ValueError):
             self._timeout = 8
         self._include_domains = self._parse_domains(
-            include_domains if include_domains is not None else os.getenv("HOME_ASSISTANT_INCLUDE_DOMAINS"),
+            include_domains if include_domains is not None else settings.home_assistant_include_domains,
             default=SUPPORTED_ENTITY_DOMAINS,
         )
         self._unit_hint_map = self._parse_unit_hint_map(
-            unit_hints_json if unit_hints_json is not None else os.getenv("HOME_ASSISTANT_UNIT_HINTS", "")
+            unit_hints_json if unit_hints_json is not None else settings.home_assistant_unit_hints
         )
 
     def _parse_domains(self, value: str | None, *, default: set[str]) -> set[str]:

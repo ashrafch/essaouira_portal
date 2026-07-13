@@ -90,7 +90,7 @@ function Properties() {
         subtitle="Gestione portfolio property multi-tenant e connessioni provider persistenti"
         right={<button type="button" onClick={() => navigate("/setup")}>Apri Setup Wizard</button>}
       />
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, marginBottom: 12 }}>
         <AppCard>
@@ -159,12 +159,12 @@ function Properties() {
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {properties.map((p) => (
-                <div key={p.id} style={{ border: "1px solid #eef2f7", borderRadius: 8, padding: 8 }}>
+                <div key={p.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <strong>{p.name}</strong>
                     <StatusBadge status={p.status || "active"} />
                   </div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
                     #{p.id} · {p.code || "n/d"} · {p.timezone}
                   </div>
                 </div>

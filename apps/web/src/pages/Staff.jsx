@@ -671,26 +671,26 @@ function Staff() {
   };
 
   const card = {
-    background: "white",
+    background: "var(--color-surface)",
     borderRadius: 14,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const sectionTitle = {
     fontSize: 13,
     fontWeight: 600,
     marginBottom: 6,
-    color: "#111827",
+    color: "var(--color-text)",
   };
 
   const smallButton = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "4px 10px",
     fontSize: 11,
-    background: "white",
+    background: "var(--color-surface)",
     cursor: "pointer",
   };
 
@@ -701,27 +701,27 @@ function Staff() {
     padding: "8px 14px",
     fontSize: 13,
     fontWeight: 600,
-    backgroundColor: "#0f766e",
-    color: "white",
+    backgroundColor: "var(--color-primary)",
+    color: "var(--color-on-primary)",
     cursor: "pointer",
   };
 
   const buttonSecondary = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "8px 14px",
     fontSize: 13,
     fontWeight: 500,
-    backgroundColor: "white",
-    color: "#374151",
+    backgroundColor: "var(--color-surface)",
+    color: "var(--color-text-muted)",
     cursor: "pointer",
   };
 
   const modeButton = (active) => ({
     ...smallButton,
-    borderColor: active ? "#0f766e" : "#d1d5db",
-    color: active ? "#0f766e" : "#374151",
-    background: active ? "#ecfdf5" : "white",
+    borderColor: active ? "var(--color-primary)" : "var(--color-border-strong)",
+    color: active ? "var(--color-primary)" : "var(--color-text-muted)",
+    background: active ? "var(--color-primary-soft)" : "var(--color-surface)",
   });
 
   const pillStatus = (status) => ({
@@ -730,10 +730,11 @@ function Staff() {
     padding: "2px 8px",
     borderRadius: 999,
     fontSize: 11,
-    backgroundColor: status === "done" ? "#dcfce7" : "#e5e7eb",
-    color: status === "done" ? "#166534" : "#374151",
+    backgroundColor:
+      status === "done" ? "var(--color-success-soft)" : "var(--color-border)",
+    color: status === "done" ? "var(--color-success-strong)" : "var(--color-text)",
     border: `1px solid ${
-      status === "done" ? "#16a34a" : "rgba(148,163,184,0.6)"
+      status === "done" ? "var(--color-success)" : "var(--color-border-strong)"
     }`,
     cursor: "pointer",
   });
@@ -753,27 +754,27 @@ function Staff() {
 
   const boardHeaderCell = {
     padding: "6px 4px",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     fontSize: 11,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontWeight: 500,
     textAlign: "center",
-    background: "#f9fafb",
+    background: "var(--color-surface-soft)",
   };
 
   const boardDayCell = {
     padding: "6px 4px",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     fontSize: 11,
-    color: "#374151",
-    background: "#f9fafb",
+    color: "var(--color-text)",
+    background: "var(--color-surface-soft)",
     fontWeight: 500,
   };
 
   const boardCell = {
     padding: 6,
-    borderBottom: "1px solid #f3f4f6",
-    borderRight: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
+    borderRight: "1px solid var(--color-border)",
     verticalAlign: "top",
     minWidth: 0,
   };
@@ -782,12 +783,13 @@ function Staff() {
     borderRadius: 10,
     padding: 6,
     marginBottom: 4,
-    border: "1px solid #e5e7eb",
-    backgroundColor: status === "done" ? "#f0fdf4" : "white",
+    border: "1px solid var(--color-border)",
+    backgroundColor:
+      status === "done" ? "var(--color-success-soft)" : "var(--color-surface)",
     boxShadow:
       status === "done"
-        ? "0 0 0 1px rgba(34,197,94,0.1)"
-        : "0 1px 2px rgba(15,23,42,0.06)",
+        ? "0 0 0 1px var(--color-success)"
+        : "var(--shadow-sm)",
     display: "flex",
     flexDirection: "column",
     gap: 4,
@@ -796,7 +798,7 @@ function Staff() {
   const inputInline = {
     width: "100%",
     borderRadius: 8,
-    border: "1px solid #e5e7eb",
+    border: "1px solid var(--color-border)",
     padding: "4px 6px",
     fontSize: 11,
   };
@@ -809,15 +811,15 @@ function Staff() {
     fontSize: 10,
     backgroundColor:
       taskType === "checkin"
-        ? "#dbeafe"
+        ? "var(--color-info-soft)"
         : taskType === "checkout"
-        ? "#fee2e2"
+        ? "var(--color-danger-soft)"
         : taskType === "cleaning"
-        ? "#dcfce7"
+        ? "var(--color-success-soft)"
         : taskType === "breakfast"
-        ? "#fef9c3"
-        : "#e5e7eb",
-    color: "#111827",
+        ? "var(--color-warning-soft)"
+        : "var(--color-border)",
+    color: "var(--color-text)",
   });
 
   const infoRow = {
@@ -844,12 +846,12 @@ function Staff() {
   const label = {
     fontSize: 11,
     fontWeight: 500,
-    color: "#374151",
+    color: "var(--color-text-muted)",
   };
 
   const input = {
     borderRadius: 8,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "6px 8px",
     fontSize: 13,
   };
@@ -872,14 +874,14 @@ function Staff() {
   };
 
   const kpiCard = {
-    background: "#f9fafb",
+    background: "var(--color-surface-soft)",
     borderRadius: 12,
     padding: "8px 10px",
   };
 
   const tinyLabel = {
     fontSize: 11,
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     marginBottom: 2,
   };
 
@@ -891,8 +893,8 @@ function Staff() {
   const quickForm = {
     marginTop: 6,
     borderRadius: 10,
-    border: "1px dashed #cbd5f5",
-    background: "#f9fafb",
+    border: "1px dashed var(--color-border-strong)",
+    background: "var(--color-surface-soft)",
     padding: 6,
     display: "flex",
     flexDirection: "column",
@@ -900,8 +902,8 @@ function Staff() {
   };
 
   const ticketCardStyle = {
-    backgroundColor: "#fffbeb",
-    border: "1px solid #fcd34d",
+    backgroundColor: "var(--color-warning-soft)",
+    border: "1px solid var(--color-warning)",
     borderRadius: 8,
     padding: "10px",
     marginBottom: 8,
@@ -916,15 +918,15 @@ function Staff() {
 
   const th = {
     textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontSize: 12,
   };
 
   const td = {
     padding: "6px 4px",
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
   };
 
   return (
@@ -932,7 +934,7 @@ function Staff() {
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Staff & Pulizie</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Board operativo per assegnare, completare e valorizzare i task
             dello staff. I costi qui finiscono direttamente nella Business.
           </p>
@@ -943,7 +945,7 @@ function Staff() {
               <label
                 style={{
                   fontSize: 11,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                   marginRight: 6,
                 }}
               >
@@ -955,7 +957,7 @@ function Staff() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 style={{
                   borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  border: "1px solid var(--color-border-strong)",
                   padding: "6px 8px",
                   fontSize: 13,
                 }}
@@ -983,7 +985,7 @@ function Staff() {
               <label
                 style={{
                   fontSize: 11,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                   marginRight: 4,
                 }}
               >
@@ -994,7 +996,7 @@ function Staff() {
                 onChange={(e) => setUnitFilter(e.target.value)}
                 style={{
                   borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  border: "1px solid var(--color-border-strong)",
                   padding: "4px 8px",
                   fontSize: 12,
                   minWidth: 140,
@@ -1012,7 +1014,7 @@ function Staff() {
               <label
                 style={{
                   fontSize: 11,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                   marginRight: 4,
                 }}
               >
@@ -1023,7 +1025,7 @@ function Staff() {
                 onChange={(e) => setTaskTypeFilter(e.target.value)}
                 style={{
                   borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  border: "1px solid var(--color-border-strong)",
                   padding: "4px 8px",
                   fontSize: 12,
                   minWidth: 140,
@@ -1037,7 +1039,7 @@ function Staff() {
                 ))}
               </select>
             </div>
-            <div style={{ fontSize: 11, color: "#6b7280" }}>
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
               Task nel periodo: <strong>{kpi.total}</strong>
             </div>
             <button
@@ -1052,7 +1054,7 @@ function Staff() {
       </div>
 
       {error && (
-        <p style={{ color: "red", fontSize: 12, marginBottom: 4 }}>{error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
       )}
       <FeedbackMessage
         message={feedback.message}
@@ -1065,7 +1067,7 @@ function Staff() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.45)",
+            background: "var(--color-overlay)",
             zIndex: 1100,
           }}
         />
@@ -1079,17 +1081,17 @@ function Staff() {
           <div style={card}>
              <div style={sectionTitle}>🔧 Segnalazioni Aperte ({openTickets.length})</div>
              {openTickets.length === 0 ? (
-                 <p style={{ fontSize: 12, color: "#6b7280" }}>Nessuna manutenzione pendente.</p>
+                 <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Nessuna manutenzione pendente.</p>
              ) : (
                  <div style={{ maxHeight: 300, overflowY: "auto" }}>
                      {openTickets.map(t => (
                          <div key={t.id} style={ticketCardStyle}>
                              <div style={{ fontWeight: 600, marginBottom: 2 }}>{t.title}</div>
-                             <div style={{ color: "#4b5563", marginBottom: 4 }}>
+                             <div style={{ color: "var(--color-text-muted)", marginBottom: 4 }}>
                                  {t.unit_id ? (unitMap[t.unit_id]?.name || `Unit #${t.unit_id}`) : "Struttura"} · {t.priority}
                              </div>
                              {t.assigned_to_id && (
-                                 <div style={{ color: "#059669" }}>
+                                 <div style={{ color: "var(--color-success)" }}>
                                      Assegnato a: {staffMembers.find(s => s.id === t.assigned_to_id)?.name || "?"}
                                  </div>
                              )}
@@ -1106,7 +1108,7 @@ function Staff() {
               <div style={kpiCard}>
                 <div style={tinyLabel}>Task totali</div>
                 <div style={tinyValue}>{kpi.total}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                   Done: {kpi.byStatus.done || 0} · Planned:{" "}
                   {kpi.byStatus.planned || 0}
                 </div>
@@ -1114,14 +1116,14 @@ function Staff() {
               <div style={kpiCard}>
                 <div style={tinyLabel}>Ore stimate</div>
                 <div style={tinyValue}>{kpi.hours.toFixed(1)}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                   Totale task filtrate
                 </div>
               </div>
               <div style={kpiCard}>
                 <div style={tinyLabel}>Costo</div>
                 <div style={tinyValue}>€ {kpi.costTotal.toFixed(2)}</div>
-                <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                   Business (Staff)
                 </div>
               </div>
@@ -1131,7 +1133,7 @@ function Staff() {
           {/* Default settings */}
           <div style={card}>
             <div style={sectionTitle}>Impostazioni staff & default</div>
-            <p style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
               Questi valori vengono usati quando il sistema crea automaticamente
               task (es. pulizie al check-out).
             </p>
@@ -1197,7 +1199,7 @@ function Staff() {
                     : "Salva impostazioni automatiche"}
                 </button>
                 {!canManageDefaults && (
-                  <p style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
                     Ruolo in sola operativita': puoi leggere i default ma non modificarli.
                   </p>
                 )}
@@ -1205,7 +1207,7 @@ function Staff() {
                   <p
                     style={{
                       fontSize: 11,
-                      color: "#6b7280",
+                      color: "var(--color-text-muted)",
                       marginTop: 4,
                     }}
                   >
@@ -1245,7 +1247,7 @@ function Staff() {
               >
                 Staff precedenti
               </button>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                 Pagina staff {staffPage + 1}/{totalStaffPages}
               </span>
               <button
@@ -1262,7 +1264,7 @@ function Staff() {
           {loading ? (
             <p style={{ fontSize: 13 }}>Caricamento task staff...</p>
           ) : filteredTasks.length === 0 ? (
-            <p style={{ fontSize: 12, color: "#6b7280" }}>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
               Nessun task staff per il periodo e i filtri selezionati.
             </p>
           ) : (
@@ -1289,7 +1291,7 @@ function Staff() {
                               height: 10,
                               borderRadius: "999px",
                               backgroundColor: color,
-                              border: "1px solid rgba(0,0,0,0.15)",
+                              border: "1px solid var(--color-border)",
                             }}
                           />
                         )}
@@ -1305,7 +1307,7 @@ function Staff() {
                     {/* prima colonna: giorno */}
                     <div style={boardDayCell}>
                       <div>{formatDate(d)}</div>
-                      <div style={{ fontSize: 10, color: "#6b7280" }}>{d}</div>
+                      <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{d}</div>
                     </div>
                     {/* celle per ogni assignee */}
                     {visibleAssignees.map((ass) => {
@@ -1321,7 +1323,7 @@ function Staff() {
                             <span
                               style={{
                                 fontSize: 10,
-                                color: "#9ca3af",
+                                color: "var(--color-text-subtle)",
                                 display: "block",
                                 marginBottom: 4,
                               }}
@@ -1356,7 +1358,7 @@ function Staff() {
                                 <div
                                   style={{
                                     fontSize: 11,
-                                    color: "#4b5563",
+                                    color: "var(--color-text-muted)",
                                   }}
                                 >
                                   {unit
@@ -1369,7 +1371,7 @@ function Staff() {
                                   <div
                                     style={{
                                       fontSize: 10,
-                                      color: "#6b7280",
+                                      color: "var(--color-text-muted)",
                                       marginTop: 2,
                                     }}
                                   >
@@ -1412,7 +1414,7 @@ function Staff() {
                                     <div
                                       style={{
                                         fontSize: 10,
-                                        color: "#6b7280",
+                                        color: "var(--color-text-muted)",
                                         marginBottom: 2,
                                       }}
                                     >
@@ -1442,7 +1444,7 @@ function Staff() {
                                     <div
                                       style={{
                                         fontSize: 10,
-                                        color: "#6b7280",
+                                        color: "var(--color-text-muted)",
                                         marginBottom: 2,
                                       }}
                                     >
@@ -1927,7 +1929,7 @@ function Staff() {
           </div>
 
           {filteredTasks.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#6b7280" }}>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
               Nessun task staff per i filtri selezionati.
             </p>
           ) : (
@@ -2012,8 +2014,8 @@ function Staff() {
                                 ...buttonSecondary,
                                 padding: "4px 10px",
                                 fontSize: 12,
-                                borderColor: "#fecaca",
-                                color: "#b91c1c",
+                                borderColor: "var(--color-danger)",
+                                color: "var(--color-danger)",
                               }}
                               onClick={() => handleDelete(t.id)}
                             >

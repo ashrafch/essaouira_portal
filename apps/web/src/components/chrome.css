@@ -1,0 +1,366 @@
+/* ============================================================
+   App chrome: Sidebar + Topbar
+   Token-driven so the shell fully supports light/dark themes.
+   ============================================================ */
+
+/* ---------------- Sidebar ---------------- */
+
+.sidebar {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface) 95%, transparent) 0%,
+    color-mix(in srgb, var(--color-surface-soft) 95%, transparent) 100%
+  );
+}
+
+.sidebar__brand-block {
+  margin-bottom: 16px;
+}
+
+.sidebar__brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar__brand-mark {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+  color: var(--color-on-primary);
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar__brand-mark-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+}
+
+.sidebar__brand-text {
+  min-width: 0;
+}
+
+.sidebar__brand {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.sidebar__brand-sub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar__link {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.sidebar__link:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.sidebar__link--sub {
+  padding-left: 14px;
+  font-size: 13px;
+}
+
+.sidebar__link.is-active {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar__link-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar__link-icon {
+  flex: none;
+  opacity: 0.85;
+}
+
+.sidebar__link.is-active .sidebar__link-icon {
+  opacity: 1;
+}
+
+.sidebar__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar__section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar__section-toggle:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+}
+
+.sidebar__section-toggle.is-active {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.sidebar__section-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar__section-icon {
+  flex: none;
+  color: var(--color-text-subtle);
+  transition: color var(--transition-fast);
+}
+
+.sidebar__section-toggle:hover .sidebar__section-icon {
+  color: var(--color-text-muted);
+}
+
+.sidebar__section-toggle.is-active .sidebar__section-icon {
+  color: var(--color-primary);
+}
+
+.sidebar__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebar__section-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-subtle);
+}
+
+.sidebar__sublinks {
+  margin-top: 4px;
+  margin-left: 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__footer {
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--color-text-subtle);
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.sidebar__badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  color: var(--color-text);
+  min-width: 26px;
+  text-align: center;
+}
+
+.sidebar__badge--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+}
+
+/* ---------------- Topbar ---------------- */
+
+.topbar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  gap: 12px;
+}
+
+.topbar__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar__title {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.topbar__subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.topbar__right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.topbar__conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.topbar__conn--online {
+  background: var(--color-success-soft);
+  color: var(--color-success-strong);
+  border-color: var(--color-success);
+}
+
+.topbar__conn--offline {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-strong);
+  border-color: var(--color-danger);
+}
+
+/* Groups the role badge + tenant/user text with a subtle separator from
+   the connectivity pill; keeps the theme toggle + logout visually distinct. */
+.topbar__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+}
+
+.topbar__user {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border);
+}
+
+/* Neutral outlined buttons in the chrome (menu, theme, logout) */
+.chrome-icon-btn,
+.topbar__logout {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-strong);
+  transition: background-color var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.chrome-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.topbar__logout {
+  font-size: 12px;
+  border-radius: var(--radius-full);
+}
+
+.chrome-icon-btn:hover,
+.topbar__logout:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  border-color: var(--color-text-subtle);
+}
+
+/* Notifications bell + count badge */
+.topbar__bell {
+  position: relative;
+}
+
+.topbar__bell-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-on-danger, #fff);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}

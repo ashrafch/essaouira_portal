@@ -2,12 +2,12 @@ import { AlertTriangle, CheckCircle2, Circle, XCircle } from "lucide-react";
 import "./ui.css";
 
 const STATUS_MAP = {
-  online: { bg: "#ecfdf5", fg: "#065f46", border: "#a7f3d0", icon: CheckCircle2 },
-  healthy: { bg: "#ecfdf5", fg: "#065f46", border: "#a7f3d0", icon: CheckCircle2 },
-  warning: { bg: "#fffbeb", fg: "#92400e", border: "#fde68a", icon: AlertTriangle },
-  critical: { bg: "#fef2f2", fg: "#991b1b", border: "#fecaca", icon: XCircle },
-  offline: { bg: "#f3f4f6", fg: "#374151", border: "#d1d5db", icon: Circle },
-  default: { bg: "#eff6ff", fg: "#1e40af", border: "#bfdbfe", icon: Circle },
+  online: { bg: "var(--color-success-soft)", fg: "var(--color-success-strong)", border: "var(--color-success)", icon: CheckCircle2 },
+  healthy: { bg: "var(--color-success-soft)", fg: "var(--color-success-strong)", border: "var(--color-success)", icon: CheckCircle2 },
+  warning: { bg: "var(--color-warning-soft)", fg: "var(--color-warning-strong)", border: "var(--color-warning)", icon: AlertTriangle },
+  critical: { bg: "var(--color-danger-soft)", fg: "var(--color-danger-strong)", border: "var(--color-danger)", icon: XCircle },
+  offline: { bg: "var(--color-surface-soft)", fg: "var(--color-text-muted)", border: "var(--color-border-strong)", icon: Circle },
+  default: { bg: "var(--color-info-soft)", fg: "var(--color-info-strong)", border: "var(--color-info)", icon: Circle },
 };
 
 function StatusBadge({ status }) {

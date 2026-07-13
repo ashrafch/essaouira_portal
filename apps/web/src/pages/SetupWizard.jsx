@@ -156,7 +156,7 @@ function SetupWizard() {
 
   async function handleDeleteProperty(propertyId) {
     const confirmed = window.confirm(
-      "Eliminare questa property? L'operazione e' bloccata se esistono unita o connessioni collegate.",
+      "Eliminare questa property? L'operazione è bloccata se esistono unità o connessioni collegate.",
     );
     if (!confirmed) return;
 
@@ -234,8 +234,8 @@ function SetupWizard() {
         subtitle="Onboarding guidato e resumable: property, provider, dispositivi, mapping e pacchetti automazione"
       />
 
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
-      {success && <p style={{ color: "#065f46" }}>{success}</p>}
+      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
+      {success && <p style={{ color: "var(--color-success-strong)" }}>{success}</p>}
 
       <FilterBar>
         {STEPS.map((step, idx) => {
@@ -245,14 +245,14 @@ function SetupWizard() {
             <div
               key={step.key}
               style={{
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--color-border)",
                 borderRadius: 10,
                 padding: 8,
                 minWidth: 110,
-                background: isCurrent ? "#dbeafe" : done ? "#dcfce7" : "#fff",
+                background: isCurrent ? "var(--color-info-soft)" : done ? "var(--color-success-soft)" : "var(--color-surface)",
               }}
             >
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Step {idx + 1}</div>
+              <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Step {idx + 1}</div>
               <div style={{ fontWeight: 700, fontSize: 13 }}>{step.label}</div>
             </div>
           );
@@ -350,7 +350,7 @@ function SetupWizard() {
             Connetti provider
           </button>
           {propertyScopedConnections.length > 0 ? (
-            <div style={{ marginTop: 8, fontSize: 12, color: "#64748b" }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: "var(--color-text-muted)" }}>
               Connessioni attive: {propertyScopedConnections.map((c) => `#${c.id}:${c.provider_name}`).join(", ")}
             </div>
           ) : null}
@@ -358,7 +358,7 @@ function SetupWizard() {
 
         <AppCard>
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Step 4 · Importazione dispositivi</h3>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Importa il catalogo dal provider selezionato nello step precedente.
           </p>
           <button
@@ -378,7 +378,7 @@ function SetupWizard() {
             {syncingProvider ? "Sincronizzo..." : "Sync tutti i dispositivi importati"}
           </button>
           {metadata.import_result ? (
-            <div style={{ marginTop: 8, fontSize: 13, color: "#374151" }}>
+            <div style={{ marginTop: 8, fontSize: 13, color: "var(--color-text-muted)" }}>
               Importati: {metadata.import_result.imported_devices} · Aggiornati: {metadata.import_result.updated_devices}
             </div>
           ) : null}
@@ -393,7 +393,7 @@ function SetupWizard() {
               {importedDevices.map((device) => (
                 <div key={device.id} className="setup-wizard-assignment-row">
                   <div className="setup-wizard-assignment-label">
-                    {device.name} <span style={{ color: "#6b7280" }}>({device.external_id})</span>
+                    {device.name} <span style={{ color: "var(--color-text-muted)" }}>({device.external_id})</span>
                   </div>
                   <select
                     value={assignments[device.id] || device.unit_id || ""}
@@ -480,7 +480,7 @@ function SetupWizard() {
           >
             Completa setup
           </button>
-          <p style={{ color: "#065f46", marginTop: 8 }}>
+          <p style={{ color: "var(--color-success-strong)", marginTop: 8 }}>
             Alla conferma viene avviata automaticamente una nuova sessione wizard.
           </p>
         </AppCard>

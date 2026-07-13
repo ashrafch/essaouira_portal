@@ -196,7 +196,13 @@ function CommandPalette() {
 
       {open ? (
         <div className="cp-overlay" role="presentation" onClick={() => setOpen(false)}>
-          <div className="cp-surface" role="presentation" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="cp-surface"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette globale"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Command label="Command Palette Globale" shouldFilter className="cp-command">
               <div className="cp-input-wrap">
                 <Command.Input

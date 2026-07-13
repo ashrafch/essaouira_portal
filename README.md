@@ -1,212 +1,78 @@
 # Essaouira Portal
 
-Multi-tenant hospitality platform for PMS/Ops + Smart Building.
+Hospitality operations platform (PMS/Ops + Smart Building) for a villa + six bungalow apartments in Essaouira — bookings, staff, maintenance, finance, and smart-property intelligence in one portal. Multi-tenant-ready, Home Assistant-integrable, Dockerized.
 
-## Quick Start (Docker)
+## Quick start
 
 ```bash
 docker compose up --build -d
 ```
 
-Default URLs:
-- Frontend: `http://localhost:8081`
-- API health via proxy: `http://localhost:8081/api/health`
-- API direct: `http://localhost:8000/health`
-- Default login: `owner / owner123`
-- Default tenant: `default`
+- Portal: <http://localhost:8081> (LAN: `http://<host-ip>:8081`)
+- API health via proxy: <http://localhost:8081/api/health>
+- Default login: `owner / owner123` — tenant `default`
 
-Stop:
+Stop: `docker compose down` · Full DB reset: `docker compose down -v`
 
-```bash
-docker compose down
-```
+Other modes (LAN publication, production/product deployment, ops profile with Prometheus/Grafana/backups): see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
-Full DB reset:
+## Repository layout
 
-```bash
-docker compose down -v
-```
+| Path | Contents |
+| --- | --- |
+| `apps/server` | FastAPI backend — modular domains (`platform`, `inventory`, `bookings`, `analytics`, `operations`, `smart_building`), SQLAlchemy models, Alembic migrations, tests |
+| `apps/web` | React 19 + Vite frontend — token-based design system with dark mode (see `apps/web/DESIGN_TOKENS.md`) |
+| `docker-compose.yml` | Dev/LAN stack (db + backend + web, ops profile optional) |
+| `docker-compose.prod.yml` | Production overlay (migrations, secret enforcement, restart policies) |
+| `infra/` | Prometheus configuration |
+| `scripts/` | Operational scripts (DB backup loop) |
+| `docs/` | Architecture, deployment, manuals, gap analysis |
 
-## Project Structure
-
-- `apps/web`: React + Vite frontend (PWA-ready)
-- `apps/server`: FastAPI + SQLAlchemy backend
-- `docker-compose.yml`: local stack (`web + backend + db`)
-- `infra/`: Prometheus / Grafana config
-- `docs/`: architecture and refactor documentation
-
-## Local Configuration
-
-Root `.env` (optional, used by Docker Compose):
-- `WEB_PORT` (default `8081`)
-- `API_PORT` (default `8000`)
-- smart provider env vars (see below)
-
-Server env (`apps/server/.env`):
-- auth / RBAC / tenant config
-- smart provider config
-- health + telemetry thresholds
-
-Web env (`apps/web/.env`):
-- `VITE_API_BASE_URL`
-
-## Home Assistant Lab Setup (Local)
-
-1. Copy root env:
-
-```bash
-copy .env.example .env
-```
-
-2. Configure:
-
-```bash
-SMART_PROVIDER_MODE=home_assistant
-HOME_ASSISTANT_URL=http://host.docker.internal:8123
-HOME_ASSISTANT_TOKEN=<YOUR_LOCAL_TOKEN_DO_NOT_COMMIT>
-HOME_ASSISTANT_TIMEOUT_SECONDS=10
-HOME_ASSISTANT_INCLUDE_DOMAINS=binary_sensor,sensor,switch,climate,input_boolean,input_number
-HOME_ASSISTANT_UNIT_HINTS={}
-```
-
-3. Rebuild backend:
-
-```bash
-docker compose up -d --build backend
-```
-
-Security notes:
-- `.env` is git-ignored: never commit real tokens
-- keep placeholders empty in versioned files (`.env.example`, `apps/server/.env.example`)
-- readiness essentials can be configured with:
-  - `ESSENTIAL_DEVICE_CATEGORIES=door_sensor,leak_sensor,climate_controller,smart_light`
-
-## Migrations
-
-```bash
-cd apps/server
-alembic -c alembic.ini upgrade head
-```
-
-Current Alembic head:
-- `0008_telemetry_insights`
-
-## Tests and Build
+## Development
 
 Backend:
 
 ```bash
 cd apps/server
-python -m pytest -q
+python -m pytest -q                      # tests
+alembic -c alembic.ini upgrade head      # migrations
 ```
 
 Frontend:
 
 ```bash
 cd apps/web
-npm run lint
-npm run build
+npm run lint && npm run build
+npm run dev                              # http://localhost:5173
 ```
 
-## Main Backend Endpoints
+Engineering rules, guardrails and Definition of Done: **[AGENTS.md](AGENTS.md)**.
 
-### Core
-- `POST /auth/login`
-- `GET/POST/PUT/DELETE /users` (owner scope)
-- `POST /users/{id}/reset-password`
+## Configuration
 
-### Setup Wizard
-- `POST /setup/start`
-- `GET /setup/session`
-- `POST /setup/property`
-- `POST /setup/units`
-- `POST /setup/connect-provider`
-- `POST /setup/import-devices`
-- `POST /setup/assign-devices`
-- `POST /setup/enable-automations`
-- `POST /setup/complete`
+All environment variables are documented in `.env.example` (dev) and `.env.production.example` (production). Real secrets live only in git-ignored `.env*` files.
 
-### Property / Provider Registry
-- `GET/POST /properties`
-- `GET/PUT /properties/{id}`
-- `GET/POST /smart/provider-connections`
-- `GET/PUT /smart/provider-connections/{id}`
+Key toggles:
 
-### Smart Inventory / Health
-- `GET /smart/devices`
-- `GET /smart/device-health`
-- `GET /smart/units/{id}/device-health`
-- `GET /smart/devices/{id}/health`
+- `APP_ENV=production` — fail-fast on weak secrets
+- `RUN_MIGRATIONS=true` — apply Alembic migrations at container startup (production default)
+- `SMART_PROVIDER_MODE=mock|home_assistant` — smart provider selection
+- `HOME_ASSISTANT_URL` / `HOME_ASSISTANT_TOKEN` — HA lab connection (see docs/DEPLOYMENT.md §6)
 
-### Smart Providers
-- `POST /smart/providers/sync?provider=mock|home_assistant`
-- `POST /smart/providers/poll?provider=mock|home_assistant`
-- `POST /smart/providers/{provider}/webhook`
+## API surface
 
-### Smart Dashboard / Operations
-- `GET /smart/dashboard?property_id=&unit_id=`
-- `GET /smart/readiness?property_id=&status=&min_score=&max_score=`
-- `GET /smart/readiness/property/{property_id}?status=&min_score=&max_score=`
-- `GET /smart/readiness/unit/{unit_id}`
-- `GET /smart/assistant/checkin?property_id=&unit_id=&status=&date_from=&date_to=`
-- `GET /smart/assistant/checkin/{booking_id}`
-- `GET /smart/assistant/checkout?property_id=&unit_id=&status=&date_from=&date_to=`
-- `GET /smart/assistant/checkout/{booking_id}`
-- `GET /smart/operations?property_id=&unit_id=&severity=&issue_type=&status=`
-- `GET /smart/operations/units-needing-attention`
-- `GET /smart/operations/issues`
-- `GET /smart/operations/activity`
-
-### Telemetry / Insights
-- `GET /smart/telemetry/device/{device_id}`
-- `GET /smart/telemetry/unit/{unit_id}`
-- `GET /smart/telemetry/property/{property_id}`
-- `GET /smart/telemetry-insights`
-- `GET /smart/telemetry-insights/property/{property_id}`
-- `GET /smart/telemetry-insights/unit/{unit_id}`
-
-### Scenario Packs
-- `GET /smart/scenario-packs`
-- `GET /smart/scenario-packs/enabled?property_id=`
-- `POST /smart/scenario-packs/enable`
-
-## Frontend Routes (Smart)
-
-- `/smart-dashboard`
-- `/smart-overview`
-- `/smart-operations`
-- `/smart-devices`
-- `/smart-devices/:id`
-- `/smart-units/:id`
-- `/smart-alerts`
-- `/smart-automation`
-- `/smart-assistant/checkin`
-- `/smart-assistant/checkout`
-- `/setup`
-- `/properties`
-
-## Operational Monitoring (Optional)
-
-```bash
-docker compose --profile ops up -d
-```
-
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (`admin/admin`)
+Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
 
 ## Documentation
 
-- Documentation index: [docs/DOCUMENTATION_INDEX.md](/c:/Users/chouikha/essaouira_portal/docs/DOCUMENTATION_INDEX.md)
-- Smart refactor spec: [docs/SMART_BUILDING_REFACTOR_SPEC.md](/c:/Users/chouikha/essaouira_portal/docs/SMART_BUILDING_REFACTOR_SPEC.md)
-- Full current-state analysis: [docs/PORTAL_CURRENT_STATE_ANALYSIS.md](/c:/Users/chouikha/essaouira_portal/docs/PORTAL_CURRENT_STATE_ANALYSIS.md)
-- Project structure guide: [docs/PROJECT_STRUCTURE_GUIDE.md](/c:/Users/chouikha/essaouira_portal/docs/PROJECT_STRUCTURE_GUIDE.md)
-- Technical operator manual: [docs/TECHNICAL_OPERATOR_MANUAL.md](/c:/Users/chouikha/essaouira_portal/docs/TECHNICAL_OPERATOR_MANUAL.md)
-- End user manual: [docs/END_USER_PORTAL_MANUAL.md](/c:/Users/chouikha/essaouira_portal/docs/END_USER_PORTAL_MANUAL.md)
-- Project flow overview: [docs/PROJECT_FLOW_OVERVIEW.md](/c:/Users/chouikha/essaouira_portal/docs/PROJECT_FLOW_OVERVIEW.md)
-- AI change guide: [docs/AI_CHANGE_GUIDE.md](/c:/Users/chouikha/essaouira_portal/docs/AI_CHANGE_GUIDE.md)
+- [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) — index by audience
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — dev / LAN / production deployment
+- [docs/GAP_ANALYSIS_AND_ROADMAP.md](docs/GAP_ANALYSIS_AND_ROADMAP.md) — current gaps and roadmap
+- [docs/PROJECT_STRUCTURE_GUIDE.md](docs/PROJECT_STRUCTURE_GUIDE.md) — where to change what
+- [docs/TECHNICAL_OPERATOR_MANUAL.md](docs/TECHNICAL_OPERATOR_MANUAL.md) — run & troubleshoot
+- [docs/END_USER_PORTAL_MANUAL.md](docs/END_USER_PORTAL_MANUAL.md) — daily portal usage
 
-## Branch Workflow
+## Branch workflow
 
-- Start feature/fix branches from `dev`
-- Run tests/lint/build before merge
-- Merge to `dev` only after checks pass
+- Feature/fix branches start from `dev`; merge back only with tests, lint and build green (CI enforces).
+- `main` is the stable line for releases.

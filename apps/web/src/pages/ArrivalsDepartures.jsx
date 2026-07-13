@@ -238,18 +238,18 @@ function ArrivalsDepartures() {
   };
 
   const card = {
-    background: "white",
+    background: "var(--color-surface)",
     borderRadius: 14,
     padding: 12,
-    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
-    border: "1px solid #e5e7eb",
+    boxShadow: "var(--shadow-sm)",
+    border: "1px solid var(--color-border)",
   };
 
   const sectionTitle = {
     fontSize: 13,
     fontWeight: 600,
     marginBottom: 6,
-    color: "#111827",
+    color: "var(--color-text)",
   };
 
   const badge = (bg, color, border) => ({
@@ -271,25 +271,25 @@ function ArrivalsDepartures() {
 
   const th = {
     textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
-    color: "#6b7280",
+    color: "var(--color-text-muted)",
     fontSize: 11,
   };
 
   const td = {
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
     verticalAlign: "top",
   };
 
   const smallButton = {
     borderRadius: 999,
-    border: "1px solid #d1d5db",
+    border: "1px solid var(--color-border-strong)",
     padding: "4px 10px",
-    color: "#374151",
+    color: "var(--color-text)",
     fontSize: 11,
-    background: "white",
+    background: "var(--color-surface)",
     cursor: "pointer",
   };
 
@@ -306,21 +306,21 @@ function ArrivalsDepartures() {
 
   const pillStatus = (paid) =>
     badge(
-      paid ? "#dcfce7" : "#fee2e2",
-      paid ? "#166534" : "#b91c1c",
-      paid ? "#16a34a" : "#ef4444"
+      paid ? "var(--color-success-soft)" : "var(--color-danger-soft)",
+      paid ? "var(--color-success-strong)" : "var(--color-danger-strong)",
+      paid ? "var(--color-success)" : "var(--color-danger)"
     );
 
   const pillTaskStatus = (status) =>
     badge(
-      status === "done" ? "#dcfce7" : "#e5e7eb",
-      status === "done" ? "#166534" : "#374151",
-      status === "done" ? "#16a34a" : "#d1d5db"
+      status === "done" ? "var(--color-success-soft)" : "var(--color-border)",
+      status === "done" ? "var(--color-success-strong)" : "var(--color-text)",
+      status === "done" ? "var(--color-success)" : "var(--color-border-strong)"
     );
 
-  const pillLate = badge("#fef9c3", "#92400e", "#facc15");
+  const pillLate = badge("var(--color-warning-soft)", "var(--color-warning-strong)", "var(--color-warning)");
 
-  const pillWarning = badge("#fee2e2", "#b91c1c", "#fecaca");
+  const pillWarning = badge("var(--color-danger-soft)", "var(--color-danger-strong)", "var(--color-danger)");
 
   const _filtersRow = {
     display: "flex",
@@ -335,7 +335,7 @@ function ArrivalsDepartures() {
       <div style={header}>
         <div>
           <h1 style={{ marginBottom: 4 }}>Arrivi & Partenze</h1>
-          <p style={{ fontSize: 13, color: "#6b7280" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Vista operativa del giorno: check-in, check-out e task staff.
           </p>
         </div>
@@ -345,7 +345,7 @@ function ArrivalsDepartures() {
               <label
                 style={{
                   fontSize: 11,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                   marginRight: 6,
                 }}
               >
@@ -357,7 +357,7 @@ function ArrivalsDepartures() {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 style={{
                   borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  border: "1px solid var(--color-border-strong)",
                   padding: "6px 8px",
                   fontSize: 13,
                 }}
@@ -367,7 +367,7 @@ function ArrivalsDepartures() {
               <label
                 style={{
                   fontSize: 11,
-                  color: "#6b7280",
+                  color: "var(--color-text-muted)",
                   marginRight: 6,
                 }}
               >
@@ -378,7 +378,7 @@ function ArrivalsDepartures() {
                 onChange={(e) => setUnitFilter(e.target.value)}
                 style={{
                   borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  border: "1px solid var(--color-border-strong)",
                   padding: "6px 8px",
                   fontSize: 13,
                   minWidth: 140,
@@ -405,8 +405,8 @@ function ArrivalsDepartures() {
               type="button"
               style={{
                 ...smallButton,
-                borderColor: "#0f766e",
-                color: "#0f766e",
+                borderColor: "var(--color-primary)",
+                color: "var(--color-primary)",
               }}
               onClick={openStaffForDate}
             >
@@ -417,7 +417,7 @@ function ArrivalsDepartures() {
       </div>
 
       {error && (
-        <p style={{ color: "red", fontSize: 12, marginBottom: 4 }}>{error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
       )}
 
       {loading ? (
@@ -437,7 +437,7 @@ function ArrivalsDepartures() {
                 Arrivi ({arrivals.length}) · {formatDate(selectedDate)}
               </div>
               {arrivals.length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessun check-in per questa data (con i filtri attuali).
                 </p>
               ) : (
@@ -477,12 +477,12 @@ function ArrivalsDepartures() {
                               </span>
 
                               {/* NUOVI DETTAGLI OSPITE */}
-                              <div style={{ fontSize: 11, color: "#4b5563", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <div style={{ fontSize: 11, color: "var(--color-text-muted)", display: "flex", gap: 6, flexWrap: "wrap" }}>
                                 <span>
                                   👥 {(b.num_adults || 1) + (b.num_children || 0)} pax
                                 </span>
                                 {b.estimated_arrival_time && (
-                                  <span style={{ color: "#0f766e", fontWeight: 500 }}>
+                                  <span style={{ color: "var(--color-primary)", fontWeight: 500 }}>
                                     🕒 {String(b.estimated_arrival_time).slice(0, 5)}
                                   </span>
                                 )}
@@ -494,7 +494,7 @@ function ArrivalsDepartures() {
                                     href={whatsappLink(b.guest_phone)}
                                     target="_blank"
                                     rel="noreferrer"
-                                    style={{ fontSize: 11, color: "#2563eb", textDecoration: "none", marginRight: 6 }}
+                                    style={{ fontSize: 11, color: "var(--color-info)", textDecoration: "none", marginRight: 6 }}
                                   >
                                     <span>📞</span> {b.guest_phone}
                                   </a>
@@ -503,9 +503,9 @@ function ArrivalsDepartures() {
                                     title="Invia Messaggio Template"
                                     style={{
                                         ...iconButton,
-                                        backgroundColor: "#dcfce7",
-                                        color: "#166534",
-                                        border: "1px solid #86efac",
+                                        backgroundColor: "var(--color-success-soft)",
+                                        color: "var(--color-success-strong)",
+                                        border: "1px solid var(--color-success)",
                                         fontSize: 12,
                                     }}
                                     onClick={() => openMessageModal(b)}
@@ -514,8 +514,8 @@ function ArrivalsDepartures() {
                                   </button>
                                 </div>
                               )}
-                              
-                              <span style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+
+                              <span style={{ fontSize: 11, color: "var(--color-text-subtle)", marginTop: 2 }}>
                                 {b.nightly_rate != null &&
                                 b.total_price != null
                                   ? `Soggiorno: ${b.nightly_rate} €/notte`
@@ -528,7 +528,7 @@ function ArrivalsDepartures() {
                             <span
                               style={{
                                 fontSize: 11,
-                                color: "#4b5563",
+                                color: "var(--color-text-muted)",
                                 textTransform: "capitalize",
                               }}
                             >
@@ -555,7 +555,7 @@ function ArrivalsDepartures() {
                           </td>
                           <td style={td}>
                             {relatedTasks.length === 0 ? (
-                              <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                              <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                                 Nessun task collegato
                               </span>
                             ) : (
@@ -597,9 +597,9 @@ function ArrivalsDepartures() {
                                 style={{
                                   ...smallButton,
                                   borderColor: b.is_paid
-                                    ? "#d1d5db"
-                                    : "#16a34a",
-                                  color: b.is_paid ? "#6b7280" : "#166534",
+                                    ? "var(--color-border-strong)"
+                                    : "var(--color-success)",
+                                  color: b.is_paid ? "var(--color-text-muted)" : "var(--color-success-strong)",
                                 }}
                                 disabled={
                                   b.is_paid || savingBookingId === b.id
@@ -616,8 +616,8 @@ function ArrivalsDepartures() {
                                 type="button"
                                 style={{
                                   ...smallButton,
-                                  borderColor: "#0f766e",
-                                  color: "#0f766e",
+                                  borderColor: "var(--color-primary)",
+                                  color: "var(--color-primary)",
                                 }}
                                 onClick={() => openBooking(b)}
                               >
@@ -627,13 +627,29 @@ function ArrivalsDepartures() {
                                 type="button"
                                 style={{
                                   ...smallButton,
-                                  borderColor: "#6366f1",
-                                  color: "#4338ca",
+                                  borderColor: "var(--color-info)",
+                                  color: "var(--color-info-strong)",
                                 }}
                                 onClick={() => openDocument(b)}
                               >
                                 📄 Stampa
                               </button>
+                              {b.unit_id != null && (
+                                <button
+                                  type="button"
+                                  title="Apri stato smart e readiness dispositivi dell'unità"
+                                  style={{
+                                    ...smallButton,
+                                    borderColor: "var(--color-primary)",
+                                    color: "var(--color-primary)",
+                                  }}
+                                  onClick={() =>
+                                    navigate(`/smart-units/${b.unit_id}`)
+                                  }
+                                >
+                                  Stato smart
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -650,7 +666,7 @@ function ArrivalsDepartures() {
                 Partenze ({departures.length}) · {formatDate(selectedDate)}
               </div>
               {departures.length === 0 ? (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                   Nessun check-out per questa data (con i filtri attuali).
                 </p>
               ) : (
@@ -683,7 +699,7 @@ function ArrivalsDepartures() {
                           style={
                             noCleaning
                               ? {
-                                  backgroundColor: "#fef2f2",
+                                  backgroundColor: "var(--color-danger-soft)",
                                 }
                               : undefined
                           }
@@ -699,7 +715,7 @@ function ArrivalsDepartures() {
                               <span style={{ fontWeight: 500 }}>
                                 {b.guest_name}
                               </span>
-                              <span style={{ fontSize: 11, color: "#6b7280" }}>
+                              <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
                                 {b.total_price != null
                                   ? `Totale: ${b.total_price} ${
                                       b.currency || "EUR"
@@ -733,7 +749,7 @@ function ArrivalsDepartures() {
                           </td>
                           <td style={td}>
                             {checkoutTasks.length === 0 ? (
-                                <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                                <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                                 No task
                                 </span>
                             ) : (
@@ -783,9 +799,9 @@ function ArrivalsDepartures() {
                                   title="Invia Messaggio"
                                   style={{
                                     ...iconButton,
-                                    backgroundColor: "#dcfce7",
-                                    color: "#166534",
-                                    border: "1px solid #86efac",
+                                    backgroundColor: "var(--color-success-soft)",
+                                    color: "var(--color-success-strong)",
+                                    border: "1px solid var(--color-success)",
                                     width: 26, height: 26, fontSize: 14
                                   }}
                                   onClick={() => openMessageModal(b)}
@@ -797,15 +813,31 @@ function ArrivalsDepartures() {
                                   title="Stampa"
                                   style={{
                                     ...iconButton,
-                                    backgroundColor: "#e0e7ff",
-                                    color: "#3730a3",
-                                    border: "1px solid #c7d2fe",
+                                    backgroundColor: "var(--color-info-soft)",
+                                    color: "var(--color-info-strong)",
+                                    border: "1px solid var(--color-info)",
                                     width: 26, height: 26, fontSize: 14
                                   }}
                                   onClick={() => openDocument(b)}
                                 >
                                   📄
                                 </button>
+                                {b.unit_id != null && (
+                                  <button
+                                    type="button"
+                                    title="Apri stato smart e readiness dispositivi dell'unità"
+                                    style={{
+                                      ...smallButton,
+                                      borderColor: "var(--color-primary)",
+                                      color: "var(--color-primary)",
+                                    }}
+                                    onClick={() =>
+                                      navigate(`/smart-units/${b.unit_id}`)
+                                    }
+                                  >
+                                    Stato smart
+                                  </button>
+                                )}
                             </div>
                           </td>
                         </tr>

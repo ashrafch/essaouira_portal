@@ -6,216 +6,121 @@ This guide explains how the repository is organized and where to work when chang
 
 ## Top-level structure
 
-- `apps/server`
-  - FastAPI backend
-  - SQLAlchemy models
-  - Alembic migrations
-  - backend tests
-- `apps/web`
-  - React + Vite frontend
-  - routes, pages, components, service layer
-- `docs`
-  - product, architecture, process, and onboarding documentation
-- `infra`
-  - Prometheus / Grafana support files
-- `scripts`
-  - local operational scripts
-- `docker-compose.yml`
-  - main local stack
-- `docker-compose.staging.yml`
-  - staging overlay
-- `AGENTS.md`
-  - development guardrails and AI execution rules
+| Path | Contents |
+| --- | --- |
+| `apps/server` | FastAPI backend: modular domains, SQLAlchemy models, Alembic migrations, tests |
+| `apps/web` | React + Vite frontend: routes, pages, components, service layer, design tokens |
+| `docs` | Product, architecture, deployment, process and onboarding documentation |
+| `infra` | Prometheus support files |
+| `scripts` | Operational scripts (DB backup loop) |
+| `docker-compose.yml` | Dev/LAN stack (plus `ops` profile) |
+| `docker-compose.prod.yml` | Production overlay |
+| `docker-compose.staging.yml` | Staging overlay |
+| `AGENTS.md` | Engineering charter: guardrails, workflows, Definition of Done |
 
 ## Backend structure
 
-Root path:
-- `apps/server/app`
+Root path: `apps/server/app`
 
-Main folders:
-- `api`
-  - middleware and request-layer cross-cutting logic
-- `core`
-  - config, auth, logging, bootstrap
-- `domains`
-  - newer modular domain logic
-- `models`
-  - shared and legacy SQLAlchemy models
-- `main.py`
-  - legacy FastAPI routes plus application bootstrap
+```text
+app/
+├── main.py            # app factory only: lifespan, CORS, middleware, router includes
+├── core/              # config.py (single source of truth), auth, logging, tenant context
+├── api/               # middlewares (auth/logging), deps.py (shared dependencies)
+├── db.py              # engine/session
+├── bootstrap.py       # dev-only schema fast-path + demo seeding
+├── models/            # SQLAlchemy models (all imported via models/__init__.py)
+└── domains/
+    ├── platform/      # health, /auth/login, /users
+    ├── inventory/     # /units, /properties
+    ├── bookings/      # /bookings, /units/{id}/schedule (+ pricing & auto-task service)
+    ├── analytics/     # /analytics/*, /alerts/today (computations in service.py)
+    ├── operations/    # staff-tasks/members/defaults, cost-items, pricing-defaults, maintenance
+    └── smart_building/ # /smart/* + /setup/*: devices, telemetry, alerts, scenes/rules,
+                        # readiness, assistants, providers (mock + home_assistant)
+```
 
-### Smart Building backend
+Every domain follows **router → service → schemas**. Routers stay thin; business logic lives in services; Pydantic schemas are explicit (v2 style, `ConfigDict`).
 
-Path:
-- `apps/server/app/domains/smart_building`
+### Configuration
 
-Key files:
-- `router.py`
-  - all `/smart/...` endpoints
-- `service.py`
-  - business logic and read models
-- `schemas.py`
-  - Pydantic request/response models
-- `taxonomy.py`
-  - canonical normalization helpers
-- `providers/`
-  - mock provider, Home Assistant adapter, mapping helpers
-
-Work here when you modify:
-- smart inventory
-- alerts
-- scenes/rules
-- telemetry
-- smart operations
-- readiness
-- smart assistant
-
-### Legacy backend areas
-
-Important legacy files:
-- `apps/server/app/main.py`
-  - still contains many PMS/Ops routes and schemas
-- `apps/server/app/models/booking.py`
-- `apps/server/app/models/staff_task.py`
-- `apps/server/app/models/maintenance.py`
-- `apps/server/app/models/unit.py`
-- `apps/server/app/models/property.py`
-
-Work here when you modify:
-- bookings
-- staff tasks
-- maintenance
-- units / properties
-- auth / platform core routes still not moved into domain folders
+- `app/core/config.py` is the only module that reads environment variables (smart provider vars are dynamic properties; everything else is frozen at import).
+- `APP_ENV=production` triggers `validate_production_safety()` at startup: weak `AUTH_SECRET_KEY` / `ADMIN_PASSWORD` abort the boot.
 
 ### Database / migrations
 
-Path:
-- `apps/server/alembic`
-- `apps/server/alembic/versions`
+Path: `apps/server/alembic/versions` — linear chain, head `0009_smart_core_tables`.
 
-Rule:
-- every schema change needs an Alembic migration
-- no schema-changing feature is complete without migration coverage
+Rules:
+
+- every schema change needs an Alembic migration; `alembic/env.py` must import all model modules
+- dev may use `AUTO_CREATE_SCHEMA=true` (create_all fast path); production applies migrations via `RUN_MIGRATIONS=true` in the container entrypoint
 
 ### Backend tests
 
-Path:
-- `apps/server/tests`
+Path: `apps/server/tests` (pytest.ini at `apps/server/pytest.ini`; deprecation warnings are errors).
 
-Typical pattern:
-- domain-focused test files
-- `TestClient(app)` for API-level validation
-- helper functions for auth headers and seed entities
+Pattern: domain-focused test files, `TestClient(app)`, helpers for auth headers and seed entities. Production-safety checks live in `tests/test_production_safety.py`.
 
 ## Frontend structure
 
-Root path:
-- `apps/web/src`
+Root path: `apps/web/src`
 
-Main folders:
-- `components`
-  - reusable UI and feature components
-- `pages`
-  - route-level page components
-- `services`
-  - API client layer
-- `routes`
-  - route map and RBAC gating
-- `hooks`
-  - reusable hooks such as polling / refresh
-- `config`
-  - role/permission helpers
+```text
+src/
+├── routes/appRoutes.js   # single route + RBAC table (rbac.js derives from it)
+├── services/             # api.js (all HTTP), auth.js (single token/session owner)
+├── components/
+│   ├── ui/               # design-system primitives (cards, badges, skeletons…)
+│   ├── smart/            # smart-domain presentation components
+│   ├── dashboard/        # dashboard cards and tiles
+│   └── chrome.css        # Sidebar/Topbar/Layout styles (token-based)
+├── hooks/                # useAutoRefresh, useTheme (dark/light, persisted)
+├── pages/                # route-level pages (lazy-loaded)
+├── offline/dbLocal.js    # Dexie offline cache (used by Calendar and Units)
+└── index.css + components/ui/ui.css   # design tokens (light + dark) and global styles
+```
 
-### Frontend component layers
+### Design system
 
-- `components/ui`
-  - shared primitives such as cards, badges, section headers, loading and freshness indicators
-- `components/dashboard`
-  - dashboard-oriented cards and list items
-- `components/smart`
-  - smart-domain-specific presentation components
+- Tokens (colors/spacing/radius/shadows, light + dark themes) are defined in `src/index.css` and documented in `apps/web/DESIGN_TOKENS.md`.
+- **Never hardcode hex colors** — use `var(--color-*)` tokens (exceptions: chart palettes, the printable BookingDocument sheet).
+- Theme: `[data-theme]` on `<html>`, set pre-paint; toggled from the Topbar; persisted in localStorage.
 
-### Frontend pages
+### Routing and RBAC
 
-Key PMS/Ops pages:
-- `Dashboard.jsx`
-- `Bookings.jsx`
-- `Calendar.jsx`
-- `Staff.jsx`
-- `StaffPlanner.jsx`
-- `Maintenance.jsx`
-- `Units.jsx`
+Files: `src/App.jsx`, `src/routes/appRoutes.js`, `src/components/ProtectedRoute.jsx`, `src/config/rbac.js`.
 
-Key Smart pages:
-- `SmartDashboard.jsx`
-- `SmartOverview.jsx`
-- `SmartOperations.jsx`
-- `SmartDevices.jsx`
-- `SmartDeviceDetail.jsx`
-- `SmartUnitDetail.jsx`
-- `SmartAlerts.jsx`
-- `SmartAutomation.jsx`
-- `SmartCheckinAssistant.jsx`
-- `SmartCheckoutAssistant.jsx`
-- `SetupWizard.jsx`
-- `Properties.jsx`
+Rules:
 
-### Frontend routing and RBAC
-
-Files:
-- `apps/web/src/App.jsx`
-- `apps/web/src/routes/appRoutes.js`
-- `apps/web/src/components/ProtectedRoute.jsx`
-- `apps/web/src/config/rbac.js`
-
-Rule:
-- every new page must be added to route config
-- route permissions must stay coherent with current RBAC model
-
-### Frontend service layer
-
-File:
-- `apps/web/src/services/api.js`
-
-Rule:
-- pages should call the API service layer, not `fetch` directly
-- when you add backend endpoints, add matching functions here
+- every new page is registered in `appRoutes.js` with `allowedRoles`; sidebar visibility derives from the same table
+- pages call `src/services/api.js`, never raw `fetch`
 
 ## How to choose the right place for a change
 
-### If the change is about smart business logic
-- start in `apps/server/app/domains/smart_building/service.py`
-
-### If the change is about smart API contract
-- update `schemas.py`, then `router.py`, then `api.js`
-
-### If the change is about PMS/Ops source-of-truth data
-- verify whether the source lives in `main.py` and legacy models
-- do not duplicate the same rule in Smart Building
-
-### If the change is only visual
-- prefer `apps/web/src/components/ui`
-- then update only the affected pages
-
-### If the change adds a new page
-- create the page in `pages`
-- wire `App.jsx`
-- wire `appRoutes.js`
-- update sidebar / command palette if relevant
+| Change | Where |
+| --- | --- |
+| Smart business logic | `app/domains/smart_building/service.py` |
+| Smart API contract | `schemas.py` → `router.py` → `apps/web/src/services/api.js` |
+| Bookings / pricing / auto tasks | `app/domains/bookings/` |
+| Analytics / KPIs / P&L | `app/domains/analytics/service.py` |
+| Staff / costs / maintenance | `app/domains/operations/` |
+| Units / properties | `app/domains/inventory/` |
+| Auth / users | `app/domains/platform/` + `app/core/auth.py` |
+| Visual only | `apps/web/src/components/ui` + tokens, then affected pages |
+| New page | page in `pages/`, wire `App.jsx` + `appRoutes.js`, sidebar/command palette if relevant |
 
 ## Common repository traps
 
-- `main.py` still contains important legacy PMS/Ops behavior
-- Smart Building is modularized; PMS/Ops is partially legacy
-- some operational entities are not tenant-scoped in DB, so smart read models must filter carefully
-- frontend uses route-level RBAC and a service layer; bypassing either creates drift
-- schema changes without migrations will break Dockerized environments quickly
+- Some legacy operational tables are not tenant-scoped in DB (see `docs/GAP_ANALYSIS_AND_ROADMAP.md`); smart read models must filter carefully.
+- Dev uses `create_all`; production uses migrations — schema changes without a migration break production.
+- Frontend uses route-level RBAC and a service layer; bypassing either creates drift.
+- `bootstrap.py` schema reconcilers are a dev-only legacy fast-path scheduled for removal.
 
 ## Practical onboarding checklist
 
-1. Read [README.md](/c:/Users/chouikha/essaouira_portal/README.md)
-2. Read [AGENTS.md](/c:/Users/chouikha/essaouira_portal/AGENTS.md)
-3. Read [SMART_BUILDING_REFACTOR_SPEC.md](/c:/Users/chouikha/essaouira_portal/docs/SMART_BUILDING_REFACTOR_SPEC.md)
-4. Read [AI_CHANGE_GUIDE.md](/c:/Users/chouikha/essaouira_portal/docs/AI_CHANGE_GUIDE.md)
+1. Read [README.md](../README.md)
+2. Read [AGENTS.md](../AGENTS.md)
+3. Read [DEPLOYMENT.md](DEPLOYMENT.md)
+4. Read [AI_CHANGE_GUIDE.md](AI_CHANGE_GUIDE.md)
 5. Run backend tests and frontend build once before editing

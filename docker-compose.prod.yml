@@ -1,0 +1,37 @@
+# Production overlay.
+#
+# Usage:
+#   docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Hard requirements enforced here (compose fails fast if missing):
+#   POSTGRES_PASSWORD, AUTH_SECRET_KEY, ADMIN_PASSWORD
+#
+# Behavior changes vs. the dev stack:
+#   - no database/API host port exposure (web proxy is the only entry point)
+#   - schema managed by Alembic migrations, not create_all
+#   - no demo data seeding
+#   - APP_ENV=production activates the backend fail-fast check on weak secrets
+#   - containers restart automatically
+
+services:
+  db:
+    ports: []
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+
+  backend:
+    ports: []
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?set AUTH_SECRET_KEY in .env.production}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env.production}
+      RUN_MIGRATIONS: "true"
+      AUTO_CREATE_SCHEMA: "false"
+      AUTO_SEED_DATA: "false"
+
+  web:
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
