@@ -12,7 +12,7 @@ via ``create_all`` (AUTO_CREATE_SCHEMA) upgrade cleanly.
 The revision id is kept short (<= 32 chars) to fit alembic_version.version_num.
 
 Revision ID: 0010_rate_calendar_status
-Revises: 0009_smart_core_tables
+Revises: 0008_telemetry_insights
 Create Date: 2026-07-21
 """
 
@@ -21,7 +21,7 @@ import sqlalchemy as sa
 
 
 revision = "0010_rate_calendar_status"
-down_revision = "0009_smart_core_tables"
+down_revision = "0008_telemetry_insights"
 branch_labels = None
 depends_on = None
 

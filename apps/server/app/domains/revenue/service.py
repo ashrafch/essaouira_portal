@@ -73,6 +73,19 @@ def get_effective_nightly_prices(
     return [by_date.get(d, base) for d in _daterange(checkin, checkout)]
 
 
+def get_min_stay(db: Session, unit_id: int, checkin_date: date) -> int | None:
+    """Minimum-stay (nights) required to start a stay on ``checkin_date``, from
+    the rate calendar. None means no constraint."""
+    row = (
+        db.query(RateCalendar)
+        .filter(RateCalendar.unit_id == unit_id, RateCalendar.date == checkin_date)
+        .first()
+    )
+    if row and row.min_stay:
+        return row.min_stay
+    return None
+
+
 def list_rate_calendar(
     db: Session, unit_id: int, from_date: date, to_date: date
 ) -> dict:
@@ -198,6 +211,9 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
             ),
         )
 
+    min_price = float(unit.min_price) if unit.min_price is not None else None
+    max_price = float(unit.max_price) if unit.max_price is not None else None
+
     total_units = db.query(Unit).count() or 1
     bookings = (
         db.query(Booking)
@@ -230,6 +246,14 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
         elif occ < 0.3:
             price *= 0.90
             reasons.append("occupazione bassa −10%")
+
+        # Guardrail: clamp the recommendation to the unit price band.
+        if min_price is not None and price < min_price:
+            price = min_price
+            reasons.append(f"minimo {min_price:.0f}")
+        if max_price is not None and price > max_price:
+            price = max_price
+            reasons.append(f"massimo {max_price:.0f}")
 
         recs.append(
             {

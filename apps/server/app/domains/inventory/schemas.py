@@ -13,6 +13,8 @@ class UnitOut(BaseModel):
     capacity: int | None
     base_nightly_rate: float | None
     currency: str
+    min_price: float | None = None
+    max_price: float | None = None
 
 
 class UnitUpdate(BaseModel):
@@ -22,6 +24,8 @@ class UnitUpdate(BaseModel):
     capacity: int | None = None
     base_nightly_rate: float | None = None
     currency: str | None = None
+    min_price: float | None = None
+    max_price: float | None = None
 
 
 class PropertyOut(BaseModel):

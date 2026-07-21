@@ -7,6 +7,7 @@ import {
 } from "../services/api";
 import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
+import RateCalendarEditor from "../components/RateCalendarEditor";
 
 const EMPTY_PRICING = {
   default_cleaning_fee: "",
@@ -26,7 +27,12 @@ function Pricing() {
 
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState(null);
-  const [unitDraft, setUnitDraft] = useState({ base_nightly_rate: "", currency: "EUR" });
+  const [unitDraft, setUnitDraft] = useState({
+    base_nightly_rate: "",
+    currency: "EUR",
+    min_price: "",
+    max_price: "",
+  });
 
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   const [pricingDraft, setPricingDraft] = useState(EMPTY_PRICING);
@@ -60,6 +66,8 @@ function Pricing() {
       base_nightly_rate:
         unit.base_nightly_rate == null ? "" : String(unit.base_nightly_rate),
       currency: unit.currency || "EUR",
+      min_price: unit.min_price == null ? "" : String(unit.min_price),
+      max_price: unit.max_price == null ? "" : String(unit.max_price),
     });
     setUnitModalOpen(true);
   }
@@ -68,12 +76,12 @@ function Pricing() {
     if (!editingUnit) return;
     setSavingUnitId(editingUnit.id);
     try {
+      const toNumOrNull = (v) => (v === "" || v == null ? null : Number(v));
       const payload = {
-        base_nightly_rate:
-          unitDraft.base_nightly_rate === "" || unitDraft.base_nightly_rate == null
-            ? null
-            : Number(unitDraft.base_nightly_rate),
+        base_nightly_rate: toNumOrNull(unitDraft.base_nightly_rate),
         currency: unitDraft.currency || "EUR",
+        min_price: toNumOrNull(unitDraft.min_price),
+        max_price: toNumOrNull(unitDraft.max_price),
       };
       const updated = await updateUnit(editingUnit.id, payload);
       setUnits((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
@@ -241,6 +249,8 @@ function Pricing() {
                       <th style={th}>Mq</th>
                       <th style={th}>Capienza</th>
                       <th style={th}>Base nightly rate</th>
+                      <th style={th}>Min €</th>
+                      <th style={th}>Max €</th>
                       <th style={th}>Valuta</th>
                       <th style={th}>Azioni</th>
                     </tr>
@@ -252,6 +262,8 @@ function Pricing() {
                         <td style={td}>{u.size_m2 ?? "-"}</td>
                         <td style={td}>{u.capacity ?? "-"}</td>
                         <td style={td}>{u.base_nightly_rate == null ? "-" : Number(u.base_nightly_rate).toFixed(2)}</td>
+                        <td style={td}>{u.min_price == null ? "-" : Number(u.min_price).toFixed(0)}</td>
+                        <td style={td}>{u.max_price == null ? "-" : Number(u.max_price).toFixed(0)}</td>
                         <td style={td}>{u.currency || "EUR"}</td>
                         <td style={td}>
                           <button
@@ -282,6 +294,8 @@ function Pricing() {
               </button>
             </div>
           )}
+
+          <RateCalendarEditor units={units} />
         </>
       )}
 
@@ -308,6 +322,30 @@ function Pricing() {
             value={unitDraft.currency}
             onChange={(e) => setUnitDraft((prev) => ({ ...prev, currency: e.target.value }))}
           />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={field}>
+            <label style={label}>Prezzo minimo (guardrail consigli)</label>
+            <input
+              type="number"
+              step="1"
+              style={input}
+              value={unitDraft.min_price}
+              onChange={(e) => setUnitDraft((prev) => ({ ...prev, min_price: e.target.value }))}
+              placeholder="nessun minimo"
+            />
+          </div>
+          <div style={field}>
+            <label style={label}>Prezzo massimo (guardrail consigli)</label>
+            <input
+              type="number"
+              step="1"
+              style={input}
+              value={unitDraft.max_price}
+              onChange={(e) => setUnitDraft((prev) => ({ ...prev, max_price: e.target.value }))}
+              placeholder="nessun massimo"
+            />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
           <button type="button" onClick={() => setUnitModalOpen(false)}>Annulla</button>

@@ -200,3 +200,68 @@ def test_manual_override_is_not_overwritten_by_apply():
         day = cal.json()["days"][0]
         assert day["price"] == 999
         assert day["price_source"] == "manual"
+
+
+def test_min_stay_enforced_at_booking_time():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+        unit_id = _first_unit_id(client, headers)
+
+        # 3-night minimum on the arrival date.
+        client.put(
+            "/revenue/rate-calendar",
+            json={
+                "unit_id": unit_id,
+                "entries": [{"date": "2027-10-10", "price": 100, "min_stay": 3}],
+            },
+            headers=headers,
+        )
+        for b in client.get("/bookings", headers=headers).json():
+            if b["unit_id"] == unit_id and b["checkin_date"] == "2027-10-10":
+                client.delete(f"/bookings/{b['id']}", headers=headers)
+
+        base = {
+            "unit_id": unit_id,
+            "guest_name": "Min Stay",
+            "source": "direct",
+            "checkin_date": "2027-10-10",
+            "currency": "EUR",
+        }
+        too_short = client.post(
+            "/bookings", json={**base, "checkout_date": "2027-10-12"}, headers=headers
+        )
+        assert too_short.status_code == 400
+        assert "minimo" in too_short.text.lower()
+
+        ok = client.post(
+            "/bookings", json={**base, "checkout_date": "2027-10-13"}, headers=headers
+        )
+        assert ok.status_code == 200
+        client.delete(f"/bookings/{ok.json()['id']}", headers=headers)
+
+
+def test_recommendations_clamped_to_price_band():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+        unit_id = _first_unit_id(client, headers)
+
+        client.put(
+            f"/units/{unit_id}",
+            json={
+                "base_nightly_rate": 100,
+                "min_price": 90,
+                "max_price": 105,
+                "currency": "EUR",
+            },
+            headers=headers,
+        )
+
+        rec = client.get(
+            f"/revenue/recommendations?unit_id={unit_id}"
+            "&from_date=2027-11-01&to_date=2027-11-30",
+            headers=headers,
+        )
+        assert rec.status_code == 200
+        recs = rec.json()["recommendations"]
+        assert recs
+        assert all(90 <= r["recommended_price"] <= 105 for r in recs)

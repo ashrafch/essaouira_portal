@@ -1,8 +1,11 @@
 """add smart device telemetry
 
 Revision ID: 0007_device_telemetry
-Revises: 0006_scenario_pack_installs
+Revises: 0009_smart_core_tables
 Create Date: 2026-03-09 17:15:00.000000
+
+Now runs after 0009 (smart core tables) so its foreign key to ``devices`` is
+valid when building a fresh database from scratch.
 """
 
 from typing import Sequence, Union
@@ -13,7 +16,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "0007_device_telemetry"
-down_revision: Union[str, None] = "0006_scenario_pack_installs"
+down_revision: Union[str, None] = "0009_smart_core_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

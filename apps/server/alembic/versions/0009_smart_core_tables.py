@@ -6,8 +6,13 @@ chain complete. Every create is guarded with an inspector check so databases
 already bootstrapped via create_all upgrade cleanly.
 
 Revision ID: 0009_smart_core_tables
-Revises: 0008_telemetry_insights
+Revises: 0006_scenario_pack_installs
 Create Date: 2026-07-08
+
+Reordered to run before 0007/0008: those telemetry migrations declare foreign
+keys to ``devices``, which is created here. All three migrations are guarded, so
+this reordering is a no-op on databases already bootstrapped via create_all and
+lets a fresh database build the whole chain from scratch.
 """
 
 from alembic import op
@@ -15,7 +20,7 @@ import sqlalchemy as sa
 
 
 revision = "0009_smart_core_tables"
-down_revision = "0008_telemetry_insights"
+down_revision = "0006_scenario_pack_installs"
 branch_labels = None
 depends_on = None
 

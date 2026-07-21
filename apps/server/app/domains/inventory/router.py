@@ -50,6 +50,10 @@ def update_unit(unit_id: int, payload: UnitUpdate, db: Session = Depends(get_db)
         unit.base_nightly_rate = payload.base_nightly_rate
     if payload.currency is not None:
         unit.currency = payload.currency
+    if payload.min_price is not None:
+        unit.min_price = payload.min_price
+    if payload.max_price is not None:
+        unit.max_price = payload.max_price
 
     db.commit()
     db.refresh(unit)

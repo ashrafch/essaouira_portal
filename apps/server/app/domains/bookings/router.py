@@ -9,6 +9,7 @@ from app.domains.bookings.service import (
     compute_booking_financials,
     create_auto_staff_tasks_for_booking,
 )
+from app.domains.revenue.service import get_min_stay
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.unit import Unit
@@ -50,6 +51,13 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400,
             detail="Esiste già una prenotazione per questa unità nelle date selezionate.",
+        )
+
+    min_stay = get_min_stay(db, payload.unit_id, payload.checkin_date)
+    if min_stay and (payload.checkout_date - payload.checkin_date).days < min_stay:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Soggiorno minimo di {min_stay} notti per la data di arrivo selezionata.",
         )
 
     financials = compute_booking_financials(db, payload, unit)
@@ -118,6 +126,13 @@ def update_booking(
         raise HTTPException(
             status_code=400,
             detail="Esiste già una prenotazione per questa unità nelle date selezionate.",
+        )
+
+    min_stay = get_min_stay(db, payload.unit_id, payload.checkin_date)
+    if min_stay and (payload.checkout_date - payload.checkin_date).days < min_stay:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Soggiorno minimo di {min_stay} notti per la data di arrivo selezionata.",
         )
 
     financials = compute_booking_financials(db, payload, unit)

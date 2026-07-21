@@ -14,3 +14,8 @@ class Unit(Base):
     # 💰 tariffa base consigliata per notte (può essere sovrascritta sulla singola prenotazione)
     base_nightly_rate = Column(Numeric(10, 2), nullable=True)
     currency = Column(String(3), nullable=False, default="EUR")
+
+    # Guardrail per il motore revenue: le tariffe consigliate vengono limitate a
+    # questa banda [min_price, max_price] (nullable = nessun vincolo).
+    min_price = Column(Numeric(10, 2), nullable=True)
+    max_price = Column(Numeric(10, 2), nullable=True)

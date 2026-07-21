@@ -1,6 +1,7 @@
 # Revenue Management — Integration Analysis & Roadmap (PriceLabs-like)
 
-Status: **Fase 0 shipped** (rate calendar + booking-status + recommendation engine v1).
+Status: **Fase 0 + Fase 1 shipped** (rate calendar, booking-status, recommendation
+engine v1, min-stay enforcement, min/max price guardrails, manual rate editor).
 Owner domain: `apps/server/app/domains/revenue/`.
 
 This document maps PriceLabs-style dynamic-pricing capabilities onto the existing
@@ -33,7 +34,9 @@ Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
 | Occupancy-based recommendation | 🔴 `recommend_prices()` | **0 ✅** |
 | Day-of-week (weekend) premium | 🔴 recommendation rule | **0 ✅** |
 | Manual overrides (locked days) | 🔴 `is_override` | **0 ✅** |
-| Min-stay per date | 🔴 `rate_calendar.min_stay` (stored; enforcement pending) | 0/1 |
+| Min-stay per date (stored + enforced at booking) | 🔴 `rate_calendar.min_stay` | **1 ✅** |
+| Min/max price guardrails (clamp recommendations) | 🔴 `Unit.min_price/max_price` | **1 ✅** |
+| Manual rate-calendar editor (UI) | 🔴 `RateCalendarEditor` on Pricing page | **1 ✅** |
 | Seasonal profiles, lead-time rules | 🔴 rules engine | 2 |
 | iCal availability sync (anti-overbooking) | 🔴 channel connections + `.ics` | 3 |
 | Market/competitor data | 🔴 manual comp-set only | 4 |
@@ -83,26 +86,50 @@ Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
 booking-uses-calendar, recommendation preview+apply, override-not-overwritten.
 Full backend suite green.
 
-## 5. Recommendation model v1 (transparent)
+## 5. Fase 1 — what shipped
 
-```
+**Backend**
+- `Unit.min_price` / `Unit.max_price` (Alembic `0011_unit_price_guardrails`,
+  guarded) — recommendations are clamped to this band.
+- Min-stay enforcement: `POST`/`PUT /bookings` reject a stay shorter than the
+  `rate_calendar.min_stay` of its check-in date (`get_min_stay`).
+- Tests: min-stay rejection/acceptance, recommendation clamp.
+
+**Frontend**
+- `components/RateCalendarEditor.jsx` — per-unit, per-month editable grid
+  (price + min-stay), "Applica consigli" (one-click apply, skips manual
+  overrides), "Salva modifiche" (manual upsert). Mounted on `Tariffe & Canali`.
+- `Pricing.jsx` — min/max price fields on the unit editor + columns in the table.
+
+## 6. Recommendation model v1 (transparent)
+
+```text
 price = base_nightly_rate
 if weekday in {Fri, Sat}:      price *= 1.15      # weekend
 if portfolio_occupancy >= 0.8: price *= 1.25      # high demand
 elif >= 0.6:                   price *= 1.12
 elif < 0.3:                    price *= 0.90       # stimulate low-demand dates
+price = clamp(price, unit.min_price, unit.max_price)   # Fase 1 guardrail
 ```
+
 Portfolio occupancy for a date = share of units with a non-cancelled booking
 covering that date. No black box; every recommendation carries its `reason`.
 
-## 6. Next phases
+## 7. Migration chain (fixed)
 
-1. **Fase 1** — min-stay enforcement at booking time; manual rate-calendar editor
-   on the `Tariffe & Canali` (`Pricing.jsx`) page; min/max price guardrails.
-2. **Fase 2** — seasonal profiles, lead-time (last-minute/early-bird/orphan-gap).
-3. **Fase 3** — iCal export/import per unit; `ChannelConnection` with last-sync
+The Alembic chain was reordered so a fresh database builds from scratch:
+`… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011`. Previously the
+telemetry migrations (0007/0008) declared foreign keys to `devices`, which was
+only created in 0009 — so `alembic upgrade head` on an empty DB failed. All these
+migrations are guarded, so the reorder is a no-op on create_all-bootstrapped
+databases. Verified: full chain builds a fresh Postgres end-to-end.
+
+## 8. Next phases
+
+1. **Fase 2** — seasonal profiles, lead-time (last-minute/early-bird/orphan-gap).
+2. **Fase 3** — iCal export/import per unit; `ChannelConnection` with last-sync
    state; reconcile with the existing overlap check.
-4. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
+3. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
    low forward occupancy); OTA price push behind an adapter.
 
 See also: `docs/GAP_ANALYSIS_AND_ROADMAP.md`, `AGENTS.md` (§2 ownership boundaries).
