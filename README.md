@@ -20,7 +20,7 @@ Other modes (LAN publication, production/product deployment, ops profile with Pr
 
 | Path | Contents |
 | --- | --- |
-| `apps/server` | FastAPI backend — modular domains (`platform`, `inventory`, `bookings`, `analytics`, `operations`, `smart_building`), SQLAlchemy models, Alembic migrations, tests |
+| `apps/server` | FastAPI backend — modular domains (`platform`, `inventory`, `bookings`, `analytics`, `operations`, `revenue`, `smart_building`), SQLAlchemy models, Alembic migrations, tests |
 | `apps/web` | React 19 + Vite frontend — token-based design system with dark mode (see `apps/web/DESIGN_TOKENS.md`) |
 | `docker-compose.yml` | Dev/LAN stack (db + backend + web, ops profile optional) |
 | `docker-compose.prod.yml` | Production overlay (migrations, secret enforcement, restart policies) |
@@ -61,7 +61,7 @@ Key toggles:
 
 ## API surface
 
-Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
+Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/revenue/*` (rate calendar, price recommendations), `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
 
 ## Documentation
 

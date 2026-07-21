@@ -143,6 +143,38 @@ export function getUnitSchedule(unitId, params = {}) {
   return apiGet(`/units/${unitId}/schedule`, params);
 }
 
+/* --------- REVENUE / RATE CALENDAR --------- */
+
+/**
+ * Calendario tariffe per unità. params: { from_date, to_date }.
+ * Ritorna { unit_id, unit_name, from_date, to_date, currency, days[] }
+ * dove ogni giorno ha price/min_stay/price_source/is_override/is_stored.
+ */
+export function getRateCalendar(unitId, params = {}) {
+  return apiGet("/revenue/rate-calendar", { unit_id: unitId, ...params });
+}
+
+// entries: [{ date, price, min_stay?, currency? }]
+export function upsertRateCalendar(unitId, entries) {
+  return apiPut("/revenue/rate-calendar", { unit_id: unitId, entries });
+}
+
+export function deleteRateCalendarDay(unitId, day) {
+  return apiDelete(`/revenue/rate-calendar?unit_id=${unitId}&day=${day}`);
+}
+
+export function getRevenueRecommendations(unitId, params = {}) {
+  return apiGet("/revenue/recommendations", { unit_id: unitId, ...params });
+}
+
+export function applyRevenueRecommendations(unitId, fromDate, toDate) {
+  return apiPost("/revenue/recommendations/apply", {
+    unit_id: unitId,
+    from_date: fromDate,
+    to_date: toDate,
+  });
+}
+
 /* --------- ANALYTICS --------- */
 
 // riepilogo base (se lo usiamo ancora in Dashboard)

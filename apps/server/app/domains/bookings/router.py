@@ -64,6 +64,7 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
         estimated_arrival_time=payload.estimated_arrival_time,
 
         source=payload.source,
+        status=payload.status,
         checkin_date=payload.checkin_date,
         checkout_date=payload.checkout_date,
         notes=payload.notes,
@@ -131,6 +132,7 @@ def update_booking(
     booking.estimated_arrival_time = payload.estimated_arrival_time
 
     booking.source = payload.source
+    booking.status = payload.status
     booking.checkin_date = payload.checkin_date
     booking.checkout_date = payload.checkout_date
     booking.notes = payload.notes

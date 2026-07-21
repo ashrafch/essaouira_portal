@@ -16,6 +16,8 @@ class BookingBase(BaseModel):
     estimated_arrival_time: time | None = None
 
     source: str = "direct"
+    # pending / confirmed / cancelled / hold
+    status: str = "confirmed"
     checkin_date: date
     checkout_date: date
     notes: str | None = None

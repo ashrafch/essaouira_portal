@@ -13,6 +13,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import {
   getMonthPnL,
   getStaffTasks,
@@ -22,8 +23,21 @@ import {
   getDashboardSummary,
   ownerMonthlyReportCsvUrl,
 } from "../services/api";
+import { formatCurrency } from "../utils/format";
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+// Theme-aware chart palette (CSS design tokens, not hardcoded hex).
+// Booking sources reuse the same tones as the Calendar legend for consistency.
+const SOURCE_COLORS = {
+  direct: "var(--color-success)",
+  airbnb: "var(--color-warning)",
+  booking: "var(--color-info)",
+};
+const CHART_FALLBACK = [
+  "var(--color-primary)",
+  "var(--color-accent)",
+  "var(--color-info)",
+  "var(--color-warning)",
+];
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -86,6 +100,7 @@ function Dashboard() {
     if (!pnl?.revenue_by_source) return [];
     return Object.entries(pnl.revenue_by_source).map(([key, value]) => ({
       name: key === "direct" ? "Diretta" : key.charAt(0).toUpperCase() + key.slice(1),
+      source: key,
       value: value,
     })).filter(item => item.value > 0);
   }, [pnl]);
@@ -219,7 +234,7 @@ function Dashboard() {
         <div style={kpiCard("var(--color-info)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>RevPAR</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            EUR {advancedKpis?.revpar?.toLocaleString?.() ?? 0}
+            {formatCurrency(advancedKpis?.revpar)}
           </div>
         </div>
         <div style={kpiCard("var(--color-info)")}>
@@ -231,7 +246,7 @@ function Dashboard() {
         <div style={kpiCard("var(--color-info)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Pipeline 30g</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            EUR {advancedKpis?.pipeline_revenue_next_30_days?.toLocaleString?.() ?? 0}
+            {formatCurrency(advancedKpis?.pipeline_revenue_next_30_days)}
           </div>
         </div>
         <div style={kpiCard("var(--color-warning)")}>
@@ -265,19 +280,19 @@ function Dashboard() {
         <div style={kpiCard("var(--color-primary)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Ricavi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            € {pnl?.revenue_total.toLocaleString()}
+            {formatCurrency(pnl?.revenue_total)}
           </div>
         </div>
         <div style={kpiCard("var(--color-danger)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Costi Totali</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            € {pnl?.costs_total.toLocaleString()}
+            {formatCurrency(pnl?.costs_total)}
           </div>
         </div>
         <div style={kpiCard(pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Profitto Netto</div>
           <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)", marginTop: "8px" }}>
-            € {pnl?.profit.toLocaleString()}
+            {formatCurrency(pnl?.profit)}
           </div>
         </div>
         <div style={kpiCard("var(--color-warning)")}>
@@ -285,7 +300,7 @@ function Dashboard() {
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
              <span style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
              <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
-               (€ {pnl?.adr ? pnl.adr.toFixed(0) : 0}/notte)
+               ({formatCurrency(pnl?.adr)}/notte)
              </span>
           </div>
         </div>
@@ -310,10 +325,13 @@ function Dashboard() {
                     dataKey="value"
                   >
                     {sourceData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={SOURCE_COLORS[entry.source] || CHART_FALLBACK[index % CHART_FALLBACK.length]}
+                      />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `€ ${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value) => formatCurrency(value)} />
                   <Legend verticalAlign="bottom" height={36}/>
                 </PieChart>
               </ResponsiveContainer>
@@ -335,7 +353,7 @@ function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => `€ ${value.toLocaleString()}`} />
+                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => formatCurrency(value)} />
                   <Bar dataKey="Importo" fill="var(--color-danger)" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -395,12 +413,14 @@ function Dashboard() {
           </div>
 
           {tasksTotal > 0 && tasksCompleted < tasksTotal ? (
-            <div style={{ fontSize: "13px", color: "var(--color-warning-strong)", backgroundColor: "var(--color-warning-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-warning)" }}>
-              ⚠️ Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attività da completare oggi.
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", color: "var(--color-warning-strong)", backgroundColor: "var(--color-warning-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-warning)" }}>
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attività da completare oggi.</span>
             </div>
           ) : tasksTotal > 0 ? (
-            <div style={{ fontSize: "13px", color: "var(--color-success-strong)", backgroundColor: "var(--color-success-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-success)" }}>
-              ✅ Ottimo lavoro! Tutte le attività di oggi sono completate.
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", color: "var(--color-success-strong)", backgroundColor: "var(--color-success-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-success)" }}>
+              <CheckCircle2 size={16} aria-hidden="true" />
+              <span>Ottimo lavoro! Tutte le attività di oggi sono completate.</span>
             </div>
           ) : (
             <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Nessun task programmato per oggi.</div>

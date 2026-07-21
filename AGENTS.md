@@ -38,6 +38,7 @@ apps/server/app/
 │   ├── bookings/           # bookings, unit schedule
 │   ├── analytics/          # KPIs, month summary/PnL, alerts-today
 │   ├── operations/         # staff tasks/members/defaults, cost items, maintenance, pricing defaults
+│   ├── revenue/            # rate calendar (per-unit/per-date price + min-stay), price recommendations
 │   └── smart_building/     # devices, telemetry, alerts, scenes/rules, readiness, assistants, providers/
 └── alembic/                # migrations — complete chain, source of truth in production
 ```
@@ -61,6 +62,7 @@ Rules: pages call `services/api.js` (never raw `fetch`); colors/spacing/radii co
 ### Source-of-truth boundaries (critical)
 
 - **PMS/Ops owns**: booking lifecycle, unit ownership, staff task generation, housekeeping and maintenance workflow.
+- **Revenue owns**: the per-unit/per-date rate calendar (`rate_calendar`) and price recommendations. It reads bookings/analytics for demand signals and writes prices that booking financials consume; it never re-implements the booking state machine or availability rules.
 - **Smart Building owns**: device inventory/state/telemetry, smart alerts, scenes/rules, readiness and operations read models.
 - Smart Building **reacts** to PMS events; it never re-implements PMS rules or creates a parallel booking state machine.
 - The PMS `Unit` is the canonical unit entity everywhere.

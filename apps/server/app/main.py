@@ -17,6 +17,7 @@ from app.domains.dashboard.router import router as dashboard_router
 from app.domains.inventory.router import router as inventory_router
 from app.domains.operations.router import router as operations_router
 from app.domains.platform.router import router as platform_router
+from app.domains.revenue.router import router as revenue_router
 from app.domains.smart_building.router import router as smart_building_router
 from app.domains.smart_building.setup_router import router as setup_router
 
@@ -51,4 +52,5 @@ app.include_router(inventory_router)
 app.include_router(bookings_router)
 app.include_router(analytics_router)
 app.include_router(operations_router)
+app.include_router(revenue_router)
 app.include_router(dashboard_router)

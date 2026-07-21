@@ -1,81 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getBookings, getUnits, updateBooking } from "../services/api";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  getBookings,
+  getUnits,
+  updateBooking,
+  getRateCalendar,
+} from "../services/api";
+import { PageHeader, Button, useToast } from "../components/ui";
+import {
+  MONTH_LABELS,
+  WEEKDAY_LABELS,
+  startOfDay,
+  addDays,
+  formatISO,
+  isSameDay,
+  getWeeksForMonth,
+} from "../utils/dateUtils";
+import { formatCurrency } from "../utils/format";
 import db from "../offline/dbLocal";
-
-const MONTH_LABELS = [
-  "Gennaio",
-  "Febbraio",
-  "Marzo",
-  "Aprile",
-  "Maggio",
-  "Giugno",
-  "Luglio",
-  "Agosto",
-  "Settembre",
-  "Ottobre",
-  "Novembre",
-  "Dicembre",
-];
-
-const WEEKDAY_LABELS = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
-
-function startOfDay(d) {
-  const nd = new Date(d);
-  nd.setHours(0, 0, 0, 0);
-  return nd;
-}
-
-function addDays(d, days) {
-  const nd = new Date(d);
-  nd.setDate(nd.getDate() + days);
-  return nd;
-}
-
-function formatISO(d) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Ritorna un array di settimane, ognuna = array di 7 Date, stile Google Calendar
- */
-function getWeeksForMonth(year, month) {
-  const firstOfMonth = new Date(year, month, 1);
-  const start = new Date(firstOfMonth);
-  // portiamo il cursore al lunedì della settimana del primo del mese
-  const day = start.getDay(); // 0=dom,1=lun,...6=sab
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + diffToMonday);
-
-  const weeks = [];
-  let current = startOfDay(start);
-
-  while (true) {
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-      week.push(new Date(current));
-      current = addDays(current, 1);
-    }
-    weeks.push(week);
-
-    const lastDayInWeek = week[6];
-    const monthEnd = new Date(year, month + 1, 0);
-    if (lastDayInWeek > monthEnd && lastDayInWeek.getDay() === 0) {
-      break;
-    }
-    if (lastDayInWeek > monthEnd && lastDayInWeek.getMonth() !== month) {
-      break;
-    }
-  }
-
-  return weeks;
-}
 
 function Calendar() {
   const navigate = useNavigate();
+  const toast = useToast();
   const today = new Date();
 
   const [year, setYear] = useState(today.getFullYear());
@@ -90,6 +37,7 @@ function Calendar() {
   const [draggingBooking, setDraggingBooking] = useState(null);
 
   const [selectedUnitId, setSelectedUnitId] = useState(null);
+  const [rateByDate, setRateByDate] = useState({});
 
   useEffect(() => {
     async function load() {
@@ -123,6 +71,30 @@ function Calendar() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Rate calendar for the selected unit and visible month (revenue overlay).
+  useEffect(() => {
+    if (!selectedUnitId) {
+      setRateByDate({});
+      return;
+    }
+    let active = true;
+    const from = formatISO(new Date(year, month, 1));
+    const to = formatISO(new Date(year, month + 1, 1));
+    getRateCalendar(selectedUnitId, { from_date: from, to_date: to })
+      .then((res) => {
+        if (!active) return;
+        const map = {};
+        for (const d of res.days || []) map[d.date] = d;
+        setRateByDate(map);
+      })
+      .catch(() => {
+        if (active) setRateByDate({});
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedUnitId, year, month]);
 
   const weeks = useMemo(() => getWeeksForMonth(year, month), [year, month]);
 
@@ -219,6 +191,21 @@ function Calendar() {
     };
   }, [unitBookingsInMonth, selectedUnitId, daysInMonth, monthStart, monthEnd]);
 
+  // Riepilogo tariffe del mese per l'unità selezionata (media/min/max + giorni personalizzati).
+  const rateSummary = useMemo(() => {
+    const entries = Object.values(rateByDate);
+    const prices = entries
+      .map((d) => d.price)
+      .filter((p) => p !== null && p !== undefined);
+    if (prices.length === 0) return null;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const customCount = entries.filter((d) => d.is_stored).length;
+    const currency = entries[0]?.currency || "EUR";
+    return { min, max, avg, customCount, currency };
+  }, [rateByDate]);
+
   // --- NAV MESE: FIX SALTO ANNO ---
   function nextMonth() {
     const current = new Date(year, month, 1);
@@ -232,14 +219,6 @@ function Calendar() {
     const prev = new Date(current.getFullYear(), current.getMonth() - 1, 1);
     setYear(prev.getFullYear());
     setMonth(prev.getMonth());
-  }
-
-  function isSameDay(a, b) {
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    );
   }
 
   // ---- DRAG & DROP ----
@@ -296,7 +275,9 @@ function Calendar() {
       );
       await db.bookings.put(updated);
     } catch (err) {
-      alert("Errore spostando la prenotazione: " + err.message);
+      toast.error("Errore spostando la prenotazione: " + err.message, {
+        title: "Spostamento non riuscito",
+      });
     } finally {
       setDraggingBooking(null);
     }
@@ -320,28 +301,12 @@ function Calendar() {
 
   // STILI
 
-  const pageHeader = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 12,
-    marginBottom: 20,
-    flexWrap: "wrap",
-  };
-
   const navControls = {
     display: "flex",
     alignItems: "center",
     gap: 8,
-  };
-
-  const navButton = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    backgroundColor: "var(--color-surface)",
-    padding: "4px 8px",
-    fontSize: 13,
-    cursor: "pointer",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
   };
 
   const badgeInfo = {
@@ -515,7 +480,7 @@ function Calendar() {
   const timelineDayCell = (isToday) => ({
     width: 26,
     minWidth: 26,
-    height: 32,
+    height: 48,
     borderRight: "1px solid var(--color-border)",
     backgroundColor: isToday ? "var(--color-info-soft)" : "var(--color-surface)",
     position: "relative",
@@ -545,40 +510,56 @@ function Calendar() {
     };
   };
 
+  // Prezzo/notte nella timeline: colore per provenienza (manuale/reco/base).
+  const timelinePrice = (rate) => {
+    let color = "var(--color-text-subtle)"; // base fallback
+    if (rate.price_source === "manual") color = "var(--color-accent-strong)";
+    else if (rate.price_source === "reco") color = "var(--color-info-strong)";
+    return {
+      position: "absolute",
+      top: 15,
+      left: 0,
+      right: 0,
+      textAlign: "center",
+      fontSize: 9,
+      fontWeight: rate.is_stored ? 700 : 500,
+      color,
+      lineHeight: 1,
+    };
+  };
+
   return (
     <div>
-      <div style={pageHeader}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Calendario occupazione</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Vista mensile con card prenotazioni per giorno.
-            Trascina una prenotazione su un altro giorno per spostarla.
-          </p>
-        </div>
-
-        <div style={{ textAlign: "right", fontSize: 12, color: "var(--color-text-muted)" }}>
-          <div style={{ marginBottom: 4 }}>
-            <div style={navControls}>
-              <button style={navButton} type="button" onClick={prevMonth}>
-                ◀️
-              </button>
-              <div style={{ fontWeight: 600 }}>
-                {MONTH_LABELS[month]} {year}
-              </div>
-              <button style={navButton} type="button" onClick={nextMonth}>
-                ▶️
-              </button>
+      <PageHeader
+        title="Calendario occupazione"
+        subtitle="Vista mensile con prenotazioni per giorno. Trascina una prenotazione su un altro giorno per spostarla."
+        actions={
+          <div style={navControls}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ChevronLeft size={16} />}
+              onClick={prevMonth}
+              aria-label="Mese precedente"
+            />
+            <div style={{ fontWeight: 600, minWidth: 132, textAlign: "center" }}>
+              {MONTH_LABELS[month]} {year}
             </div>
-          </div>
-          <div>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ChevronRight size={16} />}
+              onClick={nextMonth}
+              aria-label="Mese successivo"
+            />
             <span style={fromCache ? badgeOffline : badgeInfo}>
               {fromCache
-                ? "Offline – spostamento dsisabilitato (solo cache)"
+                ? "Offline – spostamento disabilitato (solo cache)"
                 : "Dati live – drag & drop attivo"}
             </span>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* CARD CALENDARIO MENSILE */}
       <div style={card}>
@@ -788,26 +769,40 @@ function Calendar() {
                     (b) => date >= b._checkin && date < b._checkout
                   );
                   const booking = bookingsForThisDay[0] || null;
+                  const rate = rateByDate[formatISO(date)] || null;
+
+                  const bookingLabel = booking
+                    ? `${booking.guest_name || "Ospite"}\n${new Date(
+                        booking.checkin_date
+                      ).toLocaleDateString("it-IT")} → ${new Date(
+                        booking.checkout_date
+                      ).toLocaleDateString("it-IT")}`
+                    : "";
+                  const rateLabel =
+                    rate && rate.price != null
+                      ? `Tariffa: ${formatCurrency(rate.price, rate.currency)}${
+                          rate.min_stay ? ` · min ${rate.min_stay} notti` : ""
+                        } (${rate.is_stored ? rate.price_source : "base"})`
+                      : "";
+                  const cellTitle = [bookingLabel, rateLabel]
+                    .filter(Boolean)
+                    .join("\n");
+
                   return (
                     <div
                       key={day}
                       style={timelineDayCell(isSameDay(date, today))}
-                      title={
-                        booking
-                          ? `${booking.guest_name || "Ospite"}\n${new Date(
-                              booking.checkin_date
-                            ).toLocaleDateString(
-                              "it-IT"
-                            )} → ${new Date(
-                              booking.checkout_date
-                            ).toLocaleDateString("it-IT")}`
-                          : ""
-                      }
+                      title={cellTitle}
                       onClick={() => {
                         if (booking) openBookingInEdit(booking.id);
                       }}
                     >
                       <span style={timelineDayNumber}>{day}</span>
+                      {rate && rate.price != null && (
+                        <span style={timelinePrice(rate)}>
+                          {Math.round(rate.price)}
+                        </span>
+                      )}
                       {booking && <div style={timelineBar(booking.source)} />}
                     </div>
                   );
@@ -838,6 +833,36 @@ function Calendar() {
                 <div>
                   Tasso di occupazione:{" "}
                   <strong>{unitOccupancy.percentage}%</strong>
+                </div>
+              </div>
+            )}
+
+            {/* riepilogo tariffe (overlay revenue) */}
+            {rateSummary && (
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 12,
+                  color: "var(--color-text-muted)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  Tariffa media{" "}
+                  <strong>
+                    {formatCurrency(rateSummary.avg, rateSummary.currency)}
+                  </strong>{" "}
+                  <span style={{ color: "var(--color-text-subtle)" }}>
+                    ({formatCurrency(rateSummary.min, rateSummary.currency)} –{" "}
+                    {formatCurrency(rateSummary.max, rateSummary.currency)})
+                  </span>
+                </div>
+                <div>
+                  Giorni con tariffa personalizzata:{" "}
+                  <strong>{rateSummary.customCount}</strong> / {daysInMonth}
                 </div>
               </div>
             )}

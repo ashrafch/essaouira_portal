@@ -19,16 +19,35 @@ def compute_booking_financials(
     payload: BookingCreate | BookingUpdate,
     unit: Unit,
 ) -> dict:
-    """Compute nightly rate, total price and fee defaults for a booking payload."""
+    """Compute nightly rate, total price and fee defaults for a booking payload.
+
+    Pricing resolution order per stay:
+    1. explicit ``payload.nightly_rate`` (manual per-booking override), else
+    2. the per-night rate calendar (stored price per date), falling back to
+       ``unit.base_nightly_rate`` for any night without a stored rate.
+
+    With an empty rate calendar this reproduces the legacy flat-rate behaviour.
+    """
+    # Local import keeps the bookings domain free of a hard revenue dependency
+    # and avoids any import cycle.
+    from app.domains.revenue.service import get_effective_nightly_prices
+
     nights = (payload.checkout_date - payload.checkin_date).days
-    nightly_rate = (
-        payload.nightly_rate
-        if payload.nightly_rate is not None
-        else unit.base_nightly_rate
-    )
-    base_total = None
-    if nightly_rate is not None:
-        base_total = float(nightly_rate) * nights
+
+    if payload.nightly_rate is not None:
+        nightly_rate = payload.nightly_rate
+        base_total = float(nightly_rate) * nights if nights > 0 else None
+    else:
+        per_night = get_effective_nightly_prices(
+            db, unit, payload.checkin_date, payload.checkout_date
+        )
+        priced_nights = [float(p) for p in per_night if p is not None]
+        if priced_nights:
+            base_total = sum(priced_nights)
+            nightly_rate = round(base_total / nights, 2) if nights > 0 else None
+        else:
+            nightly_rate = None
+            base_total = None
 
     total_price = payload.total_price or base_total
 

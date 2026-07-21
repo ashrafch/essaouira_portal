@@ -42,6 +42,12 @@ class Booking(Base):
     # direct / airbnb / booking / other
     source = Column(String, nullable=False, default="direct")
 
+    # pending / confirmed / cancelled / hold — ciclo di vita prenotazione.
+    # Serve al motore revenue (pace, cancellazioni) senza duplicare logica PMS.
+    status = Column(
+        String(16), nullable=False, default="confirmed", server_default="confirmed"
+    )
+
     # ----------------------
     #   DATE
     # ----------------------
