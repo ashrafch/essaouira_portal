@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domains.revenue import channels, service
+from app.domains.revenue import alerts, channels, service
 from app.domains.revenue.ical import export_token
 from app.domains.revenue.schemas import (
     ApplyRecommendationsIn,
@@ -14,11 +14,16 @@ from app.domains.revenue.schemas import (
     ExportInfoOut,
     LeadTimeRuleIn,
     LeadTimeRuleOut,
+    MarketRateIn,
+    MarketRateOut,
+    PricePushResultOut,
+    PricingAlertOut,
     RateCalendarOut,
     RateCalendarUpsertIn,
     RecommendationsOut,
     SeasonIn,
     SeasonOut,
+    SyncAllResultOut,
     SyncResultOut,
 )
 
@@ -177,6 +182,51 @@ def delete_channel(connection_id: int, db: Session = Depends(get_db)):
     return
 
 
+@router.post("/channels/sync-all", response_model=SyncAllResultOut)
+def sync_all_channels(db: Session = Depends(get_db)):
+    return channels.sync_all(db)
+
+
 @router.post("/channels/{connection_id}/sync", response_model=SyncResultOut)
 def sync_channel(connection_id: int, db: Session = Depends(get_db)):
     return channels.sync_channel(db, connection_id)
+
+
+@router.post("/channels/{connection_id}/push-prices", response_model=PricePushResultOut)
+def push_channel_prices(
+    connection_id: int,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    f, t = service.default_month_range(from_date, to_date)
+    return channels.push_prices(db, connection_id, f, t)
+
+
+# ---------- COMP-SET (market rates) + PRICING ALERTS ----------
+
+
+@router.get("/market-rates", response_model=list[MarketRateOut])
+def list_market_rates(db: Session = Depends(get_db)):
+    return alerts.list_market_rates(db)
+
+
+@router.post("/market-rates", response_model=MarketRateOut)
+def create_market_rate(payload: MarketRateIn, db: Session = Depends(get_db)):
+    return alerts.create_market_rate(db, payload)
+
+
+@router.put("/market-rates/{rate_id}", response_model=MarketRateOut)
+def update_market_rate(rate_id: int, payload: MarketRateIn, db: Session = Depends(get_db)):
+    return alerts.update_market_rate(db, rate_id, payload)
+
+
+@router.delete("/market-rates/{rate_id}", status_code=204)
+def delete_market_rate(rate_id: int, db: Session = Depends(get_db)):
+    alerts.delete_market_rate(db, rate_id)
+    return
+
+
+@router.get("/pricing-alerts", response_model=list[PricingAlertOut])
+def pricing_alerts(horizon_days: int = 60, db: Session = Depends(get_db)):
+    return alerts.compute_pricing_alerts(db, horizon_days=horizon_days)

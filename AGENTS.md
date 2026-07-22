@@ -38,7 +38,7 @@ apps/server/app/
 │   ├── bookings/           # bookings, unit schedule
 │   ├── analytics/          # KPIs, month summary/PnL, alerts-today
 │   ├── operations/         # staff tasks/members/defaults, cost items, maintenance, pricing defaults
-│   ├── revenue/            # rate calendar, recommendations, seasons, lead-time rules, iCal channel sync
+│   ├── revenue/            # rate calendar, recommendations, seasons, lead-time, iCal channels, comp-set, pricing alerts
 │   └── smart_building/     # devices, telemetry, alerts, scenes/rules, readiness, assistants, providers/
 └── alembic/                # migrations — complete chain, source of truth in production
 ```

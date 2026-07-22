@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { Button, useToast } from "./ui";
 import {
   getChannels,
   createChannel,
   deleteChannel,
   syncChannel,
+  syncAllChannels,
+  pushChannelPrices,
   getChannelExportInfo,
 } from "../services/api";
 
@@ -30,6 +32,8 @@ export default function ChannelSyncEditor({ units = [] }) {
   const [form, setForm] = useState({ channel: "airbnb", ical_import_url: "" });
   const [savingAdd, setSavingAdd] = useState(false);
   const [syncingId, setSyncingId] = useState(null);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [pushingId, setPushingId] = useState(null);
 
   useEffect(() => {
     if (unitId == null && units.length > 0) setUnitId(units[0].id);
@@ -109,6 +113,32 @@ export default function ChannelSyncEditor({ units = [] }) {
     }
   }
 
+  async function runSyncAll() {
+    setSyncingAll(true);
+    try {
+      const res = await syncAllChannels();
+      toast.success(`Sync completa: ${res.synced} ok, ${res.errors} errori.`);
+      await reload();
+    } catch (err) {
+      toast.error("Sincronizzazione globale non riuscita: " + err.message);
+    } finally {
+      setSyncingAll(false);
+    }
+  }
+
+  async function runPush(id) {
+    setPushingId(id);
+    try {
+      const res = await pushChannelPrices(id);
+      toast.info(res.message);
+      await reload();
+    } catch (err) {
+      toast.error("Push non riuscito: " + err.message);
+    } finally {
+      setPushingId(null);
+    }
+  }
+
   async function copyExport() {
     if (!exportUrl) return;
     try {
@@ -170,17 +200,28 @@ export default function ChannelSyncEditor({ units = [] }) {
             bloccare le date (anti overbooking a due vie).
           </p>
         </div>
-        <select
-          value={unitId ?? ""}
-          onChange={(e) => setUnitId(e.target.value ? Number(e.target.value) : null)}
-          style={{ ...input, width: "auto" }}
-        >
-          {units.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw size={15} />}
+            onClick={runSyncAll}
+            loading={syncingAll}
+          >
+            Sincronizza tutti
+          </Button>
+          <select
+            value={unitId ?? ""}
+            onChange={(e) => setUnitId(e.target.value ? Number(e.target.value) : null)}
+            style={{ ...input, width: "auto" }}
+          >
+            {units.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* EXPORT URL */}
@@ -242,6 +283,15 @@ export default function ChannelSyncEditor({ units = [] }) {
                         onClick={() => runSync(c.id)}
                         loading={syncingId === c.id}
                         aria-label="Sincronizza"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Send size={14} />}
+                        onClick={() => runPush(c.id)}
+                        loading={pushingId === c.id}
+                        aria-label="Push prezzi (simulato)"
+                        title="Push prezzi (simulato)"
                       />
                       <Button
                         variant="ghost"

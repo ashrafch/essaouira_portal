@@ -142,3 +142,48 @@ class ExportInfoOut(BaseModel):
     unit_id: int
     ical_path: str
     token: str
+
+
+class SyncAllResultOut(BaseModel):
+    synced: int
+    errors: int
+    results: list[dict]
+
+
+class PricePushResultOut(BaseModel):
+    connection_id: int
+    simulated: bool
+    pushed: int
+    status: str
+    message: str
+
+
+class MarketRateIn(BaseModel):
+    label: str
+    nightly_rate: float
+    start_date: date
+    end_date: date
+    unit_id: int | None = None
+    is_active: bool = True
+
+
+class MarketRateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    label: str
+    nightly_rate: float
+    start_date: date
+    end_date: date
+    unit_id: int | None = None
+    is_active: bool
+
+
+class PricingAlertOut(BaseModel):
+    code: str
+    severity: str  # info | warning | high
+    unit_id: int | None = None
+    unit_name: str | None = None
+    title: str
+    details: str
+    count: int = 0

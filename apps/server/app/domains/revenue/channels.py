@@ -191,3 +191,61 @@ def sync_channel(db: Session, connection_id: int) -> dict:
     result = apply_ical_import(db, conn, text)
     result["connection_id"] = conn.id
     return result
+
+
+def sync_all(db: Session) -> dict:
+    """Sync every active connection that has an import URL. Intended to be
+    triggered by an external scheduler (cron/systemd timer) — the monolith has
+    no in-process scheduler by design."""
+    conns = (
+        db.query(ChannelConnection)
+        .filter(
+            ChannelConnection.is_active.is_(True),
+            ChannelConnection.ical_import_url.isnot(None),
+        )
+        .all()
+    )
+    results = []
+    synced = errors = 0
+    for c in conns:
+        try:
+            r = sync_channel(db, c.id)
+            synced += 1
+            results.append(
+                {
+                    "connection_id": c.id,
+                    "status": "ok",
+                    "created": r["created"],
+                    "conflicts": len(r["conflicts"]),
+                }
+            )
+        except HTTPException as exc:
+            errors += 1
+            results.append(
+                {"connection_id": c.id, "status": "error", "detail": str(exc.detail)}
+            )
+    return {"synced": synced, "errors": errors, "results": results}
+
+
+def push_prices(db: Session, connection_id: int, from_date, to_date) -> dict:
+    """Push our rate calendar to the channel.
+
+    SIMULATED. Real OTA price push needs the channel's connectivity API (an
+    approved account / certified channel manager). This returns a labelled
+    simulation so the flow and UI exist without pretending hardware/API work.
+    """
+    from app.domains.revenue.service import list_rate_calendar
+
+    conn = _get_connection_or_404(db, connection_id)
+    cal = list_rate_calendar(db, conn.unit_id, from_date, to_date)
+    pushed = sum(1 for d in cal["days"] if d.get("price") is not None)
+    return {
+        "connection_id": conn.id,
+        "simulated": True,
+        "pushed": pushed,
+        "status": "simulated",
+        "message": (
+            f"Simulazione: {pushed} tariffe pronte per il push verso "
+            f"{conn.channel}. Il push reale richiede l'API di connettività del canale."
+        ),
+    }

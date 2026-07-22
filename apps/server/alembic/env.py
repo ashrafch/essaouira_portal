@@ -12,6 +12,7 @@ from app.models import (  # noqa: F401
     channel_connection,
     cost_item,
     maintenance,
+    market_rate,
     pricing_defaults,
     property,
     rate_calendar,

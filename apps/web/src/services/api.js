@@ -222,6 +222,29 @@ export function syncChannel(id) {
 export function getChannelExportInfo(unitId) {
   return apiGet(`/revenue/channels/units/${unitId}/export-info`);
 }
+export function syncAllChannels() {
+  return apiPost("/revenue/channels/sync-all", {});
+}
+export function pushChannelPrices(id) {
+  return apiPost(`/revenue/channels/${id}/push-prices`, {});
+}
+
+// Comp-set (manual market rates) + pricing alerts
+export function getMarketRates() {
+  return apiGet("/revenue/market-rates");
+}
+export function createMarketRate(payload) {
+  return apiPost("/revenue/market-rates", payload);
+}
+export function deleteMarketRate(id) {
+  return apiDelete(`/revenue/market-rates/${id}`);
+}
+export function getPricingAlerts(horizonDays) {
+  return apiGet(
+    "/revenue/pricing-alerts",
+    horizonDays != null ? { horizon_days: horizonDays } : {}
+  );
+}
 
 /* --------- ANALYTICS --------- */
 

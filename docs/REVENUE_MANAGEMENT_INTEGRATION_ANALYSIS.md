@@ -1,9 +1,10 @@
 # Revenue Management — Integration Analysis & Roadmap (PriceLabs-like)
 
-Status: **Fase 0–3 shipped** (rate calendar, booking-status, recommendation
-engine v2 — seasons/lead-time/orphan-gap, min-stay enforcement, min/max
-guardrails, editors, and **iCal availability sync** — export + import, anti
-double-booking). Owner domain: `apps/server/app/domains/revenue/`.
+Status: **Fase 0–4 shipped** — rate calendar, booking-status, recommendation
+engine v2 (seasons/lead-time/orphan-gap), min-stay, min/max guardrails, editors,
+**iCal availability sync** (export + import, anti double-booking), **manual
+comp-set + pricing alerts**, channel **sync-all**, and a **simulated OTA
+price-push adapter**. Owner domain: `apps/server/app/domains/revenue/`.
 
 This document maps PriceLabs-style dynamic-pricing capabilities onto the existing
 Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
@@ -44,8 +45,10 @@ Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
 | iCal export (share our calendar) | 🔴 public token endpoint | **3 ✅** |
 | iCal import (block channel dates) | 🔴 `channel_connections` + parser | **3 ✅** |
 | Conflict reporting (anti double-booking) | 🔴 import reconciliation | **3 ✅** |
-| Market/competitor data | 🔴 manual comp-set only | 4 |
-| Price push to OTAs | 🔴 adapter (declared future) | 4 |
+| Manual comp-set (market reference) | 🔴 `market_rates` | **4 ✅** |
+| Pricing alerts (out-of-band / orphan / low occ) | 🔴 computed on demand | **4 ✅** |
+| Channel sync-all (external scheduling) | 🔴 endpoint | **4 ✅** |
+| Price push to OTAs | 🔴 adapter (**simulated**, labelled) | **4 ⚠️** |
 
 ## 3. Honest limits
 
@@ -143,7 +146,31 @@ Full backend suite green.
 - `components/ChannelSyncEditor.jsx` on the Pricing page — copy the export URL,
   add channel import URLs, run sync, see last-sync status per connection.
 
-## 8. Recommendation model v2 (transparent)
+## 8. Fase 4 — what shipped
+
+**Backend**
+- `market_rates` (manual comp-set: label, `nightly_rate`, date range, optional
+  `unit_id`) — Alembic `0014_market_rates`, guarded. Full CRUD under
+  `/revenue/market-rates`.
+- **Pricing alerts** (`GET /revenue/pricing-alerts?horizon_days=`, computed on
+  demand, no table): price ≥25% off the comp-set band, orphan nights, and low
+  forward occupancy (<30% over the next 14 days). Read-only signals — never
+  changes prices.
+- **Channel sync-all** (`POST /revenue/channels/sync-all`): syncs every active
+  connection, for an **external** scheduler (cron/systemd) — the monolith keeps
+  no in-process scheduler by design.
+- **OTA price-push adapter** (`POST /revenue/channels/{id}/push-prices`):
+  **SIMULATED and labelled as such** — real push needs the channel's
+  connectivity API. Returns a clear simulation result, never claims a live push.
+- Tests: comp-set CRUD, out-of-band alert, orphan + low-occupancy alerts,
+  sync-all error handling, simulated push.
+
+**Frontend**
+- `PricingAlertsPanel` (alerts, top of the Pricing page), `MarketRatesEditor`
+  (comp-set), plus "Sincronizza tutti" and per-connection "Push (simulato)"
+  on `ChannelSyncEditor`.
+
+## 9. Recommendation model v2 (transparent)
 
 ```text
 price = base_nightly_rate
@@ -160,20 +187,27 @@ price = clamp(price, unit.min_price, unit.max_price)   # Fase 1 guardrail
 Portfolio occupancy for a date = share of units with a non-cancelled booking
 covering that date. No black box; every recommendation carries its `reason`.
 
-## 9. Migration chain (fixed)
+## 10. Migration chain (fixed)
 
 The Alembic chain was reordered so a fresh database builds from scratch:
-`… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011 → 0012 → 0013`.
+`… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011 → 0012 → 0013 → 0014`.
 Previously the
 telemetry migrations (0007/0008) declared foreign keys to `devices`, which was
 only created in 0009 — so `alembic upgrade head` on an empty DB failed. All these
 migrations are guarded, so the reorder is a no-op on create_all-bootstrapped
 databases. Verified: full chain builds a fresh Postgres end-to-end.
 
-## 10. Next phases
+## 11. Beyond Fase 4 (future)
 
-1. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
-   low forward occupancy); OTA price push behind an adapter; scheduled auto-sync
-   of channel connections (currently sync is manual/on-demand).
+Fasi 0–4 are complete. Remaining work is genuinely external-dependent or
+operational, and is deliberately not stubbed as "done":
+
+1. **Real OTA price push** — replace the simulated adapter with a channel
+   connectivity API (approved account / certified channel manager).
+2. **Automated repricing** — optionally apply recommendations on a schedule
+   (today apply is one-click / on-demand).
+3. **Live market data** — a real feed to replace/augment the manual comp-set.
+4. **Scheduling** — wire `sync-all` (and any auto-reprice) to a cron/systemd
+   timer or the ops profile, rather than an in-process scheduler.
 
 See also: `docs/GAP_ANALYSIS_AND_ROADMAP.md`, `AGENTS.md` (§2 ownership boundaries).
