@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -107,3 +107,38 @@ class LeadTimeRuleOut(BaseModel):
     max_days: int | None = None
     adjustment_percent: float
     is_active: bool
+
+
+class ChannelConnectionIn(BaseModel):
+    unit_id: int
+    channel: str = "other"
+    ical_import_url: str | None = None
+    external_ref: str | None = None
+    is_active: bool = True
+
+
+class ChannelConnectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    unit_id: int
+    channel: str
+    ical_import_url: str | None = None
+    external_ref: str | None = None
+    is_active: bool
+    last_sync_at: datetime | None = None
+    last_sync_status: str
+    last_sync_message: str | None = None
+
+
+class SyncResultOut(BaseModel):
+    connection_id: int | None = None
+    created: int
+    events: int
+    conflicts: list[dict]
+
+
+class ExportInfoOut(BaseModel):
+    unit_id: int
+    ical_path: str
+    token: str

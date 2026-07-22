@@ -6,6 +6,7 @@ schema creation (bootstrap) and Alembic autogeneration see the full schema.
 
 from app.models import (  # noqa: F401
     booking,
+    channel_connection,
     cost_item,
     maintenance,
     pricing_defaults,

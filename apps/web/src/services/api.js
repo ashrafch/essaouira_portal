@@ -203,6 +203,26 @@ export function deleteLeadTimeRule(id) {
   return apiDelete(`/revenue/lead-time-rules/${id}`);
 }
 
+// Channel connections (iCal availability sync)
+export function getChannels(unitId) {
+  return apiGet("/revenue/channels", unitId != null ? { unit_id: unitId } : {});
+}
+export function createChannel(payload) {
+  return apiPost("/revenue/channels", payload);
+}
+export function updateChannel(id, payload) {
+  return apiPut(`/revenue/channels/${id}`, payload);
+}
+export function deleteChannel(id) {
+  return apiDelete(`/revenue/channels/${id}`);
+}
+export function syncChannel(id) {
+  return apiPost(`/revenue/channels/${id}/sync`, {});
+}
+export function getChannelExportInfo(unitId) {
+  return apiGet(`/revenue/channels/units/${unitId}/export-info`);
+}
+
 /* --------- ANALYTICS --------- */
 
 // riepilogo base (se lo usiamo ancora in Dashboard)

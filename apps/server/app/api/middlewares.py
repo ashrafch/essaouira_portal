@@ -14,6 +14,10 @@ AUTH_EXCLUDED_PATHS = {
     "/metrics",
 }
 
+# Public, token-protected prefixes (validated by the route itself, not by JWT):
+# the iCal export must be fetchable anonymously by external channels (Airbnb…).
+AUTH_EXCLUDED_PREFIXES = ("/revenue/ical/",)
+
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -66,7 +70,9 @@ async def authentication(request: Request, call_next):
     if not settings.auth_enabled:
         return await call_next(request)
 
-    if request.url.path in AUTH_EXCLUDED_PATHS:
+    if request.url.path in AUTH_EXCLUDED_PATHS or _starts_with_any(
+        request.url.path, AUTH_EXCLUDED_PREFIXES
+    ):
         return await call_next(request)
 
     header = request.headers.get("Authorization", "")

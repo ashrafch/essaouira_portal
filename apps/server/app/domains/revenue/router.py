@@ -1,13 +1,17 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domains.revenue import service
+from app.domains.revenue import channels, service
+from app.domains.revenue.ical import export_token
 from app.domains.revenue.schemas import (
     ApplyRecommendationsIn,
     ApplyRecommendationsOut,
+    ChannelConnectionIn,
+    ChannelConnectionOut,
+    ExportInfoOut,
     LeadTimeRuleIn,
     LeadTimeRuleOut,
     RateCalendarOut,
@@ -15,9 +19,36 @@ from app.domains.revenue.schemas import (
     RecommendationsOut,
     SeasonIn,
     SeasonOut,
+    SyncResultOut,
 )
 
 router = APIRouter(prefix="/revenue", tags=["revenue"])
+
+
+# ---------- iCal EXPORT (public, token-protected — whitelisted in auth mw) ----------
+
+
+@router.get("/ical/units/{unit_id}.ics")
+def export_unit_ical(unit_id: int, token: str = "", db: Session = Depends(get_db)):
+    # Constant-ish check; wrong/missing token looks like "not found" (no oracle).
+    if not token or token != export_token(unit_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    ics = channels.build_unit_export(db, unit_id)
+    return Response(
+        content=ics,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f'inline; filename="unit-{unit_id}.ics"'},
+    )
+
+
+@router.get("/channels/units/{unit_id}/export-info", response_model=ExportInfoOut)
+def channel_export_info(unit_id: int, db: Session = Depends(get_db)):
+    channels.build_unit_export(db, unit_id)  # 404s if the unit doesn't exist
+    return ExportInfoOut(
+        unit_id=unit_id,
+        ical_path=f"/revenue/ical/units/{unit_id}.ics",
+        token=export_token(unit_id),
+    )
 
 
 @router.get("/rate-calendar", response_model=RateCalendarOut)
@@ -118,3 +149,34 @@ def update_lead_time_rule(
 def delete_lead_time_rule(rule_id: int, db: Session = Depends(get_db)):
     service.delete_lead_time_rule(db, rule_id)
     return
+
+
+# ---------- CHANNEL CONNECTIONS (iCal availability sync) ----------
+
+
+@router.get("/channels", response_model=list[ChannelConnectionOut])
+def list_channels(unit_id: int | None = None, db: Session = Depends(get_db)):
+    return channels.list_connections(db, unit_id)
+
+
+@router.post("/channels", response_model=ChannelConnectionOut)
+def create_channel(payload: ChannelConnectionIn, db: Session = Depends(get_db)):
+    return channels.create_connection(db, payload)
+
+
+@router.put("/channels/{connection_id}", response_model=ChannelConnectionOut)
+def update_channel(
+    connection_id: int, payload: ChannelConnectionIn, db: Session = Depends(get_db)
+):
+    return channels.update_connection(db, connection_id, payload)
+
+
+@router.delete("/channels/{connection_id}", status_code=204)
+def delete_channel(connection_id: int, db: Session = Depends(get_db)):
+    channels.delete_connection(db, connection_id)
+    return
+
+
+@router.post("/channels/{connection_id}/sync", response_model=SyncResultOut)
+def sync_channel(connection_id: int, db: Session = Depends(get_db)):
+    return channels.sync_channel(db, connection_id)

@@ -61,7 +61,7 @@ Key toggles:
 
 ## API surface
 
-Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/revenue/*` (rate calendar, price recommendations), `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
+Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/revenue/*` (rate calendar, recommendations, seasons, lead-time rules, iCal channels), `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
 
 ## Documentation
 

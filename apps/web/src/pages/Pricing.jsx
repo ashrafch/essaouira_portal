@@ -9,6 +9,7 @@ import Modal from "../components/Modal";
 import FeedbackMessage from "../components/FeedbackMessage";
 import RateCalendarEditor from "../components/RateCalendarEditor";
 import RevenueRulesEditor from "../components/RevenueRulesEditor";
+import ChannelSyncEditor from "../components/ChannelSyncEditor";
 
 const EMPTY_PRICING = {
   default_cleaning_fee: "",
@@ -298,6 +299,7 @@ function Pricing() {
 
           <RateCalendarEditor units={units} />
           <RevenueRulesEditor units={units} />
+          <ChannelSyncEditor units={units} />
         </>
       )}
 

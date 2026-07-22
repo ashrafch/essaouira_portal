@@ -1,9 +1,9 @@
 # Revenue Management — Integration Analysis & Roadmap (PriceLabs-like)
 
-Status: **Fase 0 + Fase 1 + Fase 2 shipped** (rate calendar, booking-status,
-recommendation engine v2 — seasons/lead-time/orphan-gap, min-stay enforcement,
-min/max guardrails, manual rate editor, seasons & lead-time rules editor).
-Owner domain: `apps/server/app/domains/revenue/`.
+Status: **Fase 0–3 shipped** (rate calendar, booking-status, recommendation
+engine v2 — seasons/lead-time/orphan-gap, min-stay enforcement, min/max
+guardrails, editors, and **iCal availability sync** — export + import, anti
+double-booking). Owner domain: `apps/server/app/domains/revenue/`.
 
 This document maps PriceLabs-style dynamic-pricing capabilities onto the existing
 Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
@@ -41,7 +41,9 @@ Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
 | Seasonal profiles (date-range %) | 🔴 `pricing_seasons` | **2 ✅** |
 | Lead-time rules (last-minute/early-bird) | 🔴 `lead_time_rules` | **2 ✅** |
 | Orphan-gap fill (single-night gaps) | 🔴 engine detection | **2 ✅** |
-| iCal availability sync (anti-overbooking) | 🔴 channel connections + `.ics` | 3 |
+| iCal export (share our calendar) | 🔴 public token endpoint | **3 ✅** |
+| iCal import (block channel dates) | 🔴 `channel_connections` + parser | **3 ✅** |
+| Conflict reporting (anti double-booking) | 🔴 import reconciliation | **3 ✅** |
 | Market/competitor data | 🔴 manual comp-set only | 4 |
 | Price push to OTAs | 🔴 adapter (declared future) | 4 |
 
@@ -120,7 +122,28 @@ Full backend suite green.
 - `components/RevenueRulesEditor.jsx` on the Pricing page — manage seasons and
   lead-time rules (list / add / delete), portfolio-wide or per unit.
 
-## 7. Recommendation model v2 (transparent)
+## 7. Fase 3 — what shipped
+
+**Backend**
+- `channel_connections` (per-unit external iCal calendars; `channel`,
+  `ical_import_url`, `last_sync_at/status/message`) — Alembic
+  `0013_channel_connections`, guarded. Full CRUD under `/revenue/channels`.
+- **iCal export**: `GET /revenue/ical/units/{id}.ics?token=…` — public,
+  HMAC-token-protected (no storage; whitelisted in the auth middleware), emits
+  generic "Reserved" all-day blocks with **no guest PII**.
+- **iCal import**: dependency-free reader/writer (`ical.py`, stdlib `urllib`
+  fetch). `apply_ical_import` refreshes a connection's blocks idempotently and
+  **reports conflicts** with existing reservations instead of double-booking.
+- Imported blocks are plain `Booking` rows (`source=<channel>`, marked in
+  `notes` as `ICAL:<conn>:<uid>`), created without auto staff tasks.
+- Tests: public export (200 with token / 404 without, no PII), import creates
+  blocks, idempotent re-import, conflict reporting.
+
+**Frontend**
+- `components/ChannelSyncEditor.jsx` on the Pricing page — copy the export URL,
+  add channel import URLs, run sync, see last-sync status per connection.
+
+## 8. Recommendation model v2 (transparent)
 
 ```text
 price = base_nightly_rate
@@ -137,20 +160,20 @@ price = clamp(price, unit.min_price, unit.max_price)   # Fase 1 guardrail
 Portfolio occupancy for a date = share of units with a non-cancelled booking
 covering that date. No black box; every recommendation carries its `reason`.
 
-## 8. Migration chain (fixed)
+## 9. Migration chain (fixed)
 
 The Alembic chain was reordered so a fresh database builds from scratch:
-`… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011`. Previously the
+`… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011 → 0012 → 0013`.
+Previously the
 telemetry migrations (0007/0008) declared foreign keys to `devices`, which was
 only created in 0009 — so `alembic upgrade head` on an empty DB failed. All these
 migrations are guarded, so the reorder is a no-op on create_all-bootstrapped
 databases. Verified: full chain builds a fresh Postgres end-to-end.
 
-## 9. Next phases
+## 10. Next phases
 
-1. **Fase 3** — iCal export/import per unit; `ChannelConnection` with last-sync
-   state; reconcile with the existing overlap check.
-2. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
-   low forward occupancy); OTA price push behind an adapter.
+1. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
+   low forward occupancy); OTA price push behind an adapter; scheduled auto-sync
+   of channel connections (currently sync is manual/on-demand).
 
 See also: `docs/GAP_ANALYSIS_AND_ROADMAP.md`, `AGENTS.md` (§2 ownership boundaries).
