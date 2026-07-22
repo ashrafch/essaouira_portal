@@ -1,7 +1,7 @@
 {
-  "name": "Essaouira Portal",
-  "short_name": "Essaouira",
-  "description": "Gestione operativa di villa e appartamenti: prenotazioni, staff, manutenzioni e smart building.",
+  "name": "Hostara",
+  "short_name": "Hostara",
+  "description": "Portale di management per l'ospitalità: prenotazioni, staff, tariffe, distribuzione e smart building.",
   "lang": "it",
   "start_url": "/",
   "scope": "/",

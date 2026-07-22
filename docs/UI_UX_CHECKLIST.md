@@ -45,9 +45,10 @@ Rimane:
 - [x] **Topbar responsive**: su mobile nasconde meta ruolo/utente, pill connettività e ricerca comandi; resta titolo + icone.
 - [x] Padding inferiore del contenuto per non finire sotto la bottom-nav.
 - [x] `ui/Modal` in **portal** su `document.body` (centrato e robusto anche sotto la topbar con `backdrop-filter`).
-- [ ] Vista **agenda/lista** del Calendario su mobile (oggi griglia 7 colonne compressa).
+- [x] Vista **agenda/lista** del Calendario su mobile (≤768px) al posto della griglia 7 colonne.
+- [x] **Skip-link** “Salta al contenuto” + `main` focus target (a11y).
 - [ ] Stacking “a card” delle tabelle dense su mobile (oltre allo scroll orizzontale).
-- [ ] Pass accessibilità completo: focus-visible, label ARIA sulle azioni icona, contrasto in dark.
+- [ ] Pass accessibilità completo: audit ARIA su tutte le azioni icona, contrasto in dark, trap/riordino focus.
 
 ### RBAC/coerenza rotte
 - [ ] `BookingDocument` dentro la tabella `appRoutes.js` (oggi cablata a parte in `App.jsx`).

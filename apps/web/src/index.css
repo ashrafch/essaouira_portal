@@ -251,6 +251,33 @@ table,
   outline-offset: 2px;
 }
 
+/* Skip-to-content link (a11y): hidden until keyboard-focused */
+.skip-link {
+  position: fixed;
+  left: 10px;
+  top: -60px;
+  z-index: 2000;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+  top: 10px;
+  text-decoration: none;
+}
+
+/* The main region is a tabindex=-1 focus target for the skip link; don't show
+   a focus ring when it receives programmatic focus. */
+.portal-main:focus {
+  outline: none;
+}
+
 /* Form controls */
 input,
 select,

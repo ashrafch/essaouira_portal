@@ -14,6 +14,8 @@ function Layout({ children }) {
 
   return (
     <div className="portal-layout">
+      <a href="#main-content" className="skip-link">Salta al contenuto</a>
+
       <aside className="portal-sidebar desktop-only">
         <Sidebar />
       </aside>
@@ -45,7 +47,7 @@ function Layout({ children }) {
         <Topbar onToggleSidebar={() => setMobileSidebarOpen(true)} />
       </header>
 
-      <main className="portal-main">
+      <main className="portal-main" id="main-content" tabIndex={-1}>
         <AnimatePresence mode="wait">
           <MotionDiv
             key={location.pathname}

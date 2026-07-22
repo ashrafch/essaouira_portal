@@ -18,11 +18,13 @@ import {
   getWeeksForMonth,
 } from "../utils/dateUtils";
 import { formatCurrency } from "../utils/format";
+import { useIsMobile } from "../hooks/useIsMobile";
 import db from "../offline/dbLocal";
 
 function Calendar() {
   const navigate = useNavigate();
   const toast = useToast();
+  const isMobile = useIsMobile();
   const today = new Date();
 
   const [year, setYear] = useState(today.getFullYear());
@@ -149,6 +151,15 @@ function Calendar() {
   const monthEnd = useMemo(
     () => startOfDay(new Date(year, month, daysInMonth)),
     [year, month, daysInMonth]
+  );
+
+  // Bookings overlapping the visible month, sorted by check-in (mobile agenda).
+  const monthAgenda = useMemo(
+    () =>
+      bookingsWithParsedDates
+        .filter((b) => b._checkin <= monthEnd && b._checkout > monthStart)
+        .sort((a, b) => a._checkin - b._checkin),
+    [bookingsWithParsedDates, monthStart, monthEnd]
   );
 
   const unitBookingsInMonth = useMemo(() => {
@@ -569,6 +580,75 @@ function Calendar() {
           <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
             Nessun appartamento configurato.
           </p>
+        ) : isMobile ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 2 }}>
+              Agenda di {MONTH_LABELS[month]} {year} — tocca una prenotazione per aprirla.
+            </div>
+            {monthAgenda.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                Nessuna prenotazione in {MONTH_LABELS[month]}.
+              </p>
+            ) : (
+              monthAgenda.map((b) => {
+                const unit = unitMap[b.unit_id];
+                const dotColor = bookingPill(b.source, false).border;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => openBookingInEdit(b.id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      textAlign: "left",
+                      width: "100%",
+                      background: "var(--color-surface-soft)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      color: "var(--color-text)",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        flex: "none",
+                        background: dotColor,
+                      }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontWeight: 600, fontSize: 14 }}>
+                        {b.guest_name || "Ospite"}
+                      </span>
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: 12,
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
+                        {unit?.name || `Unit #${b.unit_id}`} ·{" "}
+                        {new Date(b.checkin_date).toLocaleDateString("it-IT")} →{" "}
+                        {new Date(b.checkout_date).toLocaleDateString("it-IT")} · {b._nights}n
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
+            )}
+            {error && !fromCache && (
+              <p style={{ color: "var(--color-danger)", fontSize: 12 }}>
+                Errore caricamento: {error}
+              </p>
+            )}
+          </div>
         ) : (
           <>
             <div style={legend}>
