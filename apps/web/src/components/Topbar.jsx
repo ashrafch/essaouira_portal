@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, Menu, Moon, Sun, Wifi, WifiOff } from "lucide-react";
+import { resolveHelp } from "../config/helpTopics";
 import { clearAuthSession, getCurrentRole, getCurrentTenant, getCurrentUsername } from "../services/auth";
 import { getDashboardSummary } from "../services/api";
 import { useTheme } from "../hooks/useTheme";
 import CommandPalette from "./CommandPalette";
+import HelpButton from "./HelpButton";
 import StatusBadge from "./ui/StatusBadge";
 import "./chrome.css";
 
 function Topbar({ onToggleSidebar = null }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pageTopic = resolveHelp(pathname);
   const [online, setOnline] = useState(navigator.onLine);
   const [alertsOpen, setAlertsOpen] = useState(0);
   const { theme, toggleTheme } = useTheme();
@@ -62,10 +66,8 @@ function Topbar({ onToggleSidebar = null }) {
           </button>
         ) : null}
         <div>
-          <div className="topbar__title">Operatività giornaliera</div>
-          <div className="topbar__subtitle">
-            Controllo live prenotazioni, staff, costi e manutenzione
-          </div>
+          <div className="topbar__title">{pageTopic.title}</div>
+          <div className="topbar__subtitle">{pageTopic.intro}</div>
         </div>
       </div>
 
@@ -85,6 +87,7 @@ function Topbar({ onToggleSidebar = null }) {
           </div>
         </div>
         <div className="topbar__actions">
+          <HelpButton />
           <button
             type="button"
             className="chrome-icon-btn topbar__bell"

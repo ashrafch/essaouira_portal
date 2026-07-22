@@ -16,7 +16,8 @@ This folder is the working documentation hub for Essaouira Portal. Use the docum
 - [TECHNICAL_OPERATOR_MANUAL.md](TECHNICAL_OPERATOR_MANUAL.md)
 - [AI_CHANGE_GUIDE.md](AI_CHANGE_GUIDE.md)
 - [GAP_ANALYSIS_AND_ROADMAP.md](GAP_ANALYSIS_AND_ROADMAP.md)
-- [REVENUE_MANAGEMENT_INTEGRATION_ANALYSIS.md](REVENUE_MANAGEMENT_INTEGRATION_ANALYSIS.md) — PriceLabs-like pricing: integration map, roadmap, Fase 0 status
+- [REVENUE_MANAGEMENT_INTEGRATION_ANALYSIS.md](REVENUE_MANAGEMENT_INTEGRATION_ANALYSIS.md) — PriceLabs-like pricing: integration map, roadmap, Fase 0–4 status
+- [UI_UX_CHECKLIST.md](UI_UX_CHECKLIST.md) — UI/UX & roadmap checklist (done + remaining)
 
 ### For deployment and operations
 
