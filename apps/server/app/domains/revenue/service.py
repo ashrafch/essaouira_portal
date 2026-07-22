@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models.booking import Booking
 from app.models.rate_calendar import RateCalendar
+from app.models.revenue_rules import LeadTimeRule, PricingSeason
 from app.models.unit import Unit
 
 # Monday=0 .. Sunday=6. Friday and Saturday nights carry a weekend premium.
@@ -198,9 +199,57 @@ def delete_rate_day(db: Session, unit_id: int, day: date) -> None:
     db.commit()
 
 
-def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) -> list:
-    """Transparent price recommendation: base rate adjusted by day-of-week and
-    the portfolio's forward occupancy on each date. Requires a base rate."""
+def _match_season(seasons: list, unit_id: int, d: date):
+    """Highest-priority active season covering date ``d`` for this unit."""
+    matches = [
+        s
+        for s in seasons
+        if s.start_date <= d <= s.end_date
+        and (s.unit_id is None or s.unit_id == unit_id)
+    ]
+    if not matches:
+        return None
+    matches.sort(key=lambda s: (s.priority, s.id), reverse=True)
+    return matches[0]
+
+
+def _match_lead_time_rule(rules: list, lead_days: int):
+    """First active lead-time rule (ordered by min_days) matching ``lead_days``."""
+    for r in rules:
+        if lead_days >= r.min_days and (r.max_days is None or lead_days <= r.max_days):
+            return r
+    return None
+
+
+def _unit_occupied_nights(db: Session, unit_id: int, start: date, end: date) -> set:
+    """Set of nights this unit is occupied within [start, end) (non-cancelled)."""
+    rows = (
+        db.query(Booking)
+        .filter(
+            Booking.unit_id == unit_id,
+            Booking.checkin_date < end,
+            Booking.checkout_date > start,
+            Booking.status != "cancelled",
+        )
+        .all()
+    )
+    occupied = set()
+    for b in rows:
+        night = max(b.checkin_date, start)
+        stop = min(b.checkout_date, end)
+        while night < stop:
+            occupied.add(night)
+            night = night + timedelta(days=1)
+    return occupied
+
+
+def recommend_prices(
+    db: Session, unit: Unit, from_date: date, to_date: date, *, reference_date: date | None = None
+) -> list:
+    """Transparent price recommendation. Base rate adjusted, in order, by:
+    seasonal profile → day-of-week → portfolio forward occupancy → lead time →
+    orphan-gap fill, then clamped to the unit's [min_price, max_price] band.
+    Every adjustment is recorded in ``reason``. Requires a base rate."""
     base = float(unit.base_nightly_rate) if unit.base_nightly_rate is not None else None
     if base is None:
         raise HTTPException(
@@ -211,6 +260,7 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
             ),
         )
 
+    today = reference_date or date.today()
     min_price = float(unit.min_price) if unit.min_price is not None else None
     max_price = float(unit.max_price) if unit.max_price is not None else None
 
@@ -225,18 +275,45 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
         .all()
     )
 
+    seasons = (
+        db.query(PricingSeason)
+        .filter(
+            PricingSeason.is_active.is_(True),
+            PricingSeason.start_date <= to_date,
+            PricingSeason.end_date >= from_date,
+        )
+        .all()
+    )
+    lead_rules = (
+        db.query(LeadTimeRule)
+        .filter(LeadTimeRule.is_active.is_(True))
+        .order_by(LeadTimeRule.min_days)
+        .all()
+    )
+    # Orphan detection needs the neighbours of the window too.
+    unit_occupied = _unit_occupied_nights(
+        db, unit.id, from_date - timedelta(days=1), to_date + timedelta(days=1)
+    )
+
     recs = []
     for d in _daterange(from_date, to_date):
+        price = base
+        reasons = []
+
+        season = _match_season(seasons, unit.id, d)
+        if season is not None and season.adjustment_percent:
+            price *= 1 + float(season.adjustment_percent) / 100.0
+            sign = "+" if season.adjustment_percent >= 0 else ""
+            reasons.append(f"{season.name} {sign}{float(season.adjustment_percent):.0f}%")
+
+        if d.weekday() in WEEKEND_WEEKDAYS:
+            price *= 1.15
+            reasons.append("weekend +15%")
+
         occupied_units = {
             b.unit_id for b in bookings if b.checkin_date <= d < b.checkout_date
         }
         occ = len(occupied_units) / total_units
-
-        price = base
-        reasons = []
-        if d.weekday() in WEEKEND_WEEKDAYS:
-            price *= 1.15
-            reasons.append("weekend +15%")
         if occ >= 0.8:
             price *= 1.25
             reasons.append("occupazione alta +25%")
@@ -246,6 +323,23 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
         elif occ < 0.3:
             price *= 0.90
             reasons.append("occupazione bassa −10%")
+
+        lead_days = (d - today).days
+        rule = _match_lead_time_rule(lead_rules, lead_days)
+        if rule is not None and rule.adjustment_percent:
+            price *= 1 + float(rule.adjustment_percent) / 100.0
+            sign = "+" if rule.adjustment_percent >= 0 else ""
+            reasons.append(f"{rule.label} {sign}{float(rule.adjustment_percent):.0f}%")
+
+        # Orphan-gap fill: a single free night wedged between two occupied ones.
+        is_free = d not in unit_occupied
+        if (
+            is_free
+            and (d - timedelta(days=1)) in unit_occupied
+            and (d + timedelta(days=1)) in unit_occupied
+        ):
+            price *= 0.80
+            reasons.append("notte orfana −20%")
 
         # Guardrail: clamp the recommendation to the unit price band.
         if min_price is not None and price < min_price:
@@ -266,6 +360,124 @@ def recommend_prices(db: Session, unit: Unit, from_date: date, to_date: date) ->
             }
         )
     return recs
+
+
+# --------------------------------------------------------------------------- #
+# Pricing seasons CRUD
+# --------------------------------------------------------------------------- #
+
+
+def _validate_unit_exists(db: Session, unit_id: int | None) -> None:
+    if unit_id is not None and db.query(Unit).filter(Unit.id == unit_id).first() is None:
+        raise HTTPException(status_code=400, detail="Unità inesistente")
+
+
+def list_seasons(db: Session) -> list:
+    return (
+        db.query(PricingSeason)
+        .order_by(PricingSeason.priority.desc(), PricingSeason.start_date)
+        .all()
+    )
+
+
+def create_season(db: Session, payload) -> PricingSeason:
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="end_date deve essere >= start_date")
+    _validate_unit_exists(db, payload.unit_id)
+    row = PricingSeason(
+        name=payload.name,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        adjustment_percent=payload.adjustment_percent,
+        unit_id=payload.unit_id,
+        priority=payload.priority,
+        is_active=payload.is_active,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update_season(db: Session, season_id: int, payload) -> PricingSeason:
+    row = db.query(PricingSeason).filter(PricingSeason.id == season_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Stagione non trovata")
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=400, detail="end_date deve essere >= start_date")
+    _validate_unit_exists(db, payload.unit_id)
+    row.name = payload.name
+    row.start_date = payload.start_date
+    row.end_date = payload.end_date
+    row.adjustment_percent = payload.adjustment_percent
+    row.unit_id = payload.unit_id
+    row.priority = payload.priority
+    row.is_active = payload.is_active
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_season(db: Session, season_id: int) -> None:
+    row = db.query(PricingSeason).filter(PricingSeason.id == season_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Stagione non trovata")
+    db.delete(row)
+    db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Lead-time rules CRUD
+# --------------------------------------------------------------------------- #
+
+
+def _validate_lead_rule(payload) -> None:
+    if payload.min_days < 0:
+        raise HTTPException(status_code=400, detail="min_days deve essere >= 0")
+    if payload.max_days is not None and payload.max_days < payload.min_days:
+        raise HTTPException(status_code=400, detail="max_days deve essere >= min_days")
+
+
+def list_lead_time_rules(db: Session) -> list:
+    return db.query(LeadTimeRule).order_by(LeadTimeRule.min_days).all()
+
+
+def create_lead_time_rule(db: Session, payload) -> LeadTimeRule:
+    _validate_lead_rule(payload)
+    row = LeadTimeRule(
+        label=payload.label,
+        min_days=payload.min_days,
+        max_days=payload.max_days,
+        adjustment_percent=payload.adjustment_percent,
+        is_active=payload.is_active,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update_lead_time_rule(db: Session, rule_id: int, payload) -> LeadTimeRule:
+    row = db.query(LeadTimeRule).filter(LeadTimeRule.id == rule_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Regola non trovata")
+    _validate_lead_rule(payload)
+    row.label = payload.label
+    row.min_days = payload.min_days
+    row.max_days = payload.max_days
+    row.adjustment_percent = payload.adjustment_percent
+    row.is_active = payload.is_active
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_lead_time_rule(db: Session, rule_id: int) -> None:
+    row = db.query(LeadTimeRule).filter(LeadTimeRule.id == rule_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Regola non trovata")
+    db.delete(row)
+    db.commit()
 
 
 def get_recommendations(

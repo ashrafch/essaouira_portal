@@ -265,3 +265,134 @@ def test_recommendations_clamped_to_price_band():
         recs = rec.json()["recommendations"]
         assert recs
         assert all(90 <= r["recommended_price"] <= 105 for r in recs)
+
+
+def test_season_adjustment_in_recommendations():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+        unit_id = _first_unit_id(client, headers)
+        client.put(
+            f"/units/{unit_id}",
+            json={"base_nightly_rate": 100, "currency": "EUR"},
+            headers=headers,
+        )
+
+        created = client.post(
+            "/revenue/seasons",
+            json={
+                "name": "AltaTest",
+                "start_date": "2028-01-05",
+                "end_date": "2028-01-10",
+                "adjustment_percent": 50,
+                "priority": 5,
+            },
+            headers=headers,
+        )
+        assert created.status_code == 200
+        season_id = created.json()["id"]
+
+        rec = client.get(
+            f"/revenue/recommendations?unit_id={unit_id}"
+            "&from_date=2028-01-05&to_date=2028-01-11",
+            headers=headers,
+        )
+        assert rec.status_code == 200
+        recs = rec.json()["recommendations"]
+        assert recs
+        assert all("AltaTest" in r["reason"] for r in recs)
+
+        client.delete(f"/revenue/seasons/{season_id}", headers=headers)
+
+
+def test_lead_time_rule_in_recommendations():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+        unit_id = _first_unit_id(client, headers)
+        client.put(
+            f"/units/{unit_id}",
+            json={"base_nightly_rate": 100, "currency": "EUR"},
+            headers=headers,
+        )
+
+        created = client.post(
+            "/revenue/lead-time-rules",
+            json={
+                "label": "LEADTEST",
+                "min_days": 0,
+                "max_days": 100000,
+                "adjustment_percent": 10,
+            },
+            headers=headers,
+        )
+        assert created.status_code == 200
+        rule_id = created.json()["id"]
+
+        rec = client.get(
+            f"/revenue/recommendations?unit_id={unit_id}"
+            "&from_date=2028-01-20&to_date=2028-01-25",
+            headers=headers,
+        )
+        assert rec.status_code == 200
+        recs = rec.json()["recommendations"]
+        assert recs
+        assert all("LEADTEST" in r["reason"] for r in recs)
+
+        client.delete(f"/revenue/lead-time-rules/{rule_id}", headers=headers)
+
+
+def test_orphan_gap_night_is_discounted():
+    with TestClient(app) as client:
+        headers = _login_headers(client)
+        unit_id = _first_unit_id(client, headers)
+        client.put(
+            f"/units/{unit_id}",
+            json={"base_nightly_rate": 100, "currency": "EUR"},
+            headers=headers,
+        )
+
+        # Clear any leftovers around the gap window.
+        for b in client.get("/bookings", headers=headers).json():
+            if b["unit_id"] == unit_id and b["checkin_date"] in (
+                "2028-02-08",
+                "2028-02-11",
+            ):
+                client.delete(f"/bookings/{b['id']}", headers=headers)
+
+        # Booking A occupies nights 08-09, booking B occupies 11-12 → night 10 orphan.
+        a = client.post(
+            "/bookings",
+            json={
+                "unit_id": unit_id,
+                "guest_name": "A",
+                "source": "direct",
+                "checkin_date": "2028-02-08",
+                "checkout_date": "2028-02-10",
+                "currency": "EUR",
+            },
+            headers=headers,
+        )
+        b = client.post(
+            "/bookings",
+            json={
+                "unit_id": unit_id,
+                "guest_name": "B",
+                "source": "direct",
+                "checkin_date": "2028-02-11",
+                "checkout_date": "2028-02-13",
+                "currency": "EUR",
+            },
+            headers=headers,
+        )
+        assert a.status_code == 200 and b.status_code == 200
+
+        rec = client.get(
+            f"/revenue/recommendations?unit_id={unit_id}"
+            "&from_date=2028-02-08&to_date=2028-02-14",
+            headers=headers,
+        )
+        assert rec.status_code == 200
+        by_date = {r["date"]: r for r in rec.json()["recommendations"]}
+        assert "orfana" in by_date["2028-02-10"]["reason"]
+
+        client.delete(f"/bookings/{a.json()['id']}", headers=headers)
+        client.delete(f"/bookings/{b.json()['id']}", headers=headers)

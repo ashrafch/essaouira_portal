@@ -175,6 +175,34 @@ export function applyRevenueRecommendations(unitId, fromDate, toDate) {
   });
 }
 
+// Pricing seasons (date-range adjustments)
+export function getSeasons() {
+  return apiGet("/revenue/seasons");
+}
+export function createSeason(payload) {
+  return apiPost("/revenue/seasons", payload);
+}
+export function updateSeason(id, payload) {
+  return apiPut(`/revenue/seasons/${id}`, payload);
+}
+export function deleteSeason(id) {
+  return apiDelete(`/revenue/seasons/${id}`);
+}
+
+// Lead-time rules (adjust by days-until-date)
+export function getLeadTimeRules() {
+  return apiGet("/revenue/lead-time-rules");
+}
+export function createLeadTimeRule(payload) {
+  return apiPost("/revenue/lead-time-rules", payload);
+}
+export function updateLeadTimeRule(id, payload) {
+  return apiPut(`/revenue/lead-time-rules/${id}`, payload);
+}
+export function deleteLeadTimeRule(id) {
+  return apiDelete(`/revenue/lead-time-rules/${id}`);
+}
+
 /* --------- ANALYTICS --------- */
 
 // riepilogo base (se lo usiamo ancora in Dashboard)

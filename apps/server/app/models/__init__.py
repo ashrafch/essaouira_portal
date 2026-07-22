@@ -11,6 +11,7 @@ from app.models import (  # noqa: F401
     pricing_defaults,
     property,
     rate_calendar,
+    revenue_rules,
     smart_building,
     staff_defaults,
     staff_member,

@@ -1,7 +1,8 @@
 # Revenue Management — Integration Analysis & Roadmap (PriceLabs-like)
 
-Status: **Fase 0 + Fase 1 shipped** (rate calendar, booking-status, recommendation
-engine v1, min-stay enforcement, min/max price guardrails, manual rate editor).
+Status: **Fase 0 + Fase 1 + Fase 2 shipped** (rate calendar, booking-status,
+recommendation engine v2 — seasons/lead-time/orphan-gap, min-stay enforcement,
+min/max guardrails, manual rate editor, seasons & lead-time rules editor).
 Owner domain: `apps/server/app/domains/revenue/`.
 
 This document maps PriceLabs-style dynamic-pricing capabilities onto the existing
@@ -37,7 +38,9 @@ Essaouira Portal: what we reuse, what we build, and what is genuinely hard.
 | Min-stay per date (stored + enforced at booking) | 🔴 `rate_calendar.min_stay` | **1 ✅** |
 | Min/max price guardrails (clamp recommendations) | 🔴 `Unit.min_price/max_price` | **1 ✅** |
 | Manual rate-calendar editor (UI) | 🔴 `RateCalendarEditor` on Pricing page | **1 ✅** |
-| Seasonal profiles, lead-time rules | 🔴 rules engine | 2 |
+| Seasonal profiles (date-range %) | 🔴 `pricing_seasons` | **2 ✅** |
+| Lead-time rules (last-minute/early-bird) | 🔴 `lead_time_rules` | **2 ✅** |
+| Orphan-gap fill (single-night gaps) | 🔴 engine detection | **2 ✅** |
 | iCal availability sync (anti-overbooking) | 🔴 channel connections + `.ics` | 3 |
 | Market/competitor data | 🔴 manual comp-set only | 4 |
 | Price push to OTAs | 🔴 adapter (declared future) | 4 |
@@ -101,21 +104,40 @@ Full backend suite green.
   overrides), "Salva modifiche" (manual upsert). Mounted on `Tariffe & Canali`.
 - `Pricing.jsx` — min/max price fields on the unit editor + columns in the table.
 
-## 6. Recommendation model v1 (transparent)
+## 6. Fase 2 — what shipped
+
+**Backend**
+- `pricing_seasons` (name, date range, `adjustment_percent`, optional `unit_id`,
+  `priority`) and `lead_time_rules` (label, `min_days`/`max_days`,
+  `adjustment_percent`) — Alembic `0012_revenue_rules`, guarded. Full CRUD under
+  `/revenue/seasons` and `/revenue/lead-time-rules`.
+- Recommendation engine v2: applies matching season → weekend → portfolio
+  occupancy → lead-time rule → orphan-gap fill (single free night between two
+  occupied ones, −20%), then clamps to `[min_price, max_price]`.
+- Tests: season adjustment, lead-time rule, orphan-gap all reflected in `reason`.
+
+**Frontend**
+- `components/RevenueRulesEditor.jsx` on the Pricing page — manage seasons and
+  lead-time rules (list / add / delete), portfolio-wide or per unit.
+
+## 7. Recommendation model v2 (transparent)
 
 ```text
 price = base_nightly_rate
-if weekday in {Fri, Sat}:      price *= 1.15      # weekend
-if portfolio_occupancy >= 0.8: price *= 1.25      # high demand
+price *= 1 + season.adjustment%/100          # Fase 2: highest-priority season
+if weekday in {Fri, Sat}:      price *= 1.15       # weekend
+if portfolio_occupancy >= 0.8: price *= 1.25       # high demand
 elif >= 0.6:                   price *= 1.12
-elif < 0.3:                    price *= 0.90       # stimulate low-demand dates
+elif < 0.3:                    price *= 0.90        # stimulate low-demand dates
+price *= 1 + lead_time_rule.adjustment%/100  # Fase 2: days until the date
+if orphan_night:               price *= 0.80       # Fase 2: fill single-night gaps
 price = clamp(price, unit.min_price, unit.max_price)   # Fase 1 guardrail
 ```
 
 Portfolio occupancy for a date = share of units with a non-cancelled booking
 covering that date. No black box; every recommendation carries its `reason`.
 
-## 7. Migration chain (fixed)
+## 8. Migration chain (fixed)
 
 The Alembic chain was reordered so a fresh database builds from scratch:
 `… → 0006 → 0009 (smart core tables) → 0007 → 0008 → 0010 → 0011`. Previously the
@@ -124,12 +146,11 @@ only created in 0009 — so `alembic upgrade head` on an empty DB failed. All th
 migrations are guarded, so the reorder is a no-op on create_all-bootstrapped
 databases. Verified: full chain builds a fresh Postgres end-to-end.
 
-## 8. Next phases
+## 9. Next phases
 
-1. **Fase 2** — seasonal profiles, lead-time (last-minute/early-bird/orphan-gap).
-2. **Fase 3** — iCal export/import per unit; `ChannelConnection` with last-sync
+1. **Fase 3** — iCal export/import per unit; `ChannelConnection` with last-sync
    state; reconcile with the existing overlap check.
-3. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
+2. **Fase 4** — manual comp-set + pricing alerts (out-of-band price, orphan night,
    low forward occupancy); OTA price push behind an adapter.
 
 See also: `docs/GAP_ANALYSIS_AND_ROADMAP.md`, `AGENTS.md` (§2 ownership boundaries).
