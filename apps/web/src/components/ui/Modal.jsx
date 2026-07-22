@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "./utils";
 import "./ui.css";
@@ -76,7 +77,7 @@ function Modal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="ui-modal-overlay" role="presentation" onClick={closeOnBackdrop ? onClose : undefined}>
       <div
         ref={dialogRef}
@@ -102,7 +103,8 @@ function Modal({
         <div className="ui-modal-body">{children}</div>
         {footer ? <div className="ui-modal-footer">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

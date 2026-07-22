@@ -41,9 +41,13 @@ Rimane:
 - [ ] Icone “i” inline anche sulle sezioni interne (oltre alla topbar) dove utile.
 
 ### Mobile & accessibilità
-- [ ] Layout mobile dedicato per le pagine dense (Bookings, Calendar, Staff) oltre allo scroll orizzontale.
-- [ ] Valutare bottom-nav mobile (oggi solo drawer laterale).
-- [ ] Pass accessibilità: focus-visible, label ARIA sulle azioni icona, contrasto in dark.
+- [x] **Bottom-nav mobile** (≤768px, RBAC-aware): Home/Prenotazioni/Calendario/Staff + “Menu” (apre il drawer).
+- [x] **Topbar responsive**: su mobile nasconde meta ruolo/utente, pill connettività e ricerca comandi; resta titolo + icone.
+- [x] Padding inferiore del contenuto per non finire sotto la bottom-nav.
+- [x] `ui/Modal` in **portal** su `document.body` (centrato e robusto anche sotto la topbar con `backdrop-filter`).
+- [ ] Vista **agenda/lista** del Calendario su mobile (oggi griglia 7 colonne compressa).
+- [ ] Stacking “a card” delle tabelle dense su mobile (oltre allo scroll orizzontale).
+- [ ] Pass accessibilità completo: focus-visible, label ARIA sulle azioni icona, contrasto in dark.
 
 ### RBAC/coerenza rotte
 - [ ] `BookingDocument` dentro la tabella `appRoutes.js` (oggi cablata a parte in `App.jsx`).

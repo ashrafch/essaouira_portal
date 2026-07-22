@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
+import BottomNav from "./BottomNav.jsx";
 
 const MotionDiv = motion.div;
 
@@ -58,6 +59,8 @@ function Layout({ children }) {
           </MotionDiv>
         </AnimatePresence>
       </main>
+
+      <BottomNav onOpenMenu={() => setMobileSidebarOpen(true)} />
     </div>
   );
 }

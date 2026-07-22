@@ -364,3 +364,88 @@
   text-align: center;
   box-shadow: 0 0 0 2px var(--color-surface);
 }
+
+/* ---------------- Mobile bottom navigation ---------------- */
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Declutter the top bar: keep title + icon actions, drop the rest. */
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .topbar__subtitle {
+    display: none;
+  }
+  .topbar__right {
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .topbar__meta,
+  .topbar__conn,
+  .cp-trigger-btn {
+    display: none;
+  }
+  .topbar__actions {
+    padding-left: 0;
+    border-left: none;
+  }
+
+  /* Bottom nav visible on phones; sits below the drawer overlay (z 70). */
+  .bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 2px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+    border-top: 1px solid var(--color-border);
+    backdrop-filter: blur(10px);
+  }
+  .bottom-nav__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: none;
+  }
+  .bottom-nav__item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bottom-nav__item:hover {
+    color: var(--color-text);
+    background: transparent;
+    text-decoration: none;
+  }
+  .bottom-nav__item.is-active {
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  /* Room so page content is never hidden behind the fixed bar. */
+  .portal-main {
+    padding-bottom: 76px;
+  }
+}
