@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   getMaintenanceTickets,
   createMaintenanceTicket,
@@ -7,6 +8,7 @@ import {
   getUnits,
   getStaffMembers,
 } from "../services/api";
+import { PageHeader, Button, Modal } from "../components/ui";
 
 const PRIORITY_COLORS = {
   low: "var(--color-success-soft)", // verde chiaro
@@ -157,28 +159,15 @@ function Maintenance() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 40px)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Manutenzioni & Migliorie</h1>
-          <p style={{ color: "var(--color-text-muted)", fontSize: 13, margin: "4px 0 0" }}>
-            Gestisci guasti, acquisti e lavori da fare nella struttura.
-          </p>
-        </div>
-        <button
-          onClick={() => openModal()}
-          style={{
-            backgroundColor: "var(--color-primary)",
-            color: "var(--color-on-primary)",
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + Nuova Segnalazione
-        </button>
-      </div>
+      <PageHeader
+        title="Manutenzioni & Migliorie"
+        subtitle="Gestisci guasti, acquisti e lavori da fare nella struttura."
+        actions={
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => openModal()}>
+            Nuova Segnalazione
+          </Button>
+        }
+      />
 
       {loading && (
         <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 12 }}>
@@ -254,18 +243,20 @@ function Maintenance() {
                       {TYPE_LABELS[t.ticket_type] || t.ticket_type}
                     </span>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Pencil size={16} />}
                         onClick={() => openModal(t)}
-                        style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12 }}
-                      >
-                        ✏️
-                      </button>
-                      <button
+                        aria-label="Modifica ticket"
+                      />
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        icon={<Trash2 size={16} />}
                         onClick={() => handleDelete(t.id)}
-                        style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12 }}
-                      >
-                        🗑️
-                      </button>
+                        aria-label="Elimina ticket"
+                      />
                     </div>
                   </div>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.title}</div>
@@ -286,28 +277,19 @@ function Maintenance() {
                   {/* Actions to move */}
                   <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
                     {status !== "todo" && (
-                      <button
-                        onClick={() => moveStatus(t, "todo")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
-                      >
+                      <Button variant="secondary" size="sm" onClick={() => moveStatus(t, "todo")}>
                         ← Da Fare
-                      </button>
+                      </Button>
                     )}
                     {status !== "in_progress" && (
-                      <button
-                        onClick={() => moveStatus(t, "in_progress")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
-                      >
+                      <Button variant="secondary" size="sm" onClick={() => moveStatus(t, "in_progress")}>
                         In Corso
-                      </button>
+                      </Button>
                     )}
                     {status !== "done" && (
-                      <button
-                        onClick={() => moveStatus(t, "done")}
-                        style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
-                      >
+                      <Button variant="secondary" size="sm" onClick={() => moveStatus(t, "done")}>
                         Fatto →
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -318,102 +300,97 @@ function Maintenance() {
       </div>
 
       {/* MODAL FORM */}
-      {isModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "var(--color-overlay)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-          onClick={() => setIsModalOpen(false)}
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingId ? "Modifica Ticket" : "Nuovo Ticket"}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+              Annulla
+            </Button>
+            <Button variant="primary" type="submit" form="maintenance-form">
+              Salva
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="maintenance-form"
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
         >
-          <div
-            style={{ backgroundColor: "var(--color-surface)", padding: 24, borderRadius: 12, width: 400 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0 }}>{editingId ? "Modifica Ticket" : "Nuovo Ticket"}</h2>
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input
-                placeholder="Titolo (es. Lampadina fulminata)"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
-                required
-              />
-              <textarea
-                placeholder="Descrizione dettagliata..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", minHeight: 60 }}
-              />
-              
-              <div style={{ display: "flex", gap: 10 }}>
-                <select
-                  value={formData.ticket_type}
-                  onChange={(e) => setFormData({ ...formData, ticket_type: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
-                >
-                  <option value="repair">Riparazione</option>
-                  <option value="improvement">Miglioria</option>
-                  <option value="purchase">Acquisto</option>
-                </select>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
-                >
-                  <option value="low">Bassa</option>
-                  <option value="medium">Media</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
-                </select>
-              </div>
+          <input
+            placeholder="Titolo (es. Lampadina fulminata)"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
+            required
+          />
+          <textarea
+            placeholder="Descrizione dettagliata..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", minHeight: 60 }}
+          />
 
-              <select
-                value={formData.unit_id}
-                onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
-              >
-                <option value="">-- Struttura Generale --</option>
-                {units.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-
-              <select
-                value={formData.assigned_to_id}
-                onChange={(e) => setFormData({ ...formData, assigned_to_id: e.target.value })}
-                style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
-              >
-                <option value="">-- Assegna a Staff --</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
-                ))}
-              </select>
-
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <label style={{ fontSize: 12 }}>Costo €:</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.cost}
-                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                  style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
-                />
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
-                <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: "8px 16px", border: "1px solid var(--color-border-strong)", background: "var(--color-surface)", borderRadius: 6, cursor: "pointer" }}>Annulla</button>
-                <button type="submit" style={{ padding: "8px 16px", border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 6, cursor: "pointer" }}>Salva</button>
-              </div>
-            </form>
+          <div style={{ display: "flex", gap: 10 }}>
+            <select
+              value={formData.ticket_type}
+              onChange={(e) => setFormData({ ...formData, ticket_type: e.target.value })}
+              style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
+            >
+              <option value="repair">Riparazione</option>
+              <option value="improvement">Miglioria</option>
+              <option value="purchase">Acquisto</option>
+            </select>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
+            >
+              <option value="low">Bassa</option>
+              <option value="medium">Media</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
           </div>
-        </div>
-      )}
+
+          <select
+            value={formData.unit_id}
+            onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+            style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
+          >
+            <option value="">-- Struttura Generale --</option>
+            {units.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={formData.assigned_to_id}
+            onChange={(e) => setFormData({ ...formData, assigned_to_id: e.target.value })}
+            style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)" }}
+          >
+            <option value="">-- Assegna a Staff --</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+            ))}
+          </select>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <label style={{ fontSize: 12 }}>Costo €:</label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.cost}
+              onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+              style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border-strong)", flex: 1 }}
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

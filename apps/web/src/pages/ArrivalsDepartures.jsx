@@ -8,6 +8,16 @@ import {
   updateStaffTask,
 } from "../services/api";
 import MessageModal from "../components/MessageModal";
+import { PageHeader, Button, useToast } from "../components/ui";
+import {
+  CalendarDays,
+  ClipboardList,
+  Wallet,
+  Eye,
+  Printer,
+  Cpu,
+  MessageCircle,
+} from "lucide-react";
 
 function formatDate(d) {
   if (!d) return "";
@@ -23,6 +33,7 @@ function whatsappLink(phone) {
 function ArrivalsDepartures() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
+  const toast = useToast();
 
   const STAFF_ROUTE = "/staff";
 
@@ -158,7 +169,7 @@ function ArrivalsDepartures() {
         prev.map((bk) => (bk.id === updated.id ? updated : bk))
       );
     } catch (err) {
-      alert("Errore nel segnare la prenotazione come pagata: " + err.message);
+      toast.error("Errore nel segnare la prenotazione come pagata: " + err.message);
     } finally {
       setSavingBookingId(null);
     }
@@ -186,7 +197,7 @@ function ArrivalsDepartures() {
         prev.map((t) => (t.id === updated.id ? updated : t))
       );
     } catch (err) {
-      alert("Errore nel cambiare lo stato del task: " + err.message);
+      toast.error("Errore nel cambiare lo stato del task: " + err.message);
     } finally {
       setSavingTaskId(null);
     }
@@ -220,15 +231,6 @@ function ArrivalsDepartures() {
     display: "flex",
     flexDirection: "column",
     gap: 16,
-  };
-
-  const header = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 4,
-    flexWrap: "wrap",
-    gap: 8,
   };
 
   const cardGrid = {
@@ -283,27 +285,6 @@ function ArrivalsDepartures() {
     verticalAlign: "top",
   };
 
-  const smallButton = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    padding: "4px 10px",
-    color: "var(--color-text)",
-    fontSize: 11,
-    background: "var(--color-surface)",
-    cursor: "pointer",
-  };
-
-  const iconButton = {
-    ...smallButton,
-    padding: 0,
-    width: 24,
-    height: 24,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "999px",
-  };
-
   const pillStatus = (paid) =>
     badge(
       paid ? "var(--color-success-soft)" : "var(--color-danger-soft)",
@@ -332,89 +313,85 @@ function ArrivalsDepartures() {
 
   return (
     <div style={page}>
-      <div style={header}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Arrivi & Partenze</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Vista operativa del giorno: check-in, check-out e task staff.
-          </p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginRight: 6,
-                }}
-              >
-                Giorno
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-strong)",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                }}
-              />
+      <PageHeader
+        title="Arrivi & Partenze"
+        subtitle="Vista operativa del giorno: check-in, check-out e task staff."
+        actions={
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-text-muted)",
+                    marginRight: 6,
+                  }}
+                >
+                  Giorno
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border-strong)",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--color-text-muted)",
+                    marginRight: 6,
+                  }}
+                >
+                  Unità
+                </label>
+                <select
+                  value={unitFilter}
+                  onChange={(e) => setUnitFilter(e.target.value)}
+                  style={{
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border-strong)",
+                    padding: "6px 8px",
+                    fontSize: 13,
+                    minWidth: 140,
+                  }}
+                >
+                  <option value="all">Tutte le unità</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginRight: 6,
-                }}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<CalendarDays size={16} />}
+                onClick={() => setSelectedDate(todayStr)}
               >
-                Unità
-              </label>
-              <select
-                value={unitFilter}
-                onChange={(e) => setUnitFilter(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-strong)",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                  minWidth: 140,
-                }}
+                Oggi
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<ClipboardList size={16} />}
+                onClick={openStaffForDate}
               >
-                <option value="all">Tutte le unità</option>
-                {units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+                Vai a task staff del giorno
+              </Button>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              type="button"
-              style={smallButton}
-              onClick={() => setSelectedDate(todayStr)}
-            >
-              Oggi
-            </button>
-            <button
-              type="button"
-              style={{
-                ...smallButton,
-                borderColor: "var(--color-primary)",
-                color: "var(--color-primary)",
-              }}
-              onClick={openStaffForDate}
-            >
-              Vai a task staff del giorno
-            </button>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
         <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
@@ -498,20 +475,14 @@ function ArrivalsDepartures() {
                                   >
                                     <span>📞</span> {b.guest_phone}
                                   </a>
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<MessageCircle size={16} />}
                                     title="Invia Messaggio Template"
-                                    style={{
-                                        ...iconButton,
-                                        backgroundColor: "var(--color-success-soft)",
-                                        color: "var(--color-success-strong)",
-                                        border: "1px solid var(--color-success)",
-                                        fontSize: 12,
-                                    }}
+                                    aria-label="Invia Messaggio Template"
                                     onClick={() => openMessageModal(b)}
-                                  >
-                                    💬
-                                  </button>
+                                  />
                                 </div>
                               )}
 
@@ -592,15 +563,10 @@ function ArrivalsDepartures() {
                                 gap: 4,
                               }}
                             >
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: b.is_paid
-                                    ? "var(--color-border-strong)"
-                                    : "var(--color-success)",
-                                  color: b.is_paid ? "var(--color-text-muted)" : "var(--color-success-strong)",
-                                }}
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                icon={<Wallet size={16} />}
                                 disabled={
                                   b.is_paid || savingBookingId === b.id
                                 }
@@ -611,44 +577,35 @@ function ArrivalsDepartures() {
                                   : savingBookingId === b.id
                                   ? "Aggiorno..."
                                   : "Incassa"}
-                              </button>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "var(--color-primary)",
-                                  color: "var(--color-primary)",
-                                }}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<Eye size={16} />}
                                 onClick={() => openBooking(b)}
                               >
                                 Dettagli
-                              </button>
-                              <button
-                                type="button"
-                                style={{
-                                  ...smallButton,
-                                  borderColor: "var(--color-info)",
-                                  color: "var(--color-info-strong)",
-                                }}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<Printer size={16} />}
                                 onClick={() => openDocument(b)}
                               >
-                                📄 Stampa
-                              </button>
+                                Stampa
+                              </Button>
                               {b.unit_id != null && (
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<Cpu size={16} />}
                                   title="Apri stato smart e readiness dispositivi dell'unità"
-                                  style={{
-                                    ...smallButton,
-                                    borderColor: "var(--color-primary)",
-                                    color: "var(--color-primary)",
-                                  }}
                                   onClick={() =>
                                     navigate(`/smart-units/${b.unit_id}`)
                                   }
                                 >
                                   Stato smart
-                                </button>
+                                </Button>
                               )}
                             </div>
                           </td>
@@ -793,50 +750,35 @@ function ArrivalsDepartures() {
                             )}
                           </td>
                           <td style={td}>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                               <button
-                                  type="button"
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<MessageCircle size={16} />}
                                   title="Invia Messaggio"
-                                  style={{
-                                    ...iconButton,
-                                    backgroundColor: "var(--color-success-soft)",
-                                    color: "var(--color-success-strong)",
-                                    border: "1px solid var(--color-success)",
-                                    width: 26, height: 26, fontSize: 14
-                                  }}
+                                  aria-label="Invia Messaggio"
                                   onClick={() => openMessageModal(b)}
-                                >
-                                  💬
-                                </button>
-                                <button
-                                  type="button"
+                                />
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<Printer size={16} />}
                                   title="Stampa"
-                                  style={{
-                                    ...iconButton,
-                                    backgroundColor: "var(--color-info-soft)",
-                                    color: "var(--color-info-strong)",
-                                    border: "1px solid var(--color-info)",
-                                    width: 26, height: 26, fontSize: 14
-                                  }}
+                                  aria-label="Stampa"
                                   onClick={() => openDocument(b)}
-                                >
-                                  📄
-                                </button>
+                                />
                                 {b.unit_id != null && (
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    icon={<Cpu size={16} />}
                                     title="Apri stato smart e readiness dispositivi dell'unità"
-                                    style={{
-                                      ...smallButton,
-                                      borderColor: "var(--color-primary)",
-                                      color: "var(--color-primary)",
-                                    }}
                                     onClick={() =>
                                       navigate(`/smart-units/${b.unit_id}`)
                                     }
                                   >
                                     Stato smart
-                                  </button>
+                                  </Button>
                                 )}
                             </div>
                           </td>

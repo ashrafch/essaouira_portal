@@ -329,19 +329,40 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-/* Legacy escape hatch: inline-styled white buttons keep dark ink even in
-   dark mode (their background stays white). Remove once pages use tokens. */
-button[style*="background: #fff"],
-button[style*="background:#fff"],
+/* Contrast safety net for inline-styled buttons (until every page adopts the
+   ui/Button component). A bare <button> defaults to the primary fill with white
+   ink; when a page overrides the background inline but forgets the text colour,
+   the label turns invisible — the "white button" problem. These rules restore
+   readable ink. Inline `color` still wins, so intentional colours are kept.
+
+   Hardcoded white backgrounds stay white in both themes → always dark ink. */
+button[style*="#fff"],
+button[style*="#FFF"],
 button[style*="background: white"],
 button[style*="background:white"],
-button[style*="background-color: #fff"],
-button[style*="background-color:#fff"],
 button[style*="background-color: white"],
 button[style*="background-color:white"],
-button[style*="background-color: rgb(255, 255, 255)"] {
+button[style*="rgb(255, 255, 255)"],
+button[style*="rgb(255,255,255)"] {
   color: var(--color-text-on-light);
 }
+
+/* Theme-aware surfaces / transparent backgrounds → theme-aware ink. */
+button[style*="--color-surface"],
+button[style*="--color-bg"],
+button[style*="background: transparent"],
+button[style*="background:transparent"],
+button[style*="background-color: transparent"],
+button[style*="background-color:transparent"] {
+  color: var(--color-text);
+}
+
+/* Soft status backgrounds on buttons → the matching strong ink. */
+button[style*="--color-primary-soft"] { color: var(--color-primary-strong); }
+button[style*="--color-success-soft"] { color: var(--color-success-strong); }
+button[style*="--color-warning-soft"] { color: var(--color-warning-strong); }
+button[style*="--color-danger-soft"] { color: var(--color-danger-strong); }
+button[style*="--color-info-soft"] { color: var(--color-info-strong); }
 
 /* Tables */
 table {

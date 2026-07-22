@@ -12,24 +12,32 @@ Stato al momento della scrittura. `[x]` = fatto, `[ ]` = da fare.
 - [x] Revenue completo (Fasi 0–4): rate calendar, motore consigli, min-stay, guardrail, stagioni/lead-time/orfane, iCal export+import, comp-set, alert, sync-all, push (simulato).
 - [x] Fix catena migrazioni Alembic (build da zero) e fix CI (`pytest` nudo).
 
-## UI/UX — da fare
+## UI/UX
 
-### Migrazione al design system (coerenza “professionale”)
-Pagine ancora su stili inline + `components/Modal`/`FeedbackMessage` legacy, da portare su `components/ui` (PageHeader, Button, Modal, toast):
+### Migrazione al design system — FATTA sulle pagine core
+Portate a `components/ui` (PageHeader, Button, Modal accessibile, toast):
 
-- [ ] `Bookings.jsx` (1298 righe) — scomporre + `ui/Modal` + toast + tabella su design system.
-- [ ] `Staff.jsx` (2039 righe) — scomporre in feature-component.
-- [ ] `ArrivalsDepartures.jsx` — design system + toast.
-- [ ] `Business.jsx` — aggiungere **grafici** (oggi solo tabelle) e KPI trend.
-- [ ] `Pricing.jsx` — migrare le 2 modali legacy a `ui/Modal` + toast.
-- [ ] `Maintenance.jsx`, `Expenses.jsx`, `Units.jsx`, `StaffPlanner.jsx`, `StaffDirectory.jsx` — allineare a `PageHeader`/`ui`.
-- [ ] Rimuovere l'“escape hatch” CSS in `index.css` una volta migrate le pagine inline.
+- [x] Fix globale contrasto **pulsanti bianchi** (`index.css`): copre `var(--color-surface)`/`transparent`/soft, non più solo `#fff`.
+- [x] `Bookings.jsx` — `PageHeader`, `ui/Modal`, `Button`, toast (logica prenotazioni/availability invariata).
+- [x] `ArrivalsDepartures.jsx` — `PageHeader`, `Button`, toast.
+- [x] `Business.jsx` — `PageHeader`, `StatCard`, **grafici** (torta ricavi + barre per unità), toast, valuta unificata.
+- [x] `Pricing.jsx` — 2 modali legacy → `ui/Modal` + toast.
+- [x] `Maintenance.jsx`, `Expenses.jsx`, `Units.jsx` — `PageHeader`/`Button`/`Modal`/toast.
+- [x] `StaffDirectory.jsx`, `StaffPlanner.jsx` — `PageHeader`/`Button`/`Modal`/toast.
+- [x] `Staff.jsx` — light-touch (`PageHeader`, `Button`, toast).
+- [x] Rifinitura Smart via `ui.css`: gerarchia titoli sezione (19px), KPI label uppercase, ritmo card.
+
+Rimane:
+- [ ] `Staff.jsx` — **decomporre** il monolite (2039 righe) in feature-component.
+- [ ] Migrare `components/MessageModal` a `ui/Modal` (usata in ArrivalsDepartures).
+- [ ] Toggle segmentati (day/week, stato task) come componente `ui` dedicato.
+- [ ] Rimuovere l'“escape hatch” CSS in `index.css` quando non resta più nessun `<button>` inline.
 
 ### Coerenza & rifiniture
-- [ ] `PageHeader` uniforme su tutte le pagine core (oggi alcune usano `<h1>` inline).
-- [ ] Formatter valuta/percentuale (`utils/format`) usato ovunque (restano `toLocaleString` sparsi).
+- [x] `PageHeader` sulle pagine core (restano fuori solo le utility: Login/404/Forbidden).
+- [ ] Formatter valuta/percentuale (`utils/format`) ovunque (restano `toLocaleString` in alcune pagine smart).
 - [ ] Date helper condivisi (`utils/dateUtils`) al posto delle re-implementazioni in `Bookings.jsx`/`Staff.jsx`.
-- [ ] Sostituire i restanti `window.alert()` / emoji-come-UI con toast/icone.
+- [ ] Rifinitura Smart **per-pagina** con feedback visivo (struttura più profonda dove serve).
 - [ ] Icone “i” inline anche sulle sezioni interne (oltre alla topbar) dove utile.
 
 ### Mobile & accessibilità

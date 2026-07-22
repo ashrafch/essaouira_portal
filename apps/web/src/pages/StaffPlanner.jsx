@@ -1,29 +1,11 @@
 import { useEffect, useState } from "react";
 import { getStaffTasks, getUnits, updateStaffTask } from "../services/api";
+import { PageHeader, Button, Modal } from "../components/ui";
 
 const pageWrapper = {
   display: "flex",
   flexDirection: "column",
   gap: 20,
-};
-
-const headerRow = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 16,
-  flexWrap: "wrap",
-};
-
-const titleBlock = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const subtitleStyle = {
-  fontSize: 13,
-  color: "var(--color-text-muted)",
 };
 
 const dateWrapper = {
@@ -151,28 +133,6 @@ const notesStyle = {
   marginTop: 2,
 };
 
-const overlayStyle = {
-  position: "fixed",
-  inset: 0,
-  backgroundColor: "var(--color-overlay)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 50,
-};
-
-const modalStyle = {
-  backgroundColor: "var(--color-surface)",
-  borderRadius: 16,
-  padding: 20,
-  width: "100%",
-  maxWidth: 420,
-  boxShadow: "var(--shadow-lg)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
-
 const modalRow = {
   display: "flex",
   flexDirection: "column",
@@ -195,34 +155,6 @@ const modalTextArea = {
   ...modalInput,
   minHeight: 70,
   resize: "vertical",
-};
-
-const modalFooter = {
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: 8,
-  marginTop: 8,
-};
-
-const buttonBase = {
-  padding: "6px 12px",
-  borderRadius: 8,
-  fontSize: 13,
-  border: "1px solid transparent",
-  cursor: "pointer",
-};
-
-const buttonGhost = {
-  ...buttonBase,
-  backgroundColor: "var(--color-surface)",
-  borderColor: "var(--color-border-strong)",
-  color: "var(--color-text-muted)",
-};
-
-const buttonPrimary = {
-  ...buttonBase,
-  backgroundColor: "var(--color-primary)",
-  color: "var(--color-on-primary)",
 };
 
 const categories = [
@@ -375,24 +307,21 @@ function StaffPlanner() {
 
   return (
     <div style={pageWrapper}>
-      <div style={headerRow}>
-        <div style={titleBlock}>
-          <h1 style={{ margin: 0 }}>Planner Staff (giorno)</h1>
-          <p style={subtitleStyle}>
-            Vista operativa delle task di staff per un singolo giorno.
-          </p>
-        </div>
-
-        <div style={dateWrapper}>
-          <span style={dateLabel}>Seleziona giorno</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            style={dateInput}
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Planner Staff (giorno)"
+        subtitle="Vista operativa delle task di staff per un singolo giorno."
+        actions={
+          <div style={dateWrapper}>
+            <span style={dateLabel}>Seleziona giorno</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={dateInput}
+            />
+          </div>
+        }
+      />
 
       <div style={boardWrapper}>
         <div style={boardInner}>
@@ -464,10 +393,13 @@ function StaffPlanner() {
       </div>
 
       {editingTask && (
-        <div style={overlayStyle} onClick={closeEdit}>
-          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ margin: 0, fontSize: 16 }}>Modifica task staff</h2>
-            <p style={{ ...subtitleStyle, margin: 0 }}>
+        <Modal
+          open
+          onClose={closeEdit}
+          size="sm"
+          title="Modifica task staff"
+          description={
+            <>
               {editingTask.task_type === "cleaning"
                 ? "Pulizia"
                 : editingTask.task_type}
@@ -475,8 +407,20 @@ function StaffPlanner() {
               {formatUnit(editingTask)}
               {" · "}
               {editingTask.date}
-            </p>
-
+            </>
+          }
+          footer={
+            <>
+              <Button variant="ghost" onClick={closeEdit} disabled={saving}>
+                Annulla
+              </Button>
+              <Button onClick={handleSave} loading={saving}>
+                Salva modifiche
+              </Button>
+            </>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={modalRow}>
               <label style={modalLabel}>Operatore</label>
               <input
@@ -556,27 +500,8 @@ function StaffPlanner() {
             {saveError && (
               <div style={{ fontSize: 12, color: "var(--color-danger)" }}>{saveError}</div>
             )}
-
-            <div style={modalFooter}>
-              <button
-                type="button"
-                style={buttonGhost}
-                onClick={closeEdit}
-                disabled={saving}
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                style={buttonPrimary}
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? "Salvataggio..." : "Salva modifiche"}
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { Plus, RefreshCw, Pencil, Power, RotateCcw, Trash2 } from "lucide-react";
 import {
   getStaffMembers,
   createStaffMember,
   updateStaffMember,
   deactivateStaffMember,
 } from "../services/api";
-import Modal from "../components/Modal";
-import FeedbackMessage from "../components/FeedbackMessage";
+import { PageHeader, Button, Modal, useToast } from "../components/ui";
 
 const COLOR_SWATCHES = ["#0f766e", "#2563eb", "#f97316", "#a855f7", "#dc2626", "#16a34a"];
 const STAFF_ROLES = [
@@ -31,13 +31,13 @@ function sortMembers(list) {
 }
 
 function StaffDirectory() {
+  const toast = useToast();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [feedback, setFeedback] = useState({ type: "info", message: "" });
 
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState("");
@@ -92,7 +92,7 @@ function StaffDirectory() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!name.trim()) {
-      setFeedback({ type: "error", message: "Il nome è obbligatorio." });
+      toast.error("Il nome è obbligatorio.");
       return;
     }
     setSaving(true);
@@ -111,19 +111,13 @@ function StaffDirectory() {
         await createStaffMember(payload);
       }
       await loadMembers({ silent: true });
-      setFeedback({
-        type: "success",
-        message: editingId
-          ? "Membro staff aggiornato."
-          : "Nuovo membro staff creato.",
-      });
+      toast.success(
+        editingId ? "Membro staff aggiornato." : "Nuovo membro staff creato."
+      );
       resetForm();
       setIsModalOpen(false);
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore salvando membro staff: " + err.message,
-      });
+      toast.error("Errore salvando membro staff: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -133,17 +127,13 @@ function StaffDirectory() {
     try {
       await updateStaffMember(member.id, { is_active: !member.is_active });
       await loadMembers({ silent: true });
-      setFeedback({
-        type: "success",
-        message: member.is_active
+      toast.success(
+        member.is_active
           ? "Membro disattivato con successo."
-          : "Membro riattivato con successo.",
-      });
+          : "Membro riattivato con successo."
+      );
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore aggiornando stato: " + err.message,
-      });
+      toast.error("Errore aggiornando stato: " + err.message);
     }
   }
 
@@ -152,12 +142,9 @@ function StaffDirectory() {
     try {
       await deactivateStaffMember(id);
       await loadMembers({ silent: true });
-      setFeedback({ type: "success", message: "Membro eliminato." });
+      toast.success("Membro eliminato.");
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore eliminando membro: " + err.message,
-      });
+      toast.error("Errore eliminando membro: " + err.message);
     }
   }
 
@@ -181,45 +168,44 @@ function StaffDirectory() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Anagrafica Staff</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 0 }}>
-            Gestisci membri staff e stato attivo/disattivo. I disattivi non compaiono nei planner operativi.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "var(--color-success-strong)", background: "var(--color-success-soft)", border: "1px solid var(--color-success)", borderRadius: 999, padding: "6px 10px" }}>Attivi: {activeCount}</span>
-          <span style={{ fontSize: 12, color: "var(--color-text-muted)", background: "var(--color-surface-soft)", border: "1px solid var(--color-border)", borderRadius: 999, padding: "6px 10px" }}>Disattivi: {inactiveCount}</span>
-        </div>
-      </div>
+      <PageHeader
+        title="Anagrafica Staff"
+        subtitle="Gestisci membri staff e stato attivo/disattivo. I disattivi non compaiono nei planner operativi."
+        actions={
+          <>
+            <span style={{ fontSize: 12, color: "var(--color-success-strong)", background: "var(--color-success-soft)", border: "1px solid var(--color-success)", borderRadius: 999, padding: "6px 10px" }}>Attivi: {activeCount}</span>
+            <span style={{ fontSize: 12, color: "var(--color-text-muted)", background: "var(--color-surface-soft)", border: "1px solid var(--color-border)", borderRadius: 999, padding: "6px 10px" }}>Disattivi: {inactiveCount}</span>
+          </>
+        }
+      />
 
       {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
-      <FeedbackMessage
-        message={feedback.message}
-        type={feedback.type}
-        onClose={() => setFeedback({ type: "info", message: "" })}
-      />
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr" }}>
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
             <h2 style={{ margin: 0, fontSize: 15 }}>Lista staff</h2>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Plus size={14} />}
                 onClick={openCreateModal}
-                style={{ borderRadius: 999, border: "none", padding: "8px 12px", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
               >
-                + Nuovo membro
-              </button>
+                Nuovo membro
+              </Button>
               <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "inline-flex", gap: 6, alignItems: "center" }}>
                 <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
                 Mostra disattivi
               </label>
-              <button type="button" onClick={() => loadMembers()} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "6px 10px", background: "var(--color-surface)", fontSize: 12 }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RefreshCw size={14} />}
+                onClick={() => loadMembers()}
+              >
                 Aggiorna
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -256,13 +242,20 @@ function StaffDirectory() {
                         </span>
                       </td>
                       <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)", whiteSpace: "nowrap" }}>
-                        <button type="button" onClick={() => startEdit(m)} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>Modifica</button>{" "}
-                        <button type="button" onClick={() => handleToggleActive(m)} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>
-                          {m.is_active ? "Disattiva" : "Riattiva"}
-                        </button>{" "}
-                        <button type="button" onClick={() => handleDelete(m.id)} style={{ borderRadius: 999, border: "1px solid var(--color-danger)", color: "var(--color-danger)", padding: "4px 8px", background: "var(--color-surface)", fontSize: 12 }}>
-                          Elimina
-                        </button>
+                        <div style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <Button variant="secondary" size="sm" icon={<Pencil size={13} />} onClick={() => startEdit(m)}>Modifica</Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={m.is_active ? <Power size={13} /> : <RotateCcw size={13} />}
+                            onClick={() => handleToggleActive(m)}
+                          >
+                            {m.is_active ? "Disattiva" : "Riattiva"}
+                          </Button>
+                          <Button variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => handleDelete(m.id)}>
+                            Elimina
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -280,9 +273,22 @@ function StaffDirectory() {
           setIsModalOpen(false);
           resetForm();
         }}
-        width={640}
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => { setIsModalOpen(false); resetForm(); }}
+            >
+              Annulla
+            </Button>
+            <Button type="submit" form="staff-member-form" loading={saving}>
+              {editingId ? "Salva modifiche" : "Aggiungi membro"}
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={handleSubmit}>
+        <form id="staff-member-form" onSubmit={handleSubmit}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <label>Nome completo</label>
             <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Es. Fatima El A." />
@@ -315,15 +321,6 @@ function StaffDirectory() {
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               Attivo
             </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <button type="submit" disabled={saving} style={{ border: "none", borderRadius: 999, padding: "8px 12px", background: "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 600, cursor: "pointer" }}>
-              {saving ? "Salvataggio..." : editingId ? "Salva modifiche" : "Aggiungi membro"}
-            </button>
-            <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} style={{ borderRadius: 999, border: "1px solid var(--color-border-strong)", padding: "8px 12px", background: "var(--color-surface)" }}>
-              Annulla
-            </button>
           </div>
         </form>
       </Modal>

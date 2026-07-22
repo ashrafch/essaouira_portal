@@ -22,16 +22,18 @@
 
 .ui-section-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 
+/* Section title: sits below the page title (24px) in the hierarchy. */
 .ui-title {
-  font-size: 22px;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   font-weight: 700;
 }
 
@@ -39,12 +41,14 @@
   margin-top: 4px;
   color: var(--color-text-muted);
   font-size: 13px;
+  line-height: 1.45;
+  max-width: 72ch;
 }
 
 .ui-grid-cards {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .ui-kpi-value {
@@ -54,9 +58,12 @@
 }
 
 .ui-kpi-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-muted);
   margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 .ui-toolbar {

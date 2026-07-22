@@ -1,10 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
+import { Download } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   downloadMonthCostLinesCsv,
   getMonthPnL,
   getMonthCostLines,
   getUnits,
 } from "../services/api";
+import { PageHeader, Button, StatCard, useToast } from "../components/ui";
+import { formatCurrency, formatPercent } from "../utils/format";
+
+// Booking-source tones, consistent with the Calendar legend and the Dashboard.
+const SOURCE_COLORS = {
+  direct: "var(--color-success)",
+  airbnb: "var(--color-warning)",
+  booking: "var(--color-info)",
+};
+const CHART_FALLBACK = [
+  "var(--color-primary)",
+  "var(--color-accent)",
+  "var(--color-info)",
+  "var(--color-warning)",
+];
 
 function pad2(n) {
   return n < 10 ? `0${n}` : String(n);
@@ -16,6 +43,7 @@ function formatDate(d) {
 }
 
 function Business() {
+  const toast = useToast();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
@@ -30,7 +58,6 @@ function Business() {
 
   const [selectedCostCategory, setSelectedCostCategory] = useState("all");
 
-  // mappa unità
   const unitMap = useMemo(
     () =>
       units.reduce((acc, u) => {
@@ -59,34 +86,47 @@ function Business() {
         setLoading(false);
       }
     }
-
     load();
   }, [year, month]);
 
   const monthInputValue = `${year}-${pad2(month)}`;
 
-  const visibleCostLines = useMemo(() => {
-    return costLines.filter((c) =>
-      selectedCostCategory === "all"
-        ? true
-        : c.category === selectedCostCategory
-    );
-  }, [costLines, selectedCostCategory]);
+  const sourceChart = useMemo(() => {
+    if (!pnl?.revenue_by_source) return [];
+    return Object.entries(pnl.revenue_by_source)
+      .map(([key, value]) => ({
+        name: key === "direct" ? "Diretta" : key.charAt(0).toUpperCase() + key.slice(1),
+        source: key,
+        value,
+      }))
+      .filter((d) => d.value > 0);
+  }, [pnl]);
+
+  const unitChart = useMemo(() => {
+    if (!pnl?.revenue_by_unit) return [];
+    return pnl.revenue_by_unit
+      .map((u) => ({ name: u.unit_name, revenue: u.revenue }))
+      .filter((d) => d.revenue > 0);
+  }, [pnl]);
+
+  const visibleCostLines = useMemo(
+    () =>
+      costLines.filter((c) =>
+        selectedCostCategory === "all" ? true : c.category === selectedCostCategory
+      ),
+    [costLines, selectedCostCategory]
+  );
 
   const selectedCategoryTotal = useMemo(() => {
     if (!pnl || selectedCostCategory === "all") return null;
-    const found = pnl.costs_by_category.find(
-      (c) => c.category === selectedCostCategory
-    );
+    const found = pnl.costs_by_category.find((c) => c.category === selectedCostCategory);
     return found ? found.total : null;
   }, [pnl, selectedCostCategory]);
 
   const selectedCategoryPerc = useMemo(() => {
     if (!pnl || selectedCostCategory === "all") return null;
     if (!pnl.costs_total || pnl.costs_total <= 0) return null;
-    const found = pnl.costs_by_category.find(
-      (c) => c.category === selectedCostCategory
-    );
+    const found = pnl.costs_by_category.find((c) => c.category === selectedCostCategory);
     if (!found) return null;
     return (found.total / pnl.costs_total) * 100;
   }, [pnl, selectedCostCategory]);
@@ -119,82 +159,26 @@ function Business() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(`Errore export CSV: ${err.message}`);
+      toast.error(`Errore export CSV: ${err.message}`);
     } finally {
       setExporting(false);
     }
   }
 
-  // ---- styles ----
-
-  const page = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  };
-
-  const header = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 4,
-    flexWrap: "wrap",
-    gap: 8,
-  };
-
-  const cardGrid = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: 12,
-  };
-
   const card = {
     background: "var(--color-surface)",
     borderRadius: 14,
-    padding: 12,
+    padding: 14,
     boxShadow: "var(--shadow-sm)",
     border: "1px solid var(--color-border)",
   };
-
-  const cardTitle = {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.04,
-    color: "var(--color-text-muted)",
-    marginBottom: 4,
-  };
-
-  const cardValue = {
-    fontSize: 20,
-    fontWeight: 600,
-    color: "var(--color-text)",
-  };
-
-  const cardSub = {
-    fontSize: 11,
-    color: "var(--color-text-muted)",
-    marginTop: 2,
-  };
-
   const sectionTitle = {
     fontSize: 13,
     fontWeight: 600,
-    marginBottom: 6,
+    marginBottom: 8,
     color: "var(--color-text)",
   };
-
-  const sectionRow = {
-    display: "grid",
-    gridTemplateColumns: "1.2fr 1fr",
-    gap: 12,
-  };
-
-  const table = {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 12,
-  };
-
+  const table = { width: "100%", borderCollapse: "collapse", fontSize: 12 };
   const th = {
     textAlign: "left",
     borderBottom: "1px solid var(--color-border)",
@@ -202,371 +186,283 @@ function Business() {
     color: "var(--color-text-muted)",
     fontSize: 11,
   };
-
   const td = {
     borderBottom: "1px solid var(--color-border)",
     padding: "6px 4px",
     verticalAlign: "top",
   };
-
   const clickableRow = (active) => ({
     cursor: "pointer",
     backgroundColor: active ? "var(--color-primary-soft)" : "transparent",
   });
 
-  const smallButton = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    padding: "4px 10px",
-    fontSize: 11,
-    color: "var(--color-text-muted)",
-    background: "var(--color-surface-soft)",
-    cursor: "pointer",
-  };
-
   return (
-    <div style={page}>
-      <div style={header}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Business & Analytics</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Panoramica mensile di ricavi, costi e performance degli
-            appartamenti.
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-          <label
-            style={{
-              fontSize: 11,
-              color: "var(--color-text-muted)",
-              marginRight: 6,
-            }}
-          >
-            Mese di riferimento
-          </label>
-          <input
-            type="month"
-            value={monthInputValue}
-            onChange={(e) => {
-              const [y, m] = e.target.value.split("-").map(Number);
-              setYear(y);
-              setMonth(m);
-            }}
-            style={{
-              borderRadius: 8,
-              border: "1px solid var(--color-border-strong)",
-              padding: "6px 8px",
-              fontSize: 13,
-            }}
-          />
-          <button
-            type="button"
-            style={smallButton}
-            onClick={handleExportCsv}
-            disabled={exporting}
-          >
-            {exporting ? "Export..." : "Export costi CSV"}
-          </button>
-        </div>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <PageHeader
+        title="Business & Analytics"
+        subtitle="Ricavi, costi e performance degli appartamenti, mese per mese."
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <input
+              type="month"
+              aria-label="Mese di riferimento"
+              value={monthInputValue}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split("-").map(Number);
+                setYear(y);
+                setMonth(m);
+              }}
+              style={{ width: "auto" }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Download size={15} />}
+              onClick={handleExportCsv}
+              loading={exporting}
+            >
+              Export costi CSV
+            </Button>
+          </div>
+        }
+      />
 
-      {error && (
-        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
-      )}
+      {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
 
       {loading || !pnl ? (
-        <p style={{ fontSize: 13 }}>Caricamento dati business...</p>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Caricamento dati business…</p>
       ) : (
         <>
-          {/* KPI principali */}
-          <div style={cardGrid}>
-            <div style={card}>
-              <div style={cardTitle}>Occupazione</div>
-              <div style={cardValue}>{pnl.occupancy_rate.toFixed(1)}%</div>
-              <div style={cardSub}>
-                {pnl.nights_occupied} notti occupate su{" "}
-                {pnl.nights_total} disponibili
-              </div>
-            </div>
-            <div style={card}>
-              <div style={cardTitle}>Ricavi totali</div>
-              <div style={cardValue}>{pnl.revenue_total.toFixed(2)} €</div>
-              <div style={cardSub}>
-                ADR (tariffa media per notte):{" "}
-                {pnl.adr != null ? `${pnl.adr.toFixed(2)} €` : "—"}
-              </div>
-            </div>
-            <div style={card}>
-              <div style={cardTitle}>Costi totali</div>
-              <div style={cardValue}>{pnl.costs_total.toFixed(2)} €</div>
-              <div style={cardSub}>
-                Somma di tutte le spese (booking, staff e costi manuali) nel
-                mese.
-              </div>
-            </div>
-            <div style={card}>
-              <div style={cardTitle}>Profitto del mese</div>
-              <div
-                style={{
-                  ...cardValue,
-                  color: pnl.profit >= 0 ? "var(--color-success)" : "var(--color-danger)",
-                }}
-              >
-                {pnl.profit.toFixed(2)} €
-              </div>
-              <div style={cardSub}>
-                Ricavi − Costi (tutti i canali e tutte le unità).
-              </div>
-            </div>
+          {/* KPI */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <StatCard
+              label="Occupazione"
+              value={formatPercent(pnl.occupancy_rate, { decimals: 1 })}
+              hint={`${pnl.nights_occupied} notti su ${pnl.nights_total} disponibili`}
+            />
+            <StatCard
+              label="Ricavi totali"
+              value={formatCurrency(pnl.revenue_total)}
+              hint={`ADR ${pnl.adr != null ? formatCurrency(pnl.adr) : "—"}`}
+              tone="success"
+            />
+            <StatCard
+              label="Costi totali"
+              value={formatCurrency(pnl.costs_total)}
+              hint="Booking, staff e costi manuali"
+              tone="danger"
+            />
+            <StatCard
+              label="Profitto del mese"
+              value={formatCurrency(pnl.profit)}
+              hint="Ricavi − Costi"
+              tone={pnl.profit >= 0 ? "success" : "danger"}
+            />
           </div>
 
-          {/* Ricavi per sorgente / unità */}
-          <div style={sectionRow}>
+          {/* CHARTS */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: 12,
+            }}
+          >
             <div style={card}>
-              <div style={sectionTitle}>Ricavi per sorgente</div>
-              {Object.keys(pnl.revenue_by_source || {}).length === 0 ? (
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Nessun ricavo per il mese selezionato.
-                </p>
-              ) : (
-                <table style={table}>
-                  <thead>
-                    <tr>
-                      <th style={th}>Sorgente</th>
-                      <th style={th}>Ricavi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(pnl.revenue_by_source).map(
-                      ([src, value]) => (
-                        <tr key={src}>
-                          <td style={td}>{src || "Altro"}</td>
-                          <td style={td}>{value.toFixed(2)} €</td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              )}
+              <div style={sectionTitle}>Provenienza ricavi</div>
+              <div style={{ height: 240 }}>
+                {sourceChart.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={sourceChart}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={4}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {sourceChart.map((entry, i) => (
+                          <Cell
+                            key={entry.source}
+                            fill={SOURCE_COLORS[entry.source] || CHART_FALLBACK[i % CHART_FALLBACK.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => formatCurrency(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyChart label="Nessun ricavo nel mese" />
+                )}
+              </div>
             </div>
 
             <div style={card}>
               <div style={sectionTitle}>Ricavi per unità</div>
-              {pnl.revenue_by_unit.length === 0 ? (
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Nessuna prenotazione nel mese selezionato.
-                </p>
-              ) : (
+              <div style={{ height: 240 }}>
+                {unitChart.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={unitChart} layout="vertical" margin={{ left: 20, right: 16 }}>
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={90}
+                        tick={{ fontSize: 12, fill: "var(--color-text-muted)" }}
+                      />
+                      <Tooltip formatter={(v) => formatCurrency(v)} cursor={{ fill: "transparent" }} />
+                      <Bar dataKey="revenue" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={18} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyChart label="Nessuna prenotazione nel mese" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* COSTS BY CATEGORY (clickable filter) */}
+          <div style={card}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={sectionTitle}>Costi per categoria</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedCostCategory("all")}
+                disabled={selectedCostCategory === "all"}
+              >
+                Mostra tutte
+              </Button>
+            </div>
+            {pnl.costs_by_category.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                Nessun costo registrato nel mese selezionato.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
                 <table style={table}>
                   <thead>
                     <tr>
-                      <th style={th}>Unità</th>
-                      <th style={th}>Notti occupate</th>
-                      <th style={th}>Ricavi</th>
+                      <th style={th}>Categoria</th>
+                      <th style={{ ...th, textAlign: "right" }}>Totale (mese)</th>
+                      <th style={{ ...th, textAlign: "right" }}>% sul totale</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pnl.revenue_by_unit.map((u) => (
-                      <tr key={u.unit_id}>
-                        <td style={td}>{u.unit_name}</td>
-                        <td style={td}>{u.nights_occupied}</td>
-                        <td style={td}>{u.revenue.toFixed(2)} €</td>
+                    {pnl.costs_by_category.map((c) => {
+                      const active = selectedCostCategory === c.category;
+                      const perc = pnl.costs_total > 0 ? (c.total / pnl.costs_total) * 100 : 0;
+                      return (
+                        <tr
+                          key={c.category}
+                          style={clickableRow(active)}
+                          onClick={() => setSelectedCostCategory(active ? "all" : c.category)}
+                        >
+                          <td style={td}>{c.category}</td>
+                          <td style={{ ...td, textAlign: "right", fontWeight: active ? 600 : 400 }}>
+                            {formatCurrency(c.total)}
+                          </td>
+                          <td
+                            style={{
+                              ...td,
+                              textAlign: "right",
+                              fontSize: 11,
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
+                            {perc.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* COST DETAIL */}
+          <div style={card}>
+            <div style={sectionTitle}>Dettaglio costi del mese</div>
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
+              Filtro:{" "}
+              <strong>
+                {selectedCostCategory === "all" ? "tutte le categorie" : selectedCostCategory}
+              </strong>
+              {selectedCostCategory !== "all" && selectedCategoryTotal != null && (
+                <>
+                  {" "}· Totale <strong>{formatCurrency(selectedCategoryTotal)}</strong>
+                  {selectedCategoryPerc != null && (
+                    <> (<strong>{selectedCategoryPerc.toFixed(1)}%</strong> dei costi)</>
+                  )}
+                </>
+              )}
+              .
+            </p>
+            {visibleCostLines.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                Nessun costo per il filtro selezionato.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={table}>
+                  <thead>
+                    <tr>
+                      <th style={th}>Data</th>
+                      <th style={th}>Categoria</th>
+                      <th style={th}>Origine</th>
+                      <th style={th}>Riferimento</th>
+                      <th style={th}>Descrizione</th>
+                      <th style={th}>Unità</th>
+                      <th style={{ ...th, textAlign: "right" }}>Importo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleCostLines.map((c, idx) => (
+                      <tr
+                        key={c.id ?? `${c.origin}-${c.booking_id || ""}-${c.staff_task_id || ""}-${idx}`}
+                      >
+                        <td style={td}>{formatDate(c.date)}</td>
+                        <td style={td}>{c.category}</td>
+                        <td style={td}>{getOriginLabel(c)}</td>
+                        <td style={td}>
+                          {c.booking_id
+                            ? `Booking #${c.booking_id}`
+                            : c.staff_task_id
+                            ? `Task #${c.staff_task_id}`
+                            : "—"}
+                        </td>
+                        <td style={td}>{c.description || "—"}</td>
+                        <td style={td}>
+                          {c.unit_id ? unitMap[c.unit_id]?.name || `Unit #${c.unit_id}` : "—"}
+                        </td>
+                        <td style={{ ...td, textAlign: "right" }}>
+                          {formatCurrency(c.amount, c.currency || "EUR")}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
-          </div>
-
-          {/* Costi per categoria + dettaglio */}
-          <div style={{ display: "grid", gap: 12, marginTop: 8 }}>
-            <div style={card}>
-              <div style={sectionTitle}>Costi per categoria</div>
-              {pnl.costs_by_category.length === 0 ? (
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Nessun costo registrato nel mese selezionato.
-                </p>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 6,
-                      gap: 8,
-                    }}
-                  >
-                    <p style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                      Il valore in tabella è il{" "}
-                      <strong>totale dei costi</strong> per ciascuna
-                      categoria nel mese selezionato.
-                      <br />
-                      La colonna % indica quanto pesa quella categoria sui{" "}
-                      <strong>costi totali del mese</strong>.
-                      <br />
-                      Clicca una riga per filtrare il dettaglio sotto.
-                    </p>
-                    <button
-                      type="button"
-                      style={smallButton}
-                      onClick={() => setSelectedCostCategory("all")}
-                    >
-                      Mostra tutte le categorie
-                    </button>
-                  </div>
-
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={table}>
-                      <thead>
-                        <tr>
-                          <th style={th}>Categoria</th>
-                          <th style={{ ...th, textAlign: "right" }}>
-                            Totale costi (mese)
-                          </th>
-                          <th style={{ ...th, textAlign: "right" }}>
-                            % sul totale costi
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pnl.costs_by_category.map((c) => {
-                          const active = selectedCostCategory === c.category;
-                          const perc =
-                            pnl.costs_total > 0
-                              ? (c.total / pnl.costs_total) * 100
-                              : 0;
-
-                          return (
-                            <tr
-                              key={c.category}
-                              style={clickableRow(active)}
-                              onClick={() =>
-                                setSelectedCostCategory(
-                                  active ? "all" : c.category
-                                )
-                              }
-                            >
-                              <td style={td}>{c.category}</td>
-                              <td
-                                style={{
-                                  ...td,
-                                  textAlign: "right",
-                                  fontWeight: active ? 600 : 400,
-                                }}
-                              >
-                                {c.total.toFixed(2)} €
-                              </td>
-                              <td
-                                style={{
-                                  ...td,
-                                  textAlign: "right",
-                                  fontSize: 11,
-                                  color: "var(--color-text-muted)",
-                                }}
-                              >
-                                {perc.toFixed(1)}%
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div style={card}>
-              <div style={sectionTitle}>Dettaglio costi del mese</div>
-              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6 }}>
-                Stai visualizzando:{" "}
-                <strong>
-                  {selectedCostCategory === "all"
-                    ? "tutte le categorie"
-                    : selectedCostCategory}
-                </strong>
-                {selectedCostCategory !== "all" &&
-                  selectedCategoryTotal != null && (
-                    <>
-                      {" "}
-                      · Totale costi:{" "}
-                      <strong>
-                        {selectedCategoryTotal.toFixed(2)} €
-                      </strong>
-                      {selectedCategoryPerc != null && (
-                        <>
-                          {" "}
-                          (
-                          <strong>
-                            {selectedCategoryPerc.toFixed(1)}%
-                          </strong>{" "}
-                          dei costi totali)
-                        </>
-                      )}
-                    </>
-                  )}
-                . Qui vedi concretamente da dove arrivano i totali sopra
-                (booking, staff e costi manuali).
-              </p>
-
-              {visibleCostLines.length === 0 ? (
-                <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                  Nessun costo registrato per il filtro selezionato.
-                </p>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={table}>
-                    <thead>
-                      <tr>
-                        <th style={th}>Data</th>
-                        <th style={th}>Categoria</th>
-                        <th style={th}>Origine</th>
-                        <th style={th}>Riferimento</th>
-                        <th style={th}>Descrizione</th>
-                        <th style={th}>Unità</th>
-                        <th style={th}>Importo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleCostLines.map((c, idx) => (
-                        <tr
-                          key={
-                            c.id ??
-                            `${c.origin}-${c.booking_id || ""}-${
-                              c.staff_task_id || ""
-                            }-${idx}`
-                          }
-                        >
-                          <td style={td}>{formatDate(c.date)}</td>
-                          <td style={td}>{c.category}</td>
-                          <td style={td}>{getOriginLabel(c)}</td>
-                          <td style={td}>
-                            {c.booking_id
-                              ? `Booking #${c.booking_id}`
-                              : c.staff_task_id
-                              ? `Task #${c.staff_task_id}`
-                              : "—"}
-                          </td>
-                          <td style={td}>{c.description || "—"}</td>
-                          <td style={td}>
-                            {c.unit_id
-                              ? unitMap[c.unit_id]?.name ||
-                                `Unit #${c.unit_id}`
-                              : "—"}
-                          </td>
-                          <td style={td}>
-                            {c.currency || "EUR"}{" "}
-                            {Number(c.amount).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -574,5 +470,21 @@ function Business() {
   );
 }
 
-export default Business;
+function EmptyChart({ label }) {
+  return (
+    <div
+      style={{
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "var(--color-text-subtle)",
+        fontSize: 13,
+      }}
+    >
+      {label}
+    </div>
+  );
+}
 
+export default Business;

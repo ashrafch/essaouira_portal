@@ -5,8 +5,7 @@ import {
   getPricingDefaults,
   updatePricingDefaults,
 } from "../services/api";
-import Modal from "../components/Modal";
-import FeedbackMessage from "../components/FeedbackMessage";
+import { PageHeader, Button, Modal, useToast } from "../components/ui";
 import RateCalendarEditor from "../components/RateCalendarEditor";
 import RevenueRulesEditor from "../components/RevenueRulesEditor";
 import MarketRatesEditor from "../components/MarketRatesEditor";
@@ -21,13 +20,13 @@ const EMPTY_PRICING = {
 };
 
 function Pricing() {
+  const toast = useToast();
   const [units, setUnits] = useState([]);
   const [pricing, setPricing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savingUnitId, setSavingUnitId] = useState(null);
   const [savingPricing, setSavingPricing] = useState(false);
   const [error, setError] = useState(null);
-  const [feedback, setFeedback] = useState({ type: "info", message: "" });
 
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState(null);
@@ -89,11 +88,11 @@ function Pricing() {
       };
       const updated = await updateUnit(editingUnit.id, payload);
       setUnits((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-      setFeedback({ type: "success", message: "Tariffa unità aggiornata." });
+      toast.success("Tariffa unità aggiornata.");
       setUnitModalOpen(false);
       setEditingUnit(null);
     } catch (err) {
-      setFeedback({ type: "error", message: "Errore salvando unità: " + err.message });
+      toast.error("Errore salvando unità: " + err.message);
     } finally {
       setSavingUnitId(null);
     }
@@ -135,10 +134,10 @@ function Pricing() {
       const normalized = updated || EMPTY_PRICING;
       setPricing(normalized);
       setPricingDraft(normalized);
-      setFeedback({ type: "success", message: "Impostazioni pricing salvate." });
+      toast.success("Impostazioni pricing salvate.");
       setPricingModalOpen(false);
     } catch (err) {
-      setFeedback({ type: "error", message: "Errore salvando tariffe: " + err.message });
+      toast.error("Errore salvando tariffe: " + err.message);
     } finally {
       setSavingPricing(false);
     }
@@ -178,17 +177,6 @@ function Pricing() {
     fontSize: 13,
   };
 
-  const buttonPrimary = {
-    borderRadius: 999,
-    border: "none",
-    padding: "7px 12px",
-    fontSize: 12,
-    fontWeight: 600,
-    backgroundColor: "var(--color-primary)",
-    color: "var(--color-on-primary)",
-    cursor: "pointer",
-  };
-
   const table = {
     width: "100%",
     borderCollapse: "collapse",
@@ -211,21 +199,12 @@ function Pricing() {
 
   return (
     <div style={page}>
-      <div>
-        <h1 style={{ marginBottom: 4 }}>Tariffe & Canali</h1>
-        <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-          Gestisci le tariffe base per ogni appartamento e i valori di default
-          per extra come pulizie, tasse e commissioni. Questi valori servono per
-          precompilare le prenotazioni e chiudere il cerchio Ricavi / Costi.
-        </p>
-      </div>
+      <PageHeader
+        title="Tariffe & Canali"
+        subtitle="Gestisci le tariffe base per ogni appartamento e i valori di default per extra come pulizie, tasse e commissioni. Questi valori servono per precompilare le prenotazioni e chiudere il cerchio Ricavi / Costi."
+      />
 
       {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
-      <FeedbackMessage
-        message={feedback.message}
-        type={feedback.type}
-        onClose={() => setFeedback({ type: "info", message: "" })}
-      />
 
       {loading ? (
         <p>Caricamento tariffe...</p>
@@ -234,9 +213,9 @@ function Pricing() {
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <h2 style={{ fontSize: 14, margin: 0 }}>Tariffe base per unità (ADR di riferimento)</h2>
-              <button type="button" style={buttonPrimary} onClick={openPricingModal}>
+              <Button variant="primary" size="sm" onClick={openPricingModal}>
                 Configura default pricing
-              </button>
+              </Button>
             </div>
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
               Questi valori sono la base per il prezzo per notte. Puoi sempre
@@ -270,13 +249,9 @@ function Pricing() {
                         <td style={td}>{u.max_price == null ? "-" : Number(u.max_price).toFixed(0)}</td>
                         <td style={td}>{u.currency || "EUR"}</td>
                         <td style={td}>
-                          <button
-                            type="button"
-                            style={{ ...buttonPrimary, padding: "4px 10px", fontSize: 11 }}
-                            onClick={() => openUnitModal(u)}
-                          >
+                          <Button variant="primary" size="sm" onClick={() => openUnitModal(u)}>
                             Modifica
-                          </button>
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -293,9 +268,9 @@ function Pricing() {
                 Cleaning fee: {pricing.default_cleaning_fee ?? "-"} · City tax/notte: {pricing.default_city_tax_per_night ?? "-"}
                 · Commissione: {pricing.default_channel_fee_percent ?? "-"}% · Valuta: {pricing.default_currency || "EUR"}
               </p>
-              <button type="button" style={buttonPrimary} onClick={openPricingModal}>
+              <Button variant="primary" size="sm" onClick={openPricingModal}>
                 Modifica impostazioni default
-              </button>
+              </Button>
             </div>
           )}
 
@@ -311,7 +286,20 @@ function Pricing() {
         open={unitModalOpen}
         title={editingUnit ? `Modifica tariffa - ${editingUnit.name}` : "Modifica tariffa"}
         onClose={() => setUnitModalOpen(false)}
-        width={560}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setUnitModalOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              onClick={handleSaveUnit}
+              loading={Boolean(editingUnit && savingUnitId === editingUnit.id)}
+            >
+              Salva
+            </Button>
+          </>
+        }
       >
         <div style={field}>
           <label style={label}>Base nightly rate</label>
@@ -355,21 +343,25 @@ function Pricing() {
             />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-          <button type="button" onClick={() => setUnitModalOpen(false)}>Annulla</button>
-          <button type="button" onClick={handleSaveUnit} disabled={savingUnitId != null && editingUnit && savingUnitId === editingUnit.id}>
-            {editingUnit && savingUnitId === editingUnit.id ? "Salvataggio..." : "Salva"}
-          </button>
-        </div>
       </Modal>
 
       <Modal
         open={pricingModalOpen}
         title="Modifica default pricing"
         onClose={() => setPricingModalOpen(false)}
-        width={720}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPricingModalOpen(false)}>
+              Annulla
+            </Button>
+            <Button type="submit" form="pricing-defaults-form" loading={savingPricing}>
+              Salva impostazioni
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={handleSavePricing}>
+        <form id="pricing-defaults-form" onSubmit={handleSavePricing}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div style={field}>
               <label style={label}>Cleaning fee predefinita per soggiorno</label>
@@ -413,12 +405,6 @@ function Pricing() {
                 maxLength={3}
               />
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-            <button type="button" onClick={() => setPricingModalOpen(false)}>Annulla</button>
-            <button type="submit" disabled={savingPricing}>
-              {savingPricing ? "Salvataggio..." : "Salva impostazioni"}
-            </button>
           </div>
         </form>
       </Modal>

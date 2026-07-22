@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import {
   getCostItems,
   createCostItem,
@@ -6,8 +7,7 @@ import {
   deleteCostItem,
   getUnits,
 } from "../services/api";
-import Modal from "../components/Modal";
-import FeedbackMessage from "../components/FeedbackMessage";
+import { PageHeader, Button, Modal, useToast } from "../components/ui";
 
 const EXPENSE_CATEGORIES = [
   "Utenze (Luce, Acqua, Gas)",
@@ -23,6 +23,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 function Expenses() {
+  const toast = useToast();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -32,7 +33,6 @@ function Expenses() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [feedback, setFeedback] = useState({ type: "info", message: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
@@ -107,7 +107,7 @@ function Expenses() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!amount || !date) {
-      setFeedback({ type: "error", message: "Inserisci data e importo." });
+      toast.error("Inserisci data e importo.");
       return;
     }
     setSaving(true);
@@ -124,16 +124,16 @@ function Expenses() {
       if (editingId) {
         const updated = await updateCostItem(editingId, payload);
         setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-        setFeedback({ type: "success", message: "Spesa aggiornata con successo." });
+        toast.success("Spesa aggiornata con successo.");
       } else {
         const created = await createCostItem(payload);
         setItems((prev) => [...prev, created]);
-        setFeedback({ type: "success", message: "Nuova spesa registrata." });
+        toast.success("Nuova spesa registrata.");
       }
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
-      setFeedback({ type: "error", message: "Errore salvataggio: " + err.message });
+      toast.error("Errore salvataggio: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -145,51 +145,41 @@ function Expenses() {
       await deleteCostItem(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
       if (editingId === id) resetForm();
-      setFeedback({ type: "success", message: "Spesa eliminata." });
+      toast.success("Spesa eliminata.");
     } catch (err) {
-      setFeedback({ type: "error", message: "Errore eliminazione: " + err.message });
+      toast.error("Errore eliminazione: " + err.message);
     }
   }
 
   const page = { display: "flex", flexDirection: "column", gap: 16 };
-  const header = { display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 };
   const card = { backgroundColor: "var(--color-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--color-border)", boxShadow: "var(--shadow-sm)" };
   const title = { fontSize: 14, fontWeight: 600, color: "var(--color-text)", marginBottom: 4 };
   const inputStyle = { padding: "6px 10px", borderRadius: 8, border: "1px solid var(--color-border-strong)", fontSize: 13, width: "100%" };
-  const btnPrimary = { padding: "8px 16px", borderRadius: 99, border: "none", backgroundColor: "var(--color-primary)", color: "var(--color-on-primary)", cursor: "pointer", fontWeight: 500 };
-  const btnSecondary = { padding: "6px 10px", borderRadius: 99, border: "1px solid var(--color-border-strong)", backgroundColor: "var(--color-surface)", color: "var(--color-text-muted)", cursor: "pointer", fontSize: 12 };
   const table = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
   const th = { textAlign: "left", padding: "8px", borderBottom: "1px solid var(--color-border)", color: "var(--color-text-muted)", fontSize: 12 };
   const td = { padding: "8px", borderBottom: "1px solid var(--color-border)" };
 
   return (
     <div style={page}>
-      <div style={header}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Spese Generali</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Registra bollette, affitti, tasse e altre spese non legate allo staff.
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Periodo:</span>
-          <select style={{ ...inputStyle, width: "auto" }} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>{new Date(2000, i, 1).toLocaleDateString("it-IT", { month: "long" })}</option>
-            ))}
-          </select>
-          <select style={{ ...inputStyle, width: "auto" }} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-      </div>
+      <PageHeader
+        title="Spese Generali"
+        subtitle="Registra bollette, affitti, tasse e altre spese non legate allo staff."
+        actions={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Periodo:</span>
+            <select style={{ ...inputStyle, width: "auto" }} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>{new Date(2000, i, 1).toLocaleDateString("it-IT", { month: "long" })}</option>
+              ))}
+            </select>
+            <select style={{ ...inputStyle, width: "auto" }} value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        }
+      />
 
       {error && <p style={{ color: "var(--color-danger)", fontSize: 12 }}>{error}</p>}
-      <FeedbackMessage
-        message={feedback.message}
-        type={feedback.type}
-        onClose={() => setFeedback({ type: "info", message: "" })}
-      />
       {loading && <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Caricamento spese...</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
@@ -211,9 +201,9 @@ function Expenses() {
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
             <h2 style={{ ...title, marginBottom: 0 }}>Elenco Movimenti</h2>
-            <button type="button" style={btnPrimary} onClick={openCreateModal}>
-              + Nuova spesa
-            </button>
+            <Button variant="primary" icon={<Plus size={16} />} onClick={openCreateModal}>
+              Nuova spesa
+            </Button>
           </div>
           {items.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Nessuna spesa registrata per questo mese.</p>
@@ -245,8 +235,8 @@ function Expenses() {
                       </td>
                       <td style={td}>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <button style={btnSecondary} onClick={() => editItem(item)}>Modifica</button>
-                          <button style={{ ...btnSecondary, borderColor: "var(--color-danger)", color: "var(--color-danger)" }} onClick={() => handleDelete(item.id)}>Elimina</button>
+                          <Button variant="secondary" size="sm" onClick={() => editItem(item)}>Modifica</Button>
+                          <Button variant="danger" size="sm" onClick={() => handleDelete(item.id)}>Elimina</Button>
                         </div>
                       </td>
                     </tr>
@@ -265,9 +255,22 @@ function Expenses() {
           setIsModalOpen(false);
           resetForm();
         }}
-        width={640}
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => { setIsModalOpen(false); resetForm(); }}
+            >
+              Annulla
+            </Button>
+            <Button variant="primary" type="submit" form="expenses-form" loading={saving}>
+              {saving ? "Salvataggio..." : editingId ? "Aggiorna" : "Aggiungi Spesa"}
+            </Button>
+          </>
+        }
       >
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <form id="expenses-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div>
             <label style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Data</label>
             <input type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -303,15 +306,6 @@ function Expenses() {
               <option value="">-- Generale (Intera Struttura) --</option>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button type="submit" style={{ ...btnPrimary, flex: 1 }} disabled={saving}>
-              {saving ? "Salvataggio..." : editingId ? "Aggiorna" : "Aggiungi Spesa"}
-            </button>
-            <button type="button" style={btnSecondary} onClick={() => { setIsModalOpen(false); resetForm(); }}>
-              Annulla
-            </button>
           </div>
         </form>
       </Modal>

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { getUnits } from "../services/api";
 import db from "../offline/dbLocal";
+import { PageHeader } from "../components/ui";
 
 function Units() {
   const [units, setUnits] = useState([]);
@@ -34,15 +35,6 @@ function Units() {
     () => units.reduce((sum, u) => sum + (u.capacity || 0), 0),
     [units]
   );
-
-  const layoutHeader = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 12,
-    marginBottom: 20,
-    flexWrap: "wrap",
-  };
 
   const pill = {
     fontSize: 12,
@@ -132,25 +124,22 @@ function Units() {
 
   return (
     <div>
-      <div style={layoutHeader}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Appartamenti</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Panoramica delle 6 unità che affacciano sulla piscina della villa.
-          </p>
-        </div>
-
-        <div style={{ textAlign: "right", fontSize: 12, color: "var(--color-text-muted)" }}>
-          <div style={{ marginBottom: 4 }}>
-            Totale capacità: <strong>{totalCapacity}</strong> ospiti
+      <PageHeader
+        title="Appartamenti"
+        subtitle="Panoramica delle 6 unità che affacciano sulla piscina della villa."
+        actions={
+          <div style={{ textAlign: "right", fontSize: 12, color: "var(--color-text-muted)" }}>
+            <div style={{ marginBottom: 4 }}>
+              Totale capacità: <strong>{totalCapacity}</strong> ospiti
+            </div>
+            {fromCache && (
+              <span style={pill}>
+                Offline – dati da cache locale (IndexedDB)
+              </span>
+            )}
           </div>
-          {fromCache && (
-            <span style={pill}>
-              Offline – dati da cache locale (IndexedDB)
-            </span>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {error && !fromCache && (
         <p style={{ color: "var(--color-danger)", fontSize: 13, marginBottom: 12 }}>

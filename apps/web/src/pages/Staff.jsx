@@ -11,7 +11,7 @@ import {
   getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
 import { getCurrentRole } from "../services/auth";
-import FeedbackMessage from "../components/FeedbackMessage";
+import { PageHeader, Button, useToast } from "../components/ui";
 
 function formatDate(d) {
   if (!d) return "";
@@ -48,6 +48,7 @@ function getRoleLabel(value) {
 }
 
 function Staff() {
+  const toast = useToast();
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const [mode, setMode] = useState("day"); // "day" | "week"
@@ -60,7 +61,6 @@ function Staff() {
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [feedback, setFeedback] = useState({ type: "info", message: "" });
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
   const [unitFilter, setUnitFilter] = useState("all");
@@ -389,10 +389,7 @@ function Staff() {
         prev.map((t) => (t.id === updated.id ? updated : t))
       );
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore salvando il task: " + err.message,
-      });
+      toast.error("Errore salvando il task: " + err.message);
     } finally {
       setSavingTaskId(null);
     }
@@ -508,10 +505,7 @@ function Staff() {
       setTasks((prev) => [...prev, created]);
       closeQuickCreate();
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore creando il task: " + err.message,
-      });
+      toast.error("Errore creando il task: " + err.message);
     } finally {
       setCreatingTask(false);
     }
@@ -564,10 +558,7 @@ function Staff() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!date || !taskType) {
-      setFeedback({
-        type: "error",
-        message: "La data e il tipo di task sono obbligatori.",
-      });
+      toast.error("La data e il tipo di task sono obbligatori.");
       return;
     }
 
@@ -592,16 +583,16 @@ function Staff() {
       if (formMode === "edit" && editingId != null) {
         saved = await updateStaffTask(editingId, payload);
         setTasks((prev) => prev.map((t) => (t.id === saved.id ? saved : t)));
-        setFeedback({ type: "success", message: "Task aggiornato." });
+        toast.success("Task aggiornato.");
       } else {
         saved = await createStaffTask(payload);
         setTasks((prev) => [...prev, saved]);
-        setFeedback({ type: "success", message: "Task creato." });
+        toast.success("Task creato.");
       }
       resetForm();
       setIsTaskModalOpen(false);
     } catch (err) {
-      setFeedback({ type: "error", message: err.message || "Errore salvataggio task" });
+      toast.error(err.message || "Errore salvataggio task");
     } finally {
       setSaving(false);
     }
@@ -613,12 +604,9 @@ function Staff() {
       await deleteStaffTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
       if (editingId === id) resetForm();
-      setFeedback({ type: "success", message: "Task eliminato." });
+      toast.success("Task eliminato.");
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore eliminando il task: " + err.message,
-      });
+      toast.error("Errore eliminando il task: " + err.message);
     }
   }
 
@@ -653,15 +641,6 @@ function Staff() {
     gap: 16,
   };
 
-  const header = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: 4,
-    flexWrap: "wrap",
-    gap: 8,
-  };
-
   const controlsRow = {
     display: "flex",
     flexWrap: "wrap",
@@ -691,29 +670,6 @@ function Staff() {
     padding: "4px 10px",
     fontSize: 11,
     background: "var(--color-surface)",
-    cursor: "pointer",
-  };
-
-  // BOTTONI MANCANTI (AGGIUNTI)
-  const buttonPrimary = {
-    borderRadius: 999,
-    border: "none",
-    padding: "8px 14px",
-    fontSize: 13,
-    fontWeight: 600,
-    backgroundColor: "var(--color-primary)",
-    color: "var(--color-on-primary)",
-    cursor: "pointer",
-  };
-
-  const buttonSecondary = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    padding: "8px 14px",
-    fontSize: 13,
-    fontWeight: 500,
-    backgroundColor: "var(--color-surface)",
-    color: "var(--color-text-muted)",
     cursor: "pointer",
   };
 
@@ -931,15 +887,11 @@ function Staff() {
 
   return (
     <div style={page}>
-      <div style={header}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Staff & Pulizie</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Board operativo per assegnare, completare e valorizzare i task
-            dello staff. I costi qui finiscono direttamente nella Business.
-          </p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <PageHeader
+        title="Staff & Pulizie"
+        subtitle="Board operativo per assegnare, completare e valorizzare i task dello staff. I costi qui finiscono direttamente nella Business."
+        actions={
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <div>
               <label
@@ -1042,25 +994,21 @@ function Staff() {
             <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
               Task nel periodo: <strong>{kpi.total}</strong>
             </div>
-            <button
-              type="button"
-              style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12 }}
+            <Button
+              variant="primary"
+              size="sm"
               onClick={openCreateTaskModal}
             >
               + Nuovo task
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {error && (
         <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
       )}
-      <FeedbackMessage
-        message={feedback.message}
-        type={feedback.type}
-        onClose={() => setFeedback({ type: "info", message: "" })}
-      />
       {isTaskModalOpen && (
         <div
           onClick={() => setIsTaskModalOpen(false)}
@@ -1189,15 +1137,16 @@ function Staff() {
                     />
                   </div>
                 </div>
-                <button
+                <Button
                   type="submit"
-                  style={{ ...buttonPrimary, marginTop: 8 }}
+                  variant="primary"
+                  style={{ marginTop: 8 }}
                   disabled={defaultsSaving || !canManageDefaults}
                 >
                   {defaultsSaving
                     ? "Salvataggio..."
                     : "Salva impostazioni automatiche"}
-                </button>
+                </Button>
                 {!canManageDefaults && (
                   <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
                     Ruolo in sola operativita': puoi leggere i default ma non modificarli.
@@ -1239,25 +1188,25 @@ function Staff() {
                 marginBottom: 8,
               }}
             >
-              <button
-                type="button"
-                style={smallButton}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setStaffPage((p) => Math.max(0, p - 1))}
                 disabled={staffPage === 0}
               >
                 Staff precedenti
-              </button>
+              </Button>
               <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
                 Pagina staff {staffPage + 1}/{totalStaffPages}
               </span>
-              <button
-                type="button"
-                style={smallButton}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setStaffPage((p) => Math.min(totalStaffPages - 1, p + 1))}
                 disabled={staffPage >= totalStaffPages - 1}
               >
                 Staff successivi
-              </button>
+              </Button>
             </div>
           )}
 
@@ -1486,18 +1435,14 @@ function Staff() {
                                       : "Da fare"}
                                   </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  style={{
-                                    ...buttonSecondary,
-                                    marginTop: 4,
-                                    fontSize: 11,
-                                    padding: "4px 8px",
-                                  }}
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  style={{ marginTop: 4 }}
                                   onClick={() => loadTaskIntoForm(t)}
                                 >
                                   Modifica
-                                </button>
+                                </Button>
                               </div>
                             );
                           })}
@@ -1525,13 +1470,13 @@ function Staff() {
                                 >
                                   Nuovo task
                                 </span>
-                                <button
-                                  type="button"
-                                  style={buttonSecondary}
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
                                   onClick={closeQuickCreate}
                                 >
                                   ×
-                                </button>
+                                </Button>
                               </div>
 
                               {/* tipo + unità */}
@@ -1684,34 +1629,27 @@ function Staff() {
                                 }
                               />
 
-                              <button
+                              <Button
                                 type="submit"
-                                style={{
-                                  ...buttonPrimary,
-                                  fontSize: 11,
-                                  padding: "6px 10px",
-                                  alignSelf: "flex-start",
-                                }}
+                                variant="primary"
+                                size="sm"
+                                style={{ alignSelf: "flex-start" }}
                                 disabled={creatingTask}
                               >
                                 {creatingTask
                                   ? "Creazione..."
                                   : "Crea task"}
-                              </button>
+                              </Button>
                             </form>
                           ) : (
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                marginTop: 4,
-                                fontSize: 11,
-                                padding: "4px 8px",
-                              }}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              style={{ marginTop: 4 }}
                               onClick={() => openQuickCreate(d, ass)}
                             >
                               + Aggiungi task
-                            </button>
+                            </Button>
                           )}
                         </div>
                       );
@@ -1875,9 +1813,9 @@ function Staff() {
                 marginTop: 10,
               }}
             >
-              <button
+              <Button
                 type="submit"
-                style={buttonPrimary}
+                variant="primary"
                 disabled={saving}
               >
                 {saving
@@ -1885,30 +1823,28 @@ function Staff() {
                   : formMode === "create"
                   ? "Crea task"
                   : "Salva modifiche"}
-              </button>
+              </Button>
               {formMode === "edit" && (
-                <button
-                  type="button"
-                  style={buttonSecondary}
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     resetForm();
                     setIsTaskModalOpen(false);
                   }}
                 >
                   Annulla modifica
-                </button>
+                </Button>
               )}
               {formMode === "create" && (
-                <button
-                  type="button"
-                  style={buttonSecondary}
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     resetForm();
                     setIsTaskModalOpen(false);
                   }}
                 >
                   Chiudi
-                </button>
+                </Button>
               )}
             </div>
           </form>
@@ -1997,30 +1933,20 @@ function Staff() {
                             </span>
                           </td>
                           <td style={{ ...td, whiteSpace: "nowrap" }}>
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                padding: "4px 10px",
-                                fontSize: 12,
-                              }}
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => loadTaskIntoForm(t)}
                             >
                               Modifica
-                            </button>{" "}
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                padding: "4px 10px",
-                                fontSize: 12,
-                                borderColor: "var(--color-danger)",
-                                color: "var(--color-danger)",
-                              }}
+                            </Button>{" "}
+                            <Button
+                              variant="danger"
+                              size="sm"
                               onClick={() => handleDelete(t.id)}
                             >
                               Elimina
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       );

@@ -7,7 +7,8 @@ import {
   updateBooking,
   deleteBooking,
 } from "../services/api";
-import FeedbackMessage from "../components/FeedbackMessage";
+import { PageHeader, Button, Modal, useToast } from "../components/ui";
+import { Plus, Pencil, Printer, Trash2 } from "lucide-react";
 
 function formatDate(d) {
   if (!d) return "";
@@ -36,6 +37,7 @@ function hasOverlap(b, start, end) {
 
 function Bookings() {
   const location = useLocation();
+  const toast = useToast();
 
   const [units, setUnits] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -43,7 +45,6 @@ function Bookings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [feedback, setFeedback] = useState({ type: "info", message: "" });
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [formMode, setFormMode] = useState("create"); // "create" | "edit"
@@ -299,10 +300,7 @@ function Bookings() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!unitId || !guestName || !checkinDate || !checkoutDate) {
-      setFeedback({
-        type: "error",
-        message: "Unità, ospite, check-in e check-out sono obbligatori.",
-      });
+      toast.error("Unità, ospite, check-in e check-out sono obbligatori.");
       return;
     }
 
@@ -338,16 +336,16 @@ function Bookings() {
       if (formMode === "edit" && editingId != null) {
         saved = await updateBooking(editingId, payload);
         setBookings((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
-        setFeedback({ type: "success", message: "Prenotazione aggiornata." });
+        toast.success("Prenotazione aggiornata.");
       } else {
         saved = await createBooking(payload);
         setBookings((prev) => [...prev, saved]);
-        setFeedback({ type: "success", message: "Prenotazione creata." });
+        toast.success("Prenotazione creata.");
       }
       resetForm();
       setIsModalOpen(false);
     } catch (err) {
-      setFeedback({ type: "error", message: err.message });
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -362,12 +360,9 @@ function Bookings() {
       if (editingId === id) {
         resetForm();
       }
-      setFeedback({ type: "success", message: "Prenotazione eliminata." });
+      toast.success("Prenotazione eliminata.");
     } catch (err) {
-      setFeedback({
-        type: "error",
-        message: "Errore eliminando la prenotazione: " + err.message,
-      });
+      toast.error("Errore eliminando la prenotazione: " + err.message);
     }
   }
 
@@ -418,28 +413,6 @@ function Bookings() {
     ...input,
   };
 
-  const buttonPrimary = {
-    borderRadius: 999,
-    border: "none",
-    padding: "8px 14px",
-    fontSize: 13,
-    fontWeight: 600,
-    backgroundColor: "var(--color-primary)",
-    color: "var(--color-on-primary)",
-    cursor: "pointer",
-  };
-
-  const buttonSecondary = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    padding: "8px 14px",
-    fontSize: 13,
-    fontWeight: 500,
-    backgroundColor: "var(--color-surface)",
-    color: "var(--color-text-muted)",
-    cursor: "pointer",
-  };
-
   const table = {
     width: "100%",
     borderCollapse: "collapse",
@@ -471,13 +444,6 @@ function Bookings() {
     color: paid ? "var(--color-success-strong)" : "var(--color-danger-strong)",
     border: `1px solid ${paid ? "var(--color-success)" : "var(--color-danger)"}`,
   });
-
-  const header = {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    alignItems: "flex-end",
-  };
 
   const chip = (bg, color) => ({
     display: "inline-flex",
@@ -576,63 +542,58 @@ function Bookings() {
 
   return (
     <div>
-      <div style={header}>
-        <div>
-          <h1 style={{ marginBottom: 4 }}>Prenotazioni</h1>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            Gestisci le prenotazioni con informazioni economiche complete e
-            controlli immediati di disponibilità.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Prenotazioni"
+        subtitle="Gestisci le prenotazioni con informazioni economiche complete e controlli immediati di disponibilità."
+      />
 
       {error && (
         <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 8 }}>{error}</p>
-      )}
-      <FeedbackMessage
-        message={feedback.message}
-        type={feedback.type}
-        onClose={() => setFeedback({ type: "info", message: "" })}
-      />
-
-      {isModalOpen && (
-        <div
-          onClick={() => setIsModalOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "var(--color-overlay)",
-            zIndex: 1100,
-          }}
-        />
       )}
 
       {loading ? (
         <p>Caricamento prenotazioni...</p>
       ) : (
-        <div style={container}>
-          {/* FORM */}
-          <div
-            style={{
-              ...card,
-              display: isModalOpen ? "block" : "none",
-              position: "fixed",
-              zIndex: 1200,
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "min(860px, calc(100vw - 24px))",
-              maxHeight: "90vh",
-              overflowY: "auto",
+        <>
+          <Modal
+            open={isModalOpen}
+            onClose={() => {
+              resetForm();
+              setIsModalOpen(false);
             }}
-          >
-            <h2 style={{ fontSize: 14, marginBottom: 10 }}>
-              {formMode === "create"
+            title={
+              formMode === "create"
                 ? "Nuova prenotazione"
-                : `Modifica prenotazione #${editingId}`}
-            </h2>
-
-            <form onSubmit={handleSubmit}>
+                : `Modifica prenotazione #${editingId}`
+            }
+            size="lg"
+            footer={
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    resetForm();
+                    setIsModalOpen(false);
+                  }}
+                >
+                  Annulla
+                </Button>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  form="booking-form"
+                  disabled={saving}
+                >
+                  {saving
+                    ? "Salvataggio..."
+                    : formMode === "create"
+                    ? "Crea prenotazione"
+                    : "Salva modifiche"}
+                </Button>
+              </>
+            }
+          >
+            <form id="booking-form" onSubmit={handleSubmit}>
               {/* DATI BASE */}
               <div style={field}>
                 <label style={label}>Appartamento</label>
@@ -1038,34 +999,10 @@ function Bookings() {
                 />
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
-                <button type="submit" style={buttonPrimary} disabled={saving}>
-                  {saving
-                    ? "Salvataggio..."
-                    : formMode === "create"
-                    ? "Crea prenotazione"
-                    : "Salva modifiche"}
-                </button>
-                <button
-                  type="button"
-                  style={buttonSecondary}
-                  onClick={() => {
-                    resetForm();
-                    setIsModalOpen(false);
-                  }}
-                >
-                  Annulla
-                </button>
-              </div>
             </form>
-          </div>
+          </Modal>
 
+          <div style={container}>
           {/* LISTA PRENOTAZIONI */}
           <div style={card}>
             <div style={filtersRow}>
@@ -1086,13 +1023,14 @@ function Bookings() {
                   flexWrap: "wrap",
                 }}
               >
-                <button
-                  type="button"
-                  style={{ ...buttonPrimary, padding: "6px 12px", fontSize: 12 }}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus size={16} />}
                   onClick={openCreateModal}
                 >
-                  + Nuova prenotazione
-                </button>
+                  Nuova prenotazione
+                </Button>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Unità</span>
                   <select
@@ -1239,47 +1177,35 @@ function Bookings() {
                             </span>
                           </td>
                           <td style={{ ...td, whiteSpace: "nowrap" }}>
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                padding: "4px 10px",
-                                fontSize: 12,
-                              }}
-                              onClick={() => {
-                                loadBookingIntoForm(b);
-                                setIsModalOpen(true);
-                              }}
-                            >
-                              Modifica
-                            </button>{" "}
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                padding: "4px 10px",
-                                fontSize: 12,
-                                borderColor: "var(--color-info)",
-                                color: "var(--color-info-strong)",
-                                marginRight: 4
-                              }}
-                              onClick={() => openDocument(b)}
-                            >
-                              Stampa
-                            </button>{" "}
-                            <button
-                              type="button"
-                              style={{
-                                ...buttonSecondary,
-                                padding: "4px 10px",
-                                fontSize: 12,
-                                borderColor: "var(--color-danger)",
-                                color: "var(--color-danger)",
-                              }}
-                              onClick={() => handleDelete(b.id)}
-                            >
-                              Elimina
-                            </button>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<Pencil size={16} />}
+                                onClick={() => {
+                                  loadBookingIntoForm(b);
+                                  setIsModalOpen(true);
+                                }}
+                              >
+                                Modifica
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<Printer size={16} />}
+                                onClick={() => openDocument(b)}
+                              >
+                                Stampa
+                              </Button>
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                icon={<Trash2 size={16} />}
+                                onClick={() => handleDelete(b.id)}
+                              >
+                                Elimina
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1290,6 +1216,7 @@ function Bookings() {
             )}
           </div>
         </div>
+        </>
       )}
     </div>
   );
