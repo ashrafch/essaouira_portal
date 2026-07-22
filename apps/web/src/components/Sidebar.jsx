@@ -265,12 +265,12 @@ function Sidebar({ className = "", onNavigate = null }) {
       <div className="sidebar__brand-block">
         <div className="sidebar__brand-row">
           <span className="sidebar__brand-mark" aria-hidden="true">
-            E
+            H
             <span className="sidebar__brand-mark-dot" />
           </span>
           <div className="sidebar__brand-text">
-            <div className="sidebar__brand">Portale Essaouira</div>
-            <div className="sidebar__brand-sub">Gestione villa & appartamenti</div>
+            <div className="sidebar__brand">Hostara</div>
+            <div className="sidebar__brand-sub">Gestione ospitalità</div>
           </div>
         </div>
       </div>
