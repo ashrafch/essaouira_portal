@@ -7,6 +7,7 @@ import {
   deactivateStaffMember,
 } from "../services/api";
 import { PageHeader, Button, Modal, useToast } from "../components/ui";
+import { formatCurrency } from "../utils/format";
 
 const COLOR_SWATCHES = ["#0f766e", "#2563eb", "#f97316", "#a855f7", "#dc2626", "#16a34a"];
 const STAFF_ROLES = [
@@ -215,7 +216,7 @@ function StaffDirectory() {
             <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Nessun membro staff registrato.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <table className="ui-table-cards" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)", padding: 6 }}>Nome</th>
@@ -228,20 +229,20 @@ function StaffDirectory() {
                 <tbody>
                   {members.map((m) => (
                     <tr key={m.id}>
-                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }} data-label="Nome">
                         <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
                           {m.color_hex ? <span style={{ width: 10, height: 10, borderRadius: 999, background: m.color_hex }} /> : null}
                           {m.name}
                         </div>
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>{roleLabel(m.role)}</td>
-                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>{m.hourly_cost != null ? `EUR ${Number(m.hourly_cost).toFixed(2)}` : "-"}</td>
-                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }} data-label="Ruolo">{roleLabel(m.role)}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }} data-label="Costo/h">{m.hourly_cost != null ? formatCurrency(m.hourly_cost, "EUR", { decimals: 2 }) : "-"}</td>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)" }} data-label="Stato">
                         <span style={{ borderRadius: 999, padding: "2px 8px", fontSize: 11, background: m.is_active ? "var(--color-success-soft)" : "var(--color-surface-soft)", color: m.is_active ? "var(--color-success-strong)" : "var(--color-text-muted)" }}>
                           {m.is_active ? "Attivo" : "Disattivo"}
                         </span>
                       </td>
-                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: 6, borderBottom: "1px solid var(--color-border)", whiteSpace: "nowrap" }} data-label="Azioni">
                         <div style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                           <Button variant="secondary" size="sm" icon={<Pencil size={13} />} onClick={() => startEdit(m)}>Modifica</Button>
                           <Button

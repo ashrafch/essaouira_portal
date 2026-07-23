@@ -8,6 +8,7 @@ import {
   getUnits,
 } from "../services/api";
 import { PageHeader, Button, Modal, useToast } from "../components/ui";
+import { formatCurrency } from "../utils/format";
 
 const EXPENSE_CATEGORIES = [
   "Utenze (Luce, Acqua, Gas)",
@@ -186,7 +187,7 @@ function Expenses() {
         <div style={card}>
           <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Totale Spese ({new Date(year, month - 1, 1).toLocaleDateString("it-IT", { month: "long" })})</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: "var(--color-danger)", marginTop: 4 }}>
-            EUR {totalExpenses.toFixed(2)}
+            {formatCurrency(totalExpenses, "EUR", { decimals: 2 })}
           </div>
         </div>
         <div style={card}>
@@ -209,7 +210,7 @@ function Expenses() {
             <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Nessuna spesa registrata per questo mese.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
-              <table style={table}>
+              <table className="ui-table-cards" style={table}>
                 <thead>
                   <tr>
                     <th style={th}>Data</th>
@@ -222,18 +223,18 @@ function Expenses() {
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td style={td}>{new Date(item.date).toLocaleDateString("it-IT")}</td>
-                      <td style={td}>
+                      <td style={td} data-label="Data">{new Date(item.date).toLocaleDateString("it-IT")}</td>
+                      <td style={td} data-label="Categoria / Dettagli">
                         <div style={{ fontWeight: 500 }}>{item.category}</div>
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{item.description}</div>
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Riferimento">
                         {item.unit_id ? <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 99, background: "var(--color-info-soft)", color: "var(--color-info-strong)", border: "1px solid var(--color-info)" }}>{unitMap[item.unit_id]}</span> : <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>Generale</span>}
                       </td>
-                      <td style={{ ...td, fontWeight: 600, color: "var(--color-danger)" }}>
-                        - {Number(item.amount).toFixed(2)} {item.currency}
+                      <td style={{ ...td, fontWeight: 600, color: "var(--color-danger)" }} data-label="Importo">
+                        - {formatCurrency(item.amount, item.currency || "EUR", { decimals: 2 })}
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Azioni">
                         <div style={{ display: "flex", gap: 4 }}>
                           <Button variant="secondary" size="sm" onClick={() => editItem(item)}>Modifica</Button>
                           <Button variant="danger" size="sm" onClick={() => handleDelete(item.id)}>Elimina</Button>

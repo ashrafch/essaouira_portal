@@ -24,6 +24,7 @@ import {
   ownerMonthlyReportCsvUrl,
 } from "../services/api";
 import { formatCurrency } from "../utils/format";
+import InfoHint from "../components/InfoHint";
 
 // Theme-aware chart palette (CSS design tokens, not hardcoded hex).
 // Booking sources reuse the same tones as the Calendar legend for consistency.
@@ -310,9 +311,16 @@ function Dashboard() {
       <div style={gridCharts}>
         {/* Grafico a Torta: Fonti */}
         <div style={chartCard}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "var(--color-text)" }}>
-            Provenienza Ricavi
-          </h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", margin: 0, color: "var(--color-text)" }}>
+              Provenienza Ricavi
+            </h3>
+            <InfoHint title="Provenienza ricavi" label="Come leggere il grafico">
+              I ricavi del mese sono suddivisi per canale di prenotazione. I colori
+              seguono la legenda del calendario: verde = diretta, arancione = Airbnb,
+              blu = Booking.com.
+            </InfoHint>
+          </div>
           <div style={{ flex: 1, minHeight: "250px" }}>
             {sourceData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">

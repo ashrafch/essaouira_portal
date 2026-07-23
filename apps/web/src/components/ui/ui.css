@@ -911,3 +911,113 @@
     justify-content: flex-start;
   }
 }
+
+/* ---------------- Segmented toggle ---------------- */
+
+.ui-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+}
+
+.ui-segmented__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.ui-segmented__item:hover {
+  background: transparent;
+  color: var(--color-text);
+}
+
+.ui-segmented__item.is-active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-segmented__icon {
+  display: inline-flex;
+}
+
+/* ---------------- Inline section help ("i") ---------------- */
+
+.ui-info-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  box-shadow: none;
+  vertical-align: middle;
+}
+
+.ui-info-hint:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+  border-color: var(--color-text-subtle);
+}
+
+/* ---------------- Responsive tables: stack as cards on phones ----------------
+   Opt-in: add class "ui-table-cards" to a <table> and data-label="Header" to
+   each <td>. Below 640px the rows render as stacked label/value cards. */
+@media (max-width: 640px) {
+  table.ui-table-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  table.ui-table-cards tbody tr {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    background: var(--color-surface);
+  }
+  table.ui-table-cards tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    border: none;
+    text-align: right;
+  }
+  table.ui-table-cards tbody td::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: left;
+    flex: none;
+  }
+  table.ui-table-cards tbody td:empty {
+    display: none;
+  }
+}

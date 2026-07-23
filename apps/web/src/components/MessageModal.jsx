@@ -1,26 +1,5 @@
 import { useState } from "react";
-
-const overlayStyle = {
-  position: "fixed",
-  inset: 0,
-  backgroundColor: "var(--color-overlay)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 60,
-};
-
-const modalStyle = {
-  backgroundColor: "var(--color-surface)",
-  borderRadius: 16,
-  padding: 24,
-  width: "100%",
-  maxWidth: 480,
-  boxShadow: "var(--shadow-lg)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 16,
-};
+import { Modal, Button } from "./ui";
 
 const textareaStyle = {
   width: "100%",
@@ -43,35 +22,12 @@ const selectStyle = {
   marginBottom: 12,
 };
 
-const footerStyle = {
-  display: "flex",
-  justifyContent: "flex-end",
-  gap: 8,
-  marginTop: 8,
-};
-
-const btnBase = {
-  padding: "8px 16px",
-  borderRadius: 999,
-  fontSize: 13,
+const labelStyle = {
+  fontSize: 12,
   fontWeight: 600,
-  cursor: "pointer",
-  border: "none",
-};
-
-const btnCancel = {
-  ...btnBase,
-  backgroundColor: "var(--color-surface-soft)",
   color: "var(--color-text-muted)",
-};
-
-const btnSend = {
-  ...btnBase,
-  backgroundColor: "#25d366",
-  color: "white",
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
+  display: "block",
+  marginBottom: 6,
 };
 
 const TEMPLATES = [
@@ -133,60 +89,55 @@ function MessageModal({ isOpen, onClose, booking, unitName }) {
   }
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Invia messaggio WhatsApp"
-        style={modalStyle}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div>
-          <h2 style={{ fontSize: 18, marginBottom: 4 }}>Invia Messaggio WhatsApp</h2>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            A: <strong>{booking.guest_name}</strong> ({booking.guest_phone || "Nessun numero"})
-          </p>
-        </div>
-
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 6 }}>
-            Scegli Template
-          </label>
-          <select
-            style={selectStyle}
-            value={selectedTemplateId}
-            onChange={(e) => {
-              setSelectedTemplateId(e.target.value);
-              setCustomMessage("");
-            }}
-          >
-            {TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 6 }}>
-            Anteprima Messaggio (modificabile)
-          </label>
-          <textarea
-            style={textareaStyle}
-            value={message}
-            onChange={(e) => setCustomMessage(e.target.value)}
-          />
-        </div>
-
-        <div style={footerStyle}>
-          <button style={btnCancel} onClick={onClose}>
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      title="Invia Messaggio WhatsApp"
+      description={
+        <>
+          A: <strong>{booking.guest_name}</strong> ({booking.guest_phone || "Nessun numero"})
+        </>
+      }
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
             Annulla
-          </button>
-          <button style={btnSend} onClick={handleSend} disabled={!booking.guest_phone}>
-            <span>WA</span> Invia su WhatsApp
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSend}
+            disabled={!booking.guest_phone}
+            icon={<span>WA</span>}
+          >
+            Invia su WhatsApp
+          </Button>
+        </>
+      }
+    >
+      <label style={labelStyle}>Scegli Template</label>
+      <select
+        style={selectStyle}
+        value={selectedTemplateId}
+        onChange={(e) => {
+          setSelectedTemplateId(e.target.value);
+          setCustomMessage("");
+        }}
+      >
+        {TEMPLATES.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
+        ))}
+      </select>
+
+      <label style={labelStyle}>Anteprima Messaggio (modificabile)</label>
+      <textarea
+        style={textareaStyle}
+        value={message}
+        onChange={(e) => setCustomMessage(e.target.value)}
+      />
+    </Modal>
   );
 }
 

@@ -27,18 +27,17 @@ Portate a `components/ui` (PageHeader, Button, Modal accessibile, toast):
 - [x] `Staff.jsx` — light-touch (`PageHeader`, `Button`, toast).
 - [x] Rifinitura Smart via `ui.css`: gerarchia titoli sezione (19px), KPI label uppercase, ritmo card.
 
-Rimane:
-- [ ] `Staff.jsx` — **decomporre** il monolite (2039 righe) in feature-component.
-- [ ] Migrare `components/MessageModal` a `ui/Modal` (usata in ArrivalsDepartures).
-- [ ] Toggle segmentati (day/week, stato task) come componente `ui` dedicato.
-- [ ] Rimuovere l'“escape hatch” CSS in `index.css` quando non resta più nessun `<button>` inline.
+- [x] `Staff.jsx` — **decomposto** (2039 → ~150 righe) in `components/staff/*` (board, modale task, defaults, filtri, KPI, tabella, widget manutenzione); stato/logica invariati nel parent.
+- [x] `components/MessageModal` → `ui/Modal`.
+- [x] Toggle segmentati → nuovo `ui/SegmentedToggle` (usato nei filtri Staff day/week).
+- [ ] Escape-hatch CSS in `index.css`: **mantenuto di proposito** come rete di sicurezza (restano pochi `<button>` inline, es. calendario e modale task); rimuovere solo quando saranno tutti su `ui/Button`.
 
 ### Coerenza & rifiniture
 - [x] `PageHeader` sulle pagine core (restano fuori solo le utility: Login/404/Forbidden).
-- [ ] Formatter valuta/percentuale (`utils/format`) ovunque (restano `toLocaleString` in alcune pagine smart).
-- [ ] Date helper condivisi (`utils/dateUtils`) al posto delle re-implementazioni in `Bookings.jsx`/`Staff.jsx`.
-- [ ] Rifinitura Smart **per-pagina** con feedback visivo (struttura più profonda dove serve).
-- [ ] Icone “i” inline anche sulle sezioni interne (oltre alla topbar) dove utile.
+- [x] Formatter valuta/percentuale su tutte le pagine core (Bookings/Business/Expenses/StaffDirectory/Dashboard); restano `toLocaleString` solo nelle pagine **Smart** (in pausa).
+- [x] Date helper condivisi (`utils/dateUtils`) in `Bookings.jsx` e `Staff.jsx`.
+- [ ] Rifinitura Smart **per-pagina** — in pausa su richiesta (rivedere con l'uso reale).
+- [x] Icone “i” inline: componente `InfoHint` + applicato alla Dashboard (pattern riusabile).
 
 ### Mobile & accessibilità
 - [x] **Bottom-nav mobile** (≤768px, RBAC-aware): Home/Prenotazioni/Calendario/Staff + “Menu” (apre il drawer).
@@ -47,15 +46,15 @@ Rimane:
 - [x] `ui/Modal` in **portal** su `document.body` (centrato e robusto anche sotto la topbar con `backdrop-filter`).
 - [x] Vista **agenda/lista** del Calendario su mobile (≤768px) al posto della griglia 7 colonne.
 - [x] **Skip-link** “Salta al contenuto” + `main` focus target (a11y).
-- [ ] Stacking “a card” delle tabelle dense su mobile (oltre allo scroll orizzontale).
-- [ ] Pass accessibilità completo: audit ARIA su tutte le azioni icona, contrasto in dark, trap/riordino focus.
+- [x] Stacking “a card” delle tabelle dense su mobile (`.ui-table-cards`): Bookings, Business, Expenses, StaffDirectory.
+- [x] Pass accessibilità (reasonable-effort): skip-link, `role="dialog"` sui modali, `aria-expanded` sezioni sidebar, `aria-label` sulle azioni icona. Audit contrasto dark approfondito: continuo.
 
 ### RBAC/coerenza rotte
-- [ ] `BookingDocument` dentro la tabella `appRoutes.js` (oggi cablata a parte in `App.jsx`).
-- [ ] Razionalizzare accesso finanziario asimmetrico (`/business` vs `/expenses`,`/maintenance`).
+- [x] `BookingDocument` nella tabella `appRoutes.js` (flag `standalone`; RBAC da fonte unica, niente ruoli hardcodati in `App.jsx`).
+- [x] Accesso finanziario allineato: `viewer` ha lettura coerente anche su Expenses/Maintenance (scritture sempre vincolate dal middleware; `business` resta senza `operator`).
 
 ### Test frontend
-- [ ] Baseline **Vitest** (oggi nessun test frontend); coprire `utils`, `RateCalendarEditor`, `HelpButton`.
+- [x] Baseline **Vitest** (config + 15 test: `format`, `dateUtils`, `resolveHelp`, `SegmentedToggle`) + step in CI (`npm run test:run`).
 
 ## Revenue — oltre la Fase 4 (dipendenze esterne, non stubbate)
 - [ ] **Push prezzi OTA reale** (adapter attuale è simulato) — richiede API di connettività del canale.

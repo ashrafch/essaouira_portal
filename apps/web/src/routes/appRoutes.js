@@ -10,8 +10,8 @@ export const APP_ROUTES = [
   { path: "/business", key: "business", allowedRoles: ["owner", "manager", "viewer"] },
   { path: "/staff-anagrafica", key: "staffDirectory", allowedRoles: ["owner", "manager"] },
   { path: "/tariffe-canali", key: "pricing", allowedRoles: ["owner", "manager"] },
-  { path: "/maintenance", key: "maintenance", allowedRoles: ["owner", "manager", "operator"] },
-  { path: "/expenses", key: "expenses", allowedRoles: ["owner", "manager", "operator"] },
+  { path: "/maintenance", key: "maintenance", allowedRoles: ["owner", "manager", "operator", "viewer"] },
+  { path: "/expenses", key: "expenses", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/properties", key: "properties", allowedRoles: ["owner", "manager", "viewer"] },
   { path: "/admin-control", key: "adminControl", allowedRoles: ["owner"] },
   { path: "/smart-overview", key: "smartOverview", allowedRoles: ["owner", "manager", "operator", "viewer"] },
@@ -25,6 +25,14 @@ export const APP_ROUTES = [
   { path: "/smart-assistant/checkout", key: "smartCheckoutAssistant", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-units/:unitId", key: "smartUnitDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/setup", key: "setupWizard", allowedRoles: ["owner"] },
+  // Standalone = rendered full-page OUTSIDE the app Layout (printable document),
+  // but its RBAC still lives here (single source of truth).
+  {
+    path: "/bookings/:bookingId/document",
+    key: "bookingDocument",
+    allowedRoles: ["owner", "manager", "operator", "viewer"],
+    standalone: true,
+  },
 ];
 
 /**

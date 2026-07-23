@@ -54,6 +54,7 @@ const ROUTE_COMPONENTS = {
   pricing: Pricing,
   maintenance: Maintenance,
   expenses: Expenses,
+  bookingDocument: BookingDocument,
   smartOverview: SmartOverview,
   smartDashboard: SmartDashboard,
   smartOperations: SmartOperations,
@@ -75,14 +76,23 @@ function App() {
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route
-            path="/bookings/:bookingId/document"
-            element={
-              <ProtectedRoute allowedRoles={["owner", "manager", "operator", "viewer"]}>
-                <BookingDocument />
-              </ProtectedRoute>
-            }
-          />
+
+          {/* Standalone routes: full-page, outside the app Layout (RBAC from the table). */}
+          {APP_ROUTES.filter((route) => route.standalone).map((route) => {
+            const Component = ROUTE_COMPONENTS[route.key];
+            return (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute allowedRoles={route.allowedRoles}>
+                    <Component />
+                  </ProtectedRoute>
+                }
+              />
+            );
+          })}
+
           <Route
             element={
               <ProtectedRoute>
@@ -90,7 +100,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            {APP_ROUTES.map((route) => {
+            {APP_ROUTES.filter((route) => !route.standalone).map((route) => {
               const Component = ROUTE_COMPONENTS[route.key];
               return (
                 <Route

@@ -13,6 +13,7 @@ export { default as EmptyState } from "./EmptyState";
 export { default as LoadingSkeleton } from "./LoadingSkeleton";
 export { default as ActionToolbar } from "./ActionToolbar";
 export { default as Button } from "./Button";
+export { default as SegmentedToggle } from "./SegmentedToggle";
 export { default as Tabs } from "./Tabs";
 export { default as Modal } from "./Modal";
 export { default as ToastProvider } from "./ToastProvider";

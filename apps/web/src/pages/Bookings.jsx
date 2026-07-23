@@ -9,23 +9,14 @@ import {
 } from "../services/api";
 import { PageHeader, Button, Modal, useToast } from "../components/ui";
 import { Plus, Pencil, Printer, Trash2 } from "lucide-react";
-
-function formatDate(d) {
-  if (!d) return "";
-  return new Date(d).toISOString().slice(0, 10);
-}
+import { formatISO, nightsBetween } from "../utils/dateUtils";
+import { formatCurrency } from "../utils/format";
 
 function parseDate(value) {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
-}
-
-function diffNights(checkin, checkout) {
-  if (!checkin || !checkout) return 0;
-  const ms = checkout.getTime() - checkin.getTime();
-  return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
 }
 
 function hasOverlap(b, start, end) {
@@ -134,7 +125,10 @@ function Bookings() {
 
   const parsedCheckin = parseDate(checkinDate);
   const parsedCheckout = parseDate(checkoutDate);
-  const nights = diffNights(parsedCheckin, parsedCheckout);
+  const nights =
+    parsedCheckin && parsedCheckout
+      ? nightsBetween(parsedCheckin, parsedCheckout)
+      : 0;
 
   // ---- disponibilità / conflitti per intervallo selezionato ----
   const availability = useMemo(() => {
@@ -261,8 +255,10 @@ function Bookings() {
     setArrivalTime(b.estimated_arrival_time ? String(b.estimated_arrival_time).slice(0,5) : "");
 
     setSource(b.source || "direct");
-    setCheckinDate(formatDate(b.checkin_date));
-    setCheckoutDate(formatDate(b.checkout_date));
+    setCheckinDate(b.checkin_date ? formatISO(new Date(b.checkin_date)) : "");
+    setCheckoutDate(
+      b.checkout_date ? formatISO(new Date(b.checkout_date)) : ""
+    );
     setNotes(b.notes || "");
     setNightlyRate(
       b.nightly_rate != null && b.nightly_rate !== undefined
@@ -935,7 +931,7 @@ function Bookings() {
                 >
                   Totale stimato:{" "}
                   <strong>
-                    {currency} {suggestedTotal.toFixed(2)}
+                    {formatCurrency(suggestedTotal, currency, { decimals: 2 })}
                   </strong>{" "}
                   (notti × tariffa + extra). Puoi lasciare vuoto il campo totale
                   per usare questo valore calcolato automaticamente.
@@ -1079,7 +1075,7 @@ function Bookings() {
               </p>
             ) : (
               <div style={{ overflowX: "auto", marginTop: 4 }}>
-                <table style={table}>
+                <table className="ui-table-cards" style={table}>
                   <thead>
                     <tr>
                       <th style={th}>Ospite / Canale</th>
@@ -1095,7 +1091,7 @@ function Bookings() {
                       const unit = unitMap[b.unit_id];
                       const cIn = parseDate(b.checkin_date);
                       const cOut = parseDate(b.checkout_date);
-                      const n = diffNights(cIn, cOut);
+                      const n = cIn && cOut ? nightsBetween(cIn, cOut) : 0;
                       const total =
                         b.total_price != null
                           ? Number(b.total_price)
@@ -1105,7 +1101,7 @@ function Bookings() {
 
                       return (
                         <tr key={b.id}>
-                          <td style={td}>
+                          <td style={td} data-label="Ospite / Canale">
                             <div
                               style={{
                                 display: "flex",
@@ -1129,7 +1125,7 @@ function Bookings() {
                               </span>
                             </div>
                           </td>
-                          <td style={td}>
+                          <td style={td} data-label="Periodo">
                             <div
                               style={{
                                 display: "flex",
@@ -1161,22 +1157,25 @@ function Bookings() {
                               )}
                             </div>
                           </td>
-                          <td style={td}>{unit?.name || `Unit #${b.unit_id}`}</td>
-                          <td style={td}>
-                            {total != null ? (
-                              <>
-                                {b.currency || "EUR"} {total.toFixed(2)}
-                              </>
-                            ) : (
-                              "—"
-                            )}
+                          <td style={td} data-label="Unità">
+                            {unit?.name || `Unit #${b.unit_id}`}
                           </td>
-                          <td style={td}>
+                          <td style={td} data-label="Totale">
+                            {total != null
+                              ? formatCurrency(total, b.currency || "EUR", {
+                                  decimals: 2,
+                                })
+                              : "—"}
+                          </td>
+                          <td style={td} data-label="Stato">
                             <span style={pillPaid(b.is_paid)}>
                               {b.is_paid ? "Pagata" : "Da incassare"}
                             </span>
                           </td>
-                          <td style={{ ...td, whiteSpace: "nowrap" }}>
+                          <td
+                            style={{ ...td, whiteSpace: "nowrap" }}
+                            data-label="Azioni"
+                          >
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                               <Button
                                 variant="secondary"

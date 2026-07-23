@@ -358,7 +358,7 @@ function Business() {
               </p>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={table}>
+                <table className="ui-table-cards" style={table}>
                   <thead>
                     <tr>
                       <th style={th}>Categoria</th>
@@ -376,8 +376,11 @@ function Business() {
                           style={clickableRow(active)}
                           onClick={() => setSelectedCostCategory(active ? "all" : c.category)}
                         >
-                          <td style={td}>{c.category}</td>
-                          <td style={{ ...td, textAlign: "right", fontWeight: active ? 600 : 400 }}>
+                          <td style={td} data-label="Categoria">{c.category}</td>
+                          <td
+                            style={{ ...td, textAlign: "right", fontWeight: active ? 600 : 400 }}
+                            data-label="Totale (mese)"
+                          >
                             {formatCurrency(c.total)}
                           </td>
                           <td
@@ -387,6 +390,7 @@ function Business() {
                               fontSize: 11,
                               color: "var(--color-text-muted)",
                             }}
+                            data-label="% sul totale"
                           >
                             {perc.toFixed(1)}%
                           </td>
@@ -423,7 +427,7 @@ function Business() {
               </p>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table style={table}>
+                <table className="ui-table-cards" style={table}>
                   <thead>
                     <tr>
                       <th style={th}>Data</th>
@@ -440,21 +444,21 @@ function Business() {
                       <tr
                         key={c.id ?? `${c.origin}-${c.booking_id || ""}-${c.staff_task_id || ""}-${idx}`}
                       >
-                        <td style={td}>{formatDate(c.date)}</td>
-                        <td style={td}>{c.category}</td>
-                        <td style={td}>{getOriginLabel(c)}</td>
-                        <td style={td}>
+                        <td style={td} data-label="Data">{formatDate(c.date)}</td>
+                        <td style={td} data-label="Categoria">{c.category}</td>
+                        <td style={td} data-label="Origine">{getOriginLabel(c)}</td>
+                        <td style={td} data-label="Riferimento">
                           {c.booking_id
                             ? `Booking #${c.booking_id}`
                             : c.staff_task_id
                             ? `Task #${c.staff_task_id}`
                             : "—"}
                         </td>
-                        <td style={td}>{c.description || "—"}</td>
-                        <td style={td}>
+                        <td style={td} data-label="Descrizione">{c.description || "—"}</td>
+                        <td style={td} data-label="Unità">
                           {c.unit_id ? unitMap[c.unit_id]?.name || `Unit #${c.unit_id}` : "—"}
                         </td>
-                        <td style={{ ...td, textAlign: "right" }}>
+                        <td style={{ ...td, textAlign: "right" }} data-label="Importo">
                           {formatCurrency(c.amount, c.currency || "EUR")}
                         </td>
                       </tr>

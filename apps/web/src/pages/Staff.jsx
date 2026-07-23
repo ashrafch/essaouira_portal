@@ -11,41 +11,20 @@ import {
   getMaintenanceTickets, // <-- NUOVO IMPORT
 } from "../services/api";
 import { getCurrentRole } from "../services/auth";
-import { PageHeader, Button, useToast } from "../components/ui";
-
-function formatDate(d) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("it-IT");
-}
-
-function getMonday(dateStr) {
-  const d = new Date(dateStr);
-  const day = d.getDay(); // 0 domenica, 1 lun...
-  const diff = (day === 0 ? -6 : 1) - day; // porta a lunedì
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr, days) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-// Ruoli fissi allineati all'enum StaffRole del backend
-const ROLE_OPTIONS = [
-  { value: "housekeeping", label: "Housekeeping (pulizie / camere)" },
-  { value: "kitchen", label: "Cucina / Colazioni" },
-  { value: "reception_day", label: "Reception (giorno)" },
-  { value: "reception_night", label: "Reception (notte)" },
-  { value: "manager", label: "Manager / Amministratore" },
-];
-
-function getRoleLabel(value) {
-  if (!value) return "";
-  const opt = ROLE_OPTIONS.find((r) => r.value === value);
-  return opt ? opt.label : value;
-}
+import { PageHeader, useToast } from "../components/ui";
+import {
+  getMonday,
+  addDays,
+  getRoleLabel,
+} from "../components/staff/staffHelpers";
+import { page, layout } from "../components/staff/staffStyles";
+import StaffFilters from "../components/staff/StaffFilters";
+import MaintenanceTicketsWidget from "../components/staff/MaintenanceTicketsWidget";
+import StaffKpiCard from "../components/staff/StaffKpiCard";
+import StaffDefaultsForm from "../components/staff/StaffDefaultsForm";
+import StaffBoard from "../components/staff/StaffBoard";
+import TaskFormModal from "../components/staff/TaskFormModal";
+import StaffTaskTable from "../components/staff/StaffTaskTable";
 
 function Staff() {
   const toast = useToast();
@@ -58,7 +37,7 @@ function Staff() {
   const [tasks, setTasks] = useState([]);
   const [staffMembers, setStaffMembers] = useState([]);
   const [maintenanceTickets, setMaintenanceTickets] = useState([]); // <-- NUOVO STATO
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -78,7 +57,7 @@ function Staff() {
   const [defCurrency, setDefCurrency] = useState("EUR");
 
   // form task singolo (modale / edit)
-  const [formMode, setFormMode] = useState("create"); 
+  const [formMode, setFormMode] = useState("create");
   const [editingId, setEditingId] = useState(null);
   const [date, setDate] = useState("");
   const [taskType, setTaskType] = useState("cleaning");
@@ -100,7 +79,7 @@ function Staff() {
   );
 
   // quick-create su cella
-  const [quickCreateTarget, setQuickCreateTarget] = useState(null); 
+  const [quickCreateTarget, setQuickCreateTarget] = useState(null);
   const [quickType, setQuickType] = useState("cleaning");
   const [quickUnitId, setQuickUnitId] = useState("");
   const [quickCost, setQuickCost] = useState("");
@@ -153,11 +132,11 @@ function Staff() {
           getStaffMembers({ active_only: true }),
           getMaintenanceTickets(),
         ]);
-        
+
         setUnits(uns || []);
         setStaffMembers(staff || []);
         setMaintenanceTickets(tickets || []);
-        
+
         if (defs) {
           setDefAssignee(defs.cleaning_default_assignee || "Operatore 1");
           setDefCost(
@@ -188,9 +167,7 @@ function Staff() {
       setError(null);
       try {
         const params =
-          mode === "day"
-            ? { date: selectedDate }
-            : { from_date, to_date };
+          mode === "day" ? { date: selectedDate } : { from_date, to_date };
         const tsks = await getStaffTasks(params);
         setTasks(tsks || []);
       } catch (err) {
@@ -233,10 +210,7 @@ function Staff() {
       (sum, t) => sum + (t.estimated_hours || 0),
       0
     );
-    const costTotal = filteredTasks.reduce(
-      (sum, t) => sum + (t.cost || 0),
-      0
-    );
+    const costTotal = filteredTasks.reduce((sum, t) => sum + (t.cost || 0), 0);
     return { total, byStatus, hours, costTotal };
   }, [filteredTasks]);
 
@@ -246,9 +220,7 @@ function Staff() {
       if (m.role) set.add(m.role);
     });
     const arr = Array.from(set);
-    arr.sort((a, b) =>
-      getRoleLabel(a).localeCompare(getRoleLabel(b))
-    );
+    arr.sort((a, b) => getRoleLabel(a).localeCompare(getRoleLabel(b)));
     return arr;
   }, [staffMembers]);
 
@@ -348,20 +320,10 @@ function Staff() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [tasks]);
 
-  function getTaskLabel(taskType) {
-    if (taskType === "checkin") return "Check-in";
-    if (taskType === "checkout") return "Check-out";
-    if (taskType === "cleaning") return "Pulizia";
-    if (taskType === "breakfast") return "Colazione";
-    if (taskType === "maintenance") return "Manutenzione";
-    return taskType || "Altro";
-  }
-
   // -- LOGICA TICKET MANUTENZIONE --
   const openTickets = useMemo(() => {
-    return maintenanceTickets.filter(t => t.status !== 'done');
+    return maintenanceTickets.filter((t) => t.status !== "done");
   }, [maintenanceTickets]);
-
 
   // ---- AZIONI ----
 
@@ -385,9 +347,7 @@ function Staff() {
         ...partial,
       };
       const updated = await updateStaffTask(taskId, payload);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updated.id ? updated : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } catch (err) {
       toast.error("Errore salvando il task: " + err.message);
     } finally {
@@ -433,8 +393,7 @@ function Staff() {
   }
 
   function handleChangeAssignee(task, newName) {
-    const assignee =
-      !newName || newName === "Non assegnato" ? null : newName;
+    const assignee = !newName || newName === "Non assegnato" ? null : newName;
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id ? { ...t, assignee_name: assignee } : t
@@ -573,7 +532,7 @@ function Staff() {
       currency,
       booking_id: bookingId !== "" ? Number(bookingId) : null,
       unit_id: unitId !== "" ? Number(unitId) : null,
-      time: null, 
+      time: null,
     };
 
     setSaving(true);
@@ -633,381 +592,33 @@ function Staff() {
     }
   }
 
-  // ---- STYLES ----
-
-  const page = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  };
-
-  const controlsRow = {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 10,
-    fontSize: 12,
-  };
-
-  const card = {
-    background: "var(--color-surface)",
-    borderRadius: 14,
-    padding: 12,
-    boxShadow: "var(--shadow-sm)",
-    border: "1px solid var(--color-border)",
-  };
-
-  const sectionTitle = {
-    fontSize: 13,
-    fontWeight: 600,
-    marginBottom: 6,
-    color: "var(--color-text)",
-  };
-
-  const smallButton = {
-    borderRadius: 999,
-    border: "1px solid var(--color-border-strong)",
-    padding: "4px 10px",
-    fontSize: 11,
-    background: "var(--color-surface)",
-    cursor: "pointer",
-  };
-
-  const modeButton = (active) => ({
-    ...smallButton,
-    borderColor: active ? "var(--color-primary)" : "var(--color-border-strong)",
-    color: active ? "var(--color-primary)" : "var(--color-text-muted)",
-    background: active ? "var(--color-primary-soft)" : "var(--color-surface)",
-  });
-
-  const pillStatus = (status) => ({
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "2px 8px",
-    borderRadius: 999,
-    fontSize: 11,
-    backgroundColor:
-      status === "done" ? "var(--color-success-soft)" : "var(--color-border)",
-    color: status === "done" ? "var(--color-success-strong)" : "var(--color-text)",
-    border: `1px solid ${
-      status === "done" ? "var(--color-success)" : "var(--color-border-strong)"
-    }`,
-    cursor: "pointer",
-  });
-
-  const boardWrapper = {
-    overflowX: "hidden",
-    width: "100%",
-  };
-
-  const board = {
-    minWidth: "100%",
-    display: "grid",
-    gridTemplateColumns: `130px repeat(${visibleAssignees.length || 1}, minmax(0, 1fr))`,
-    borderCollapse: "collapse",
-    fontSize: 12,
-  };
-
-  const boardHeaderCell = {
-    padding: "6px 4px",
-    borderBottom: "1px solid var(--color-border)",
-    fontSize: 11,
-    color: "var(--color-text-muted)",
-    fontWeight: 500,
-    textAlign: "center",
-    background: "var(--color-surface-soft)",
-  };
-
-  const boardDayCell = {
-    padding: "6px 4px",
-    borderBottom: "1px solid var(--color-border)",
-    fontSize: 11,
-    color: "var(--color-text)",
-    background: "var(--color-surface-soft)",
-    fontWeight: 500,
-  };
-
-  const boardCell = {
-    padding: 6,
-    borderBottom: "1px solid var(--color-border)",
-    borderRight: "1px solid var(--color-border)",
-    verticalAlign: "top",
-    minWidth: 0,
-  };
-
-  const miniTaskCard = (status) => ({
-    borderRadius: 10,
-    padding: 6,
-    marginBottom: 4,
-    border: "1px solid var(--color-border)",
-    backgroundColor:
-      status === "done" ? "var(--color-success-soft)" : "var(--color-surface)",
-    boxShadow:
-      status === "done"
-        ? "0 0 0 1px var(--color-success)"
-        : "var(--shadow-sm)",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  });
-
-  const inputInline = {
-    width: "100%",
-    borderRadius: 8,
-    border: "1px solid var(--color-border)",
-    padding: "4px 6px",
-    fontSize: 11,
-  };
-
-  const tagType = (taskType) => ({
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "2px 6px",
-    borderRadius: 999,
-    fontSize: 10,
-    backgroundColor:
-      taskType === "checkin"
-        ? "var(--color-info-soft)"
-        : taskType === "checkout"
-        ? "var(--color-danger-soft)"
-        : taskType === "cleaning"
-        ? "var(--color-success-soft)"
-        : taskType === "breakfast"
-        ? "var(--color-warning-soft)"
-        : "var(--color-border)",
-    color: "var(--color-text)",
-  });
-
-  const infoRow = {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 4,
-    alignItems: "center",
-  };
-
-  const layout = {
-    display: "grid",
-    gridTemplateColumns: "minmax(260px, 320px) 1fr",
-    gap: 12,
-    alignItems: "flex-start",
-  };
-
-  const field = {
-    marginBottom: 8,
-    display: "flex",
-    flexDirection: "column",
-    gap: 3,
-  };
-
-  const label = {
-    fontSize: 11,
-    fontWeight: 500,
-    color: "var(--color-text-muted)",
-  };
-
-  const input = {
-    borderRadius: 8,
-    border: "1px solid var(--color-border-strong)",
-    padding: "6px 8px",
-    fontSize: 13,
-  };
-
-  const select = {
-    ...input,
-  };
-
-  const textarea = {
-    ...input,
-    minHeight: 60,
-    resize: "vertical",
-  };
-
-  const kpiGrid = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: 8,
-    marginBottom: 8,
-  };
-
-  const kpiCard = {
-    background: "var(--color-surface-soft)",
-    borderRadius: 12,
-    padding: "8px 10px",
-  };
-
-  const tinyLabel = {
-    fontSize: 11,
-    color: "var(--color-text-muted)",
-    marginBottom: 2,
-  };
-
-  const tinyValue = {
-    fontSize: 18,
-    fontWeight: 700,
-  };
-
-  const quickForm = {
-    marginTop: 6,
-    borderRadius: 10,
-    border: "1px dashed var(--color-border-strong)",
-    background: "var(--color-surface-soft)",
-    padding: 6,
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  };
-
-  const ticketCardStyle = {
-    backgroundColor: "var(--color-warning-soft)",
-    border: "1px solid var(--color-warning)",
-    borderRadius: 8,
-    padding: "10px",
-    marginBottom: 8,
-    fontSize: 12,
-  };
-  
-  const table = {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: 13,
-  };
-
-  const th = {
-    textAlign: "left",
-    borderBottom: "1px solid var(--color-border)",
-    padding: "6px 4px",
-    color: "var(--color-text-muted)",
-    fontSize: 12,
-  };
-
-  const td = {
-    padding: "6px 4px",
-    borderBottom: "1px solid var(--color-border)",
-  };
-
   return (
     <div style={page}>
       <PageHeader
         title="Staff & Pulizie"
         subtitle="Board operativo per assegnare, completare e valorizzare i task dello staff. I costi qui finiscono direttamente nella Business."
         actions={
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginRight: 6,
-                }}
-              >
-                Data di riferimento
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-strong)",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-              <button
-                type="button"
-                style={modeButton(mode === "day")}
-                onClick={() => setMode("day")}
-              >
-                Giorno
-              </button>
-              <button
-                type="button"
-                style={modeButton(mode === "week")}
-                onClick={() => setMode("week")}
-              >
-                Settimana
-              </button>
-            </div>
-          </div>
-          <div style={controlsRow}>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginRight: 4,
-                }}
-              >
-                Unità
-              </label>
-              <select
-                value={unitFilter}
-                onChange={(e) => setUnitFilter(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-strong)",
-                  padding: "4px 8px",
-                  fontSize: 12,
-                  minWidth: 140,
-                }}
-              >
-                <option value="all">Tutte le unità</option>
-                {units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginRight: 4,
-                }}
-              >
-                Tipo task
-              </label>
-              <select
-                value={taskTypeFilter}
-                onChange={(e) => setTaskTypeFilter(e.target.value)}
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border-strong)",
-                  padding: "4px 8px",
-                  fontSize: 12,
-                  minWidth: 140,
-                }}
-              >
-                <option value="all">Tutti i tipi</option>
-                {taskTypes.map((tt) => (
-                  <option key={tt} value={tt}>
-                    {getTaskLabel(tt)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-              Task nel periodo: <strong>{kpi.total}</strong>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={openCreateTaskModal}
-            >
-              + Nuovo task
-            </Button>
-          </div>
-          </div>
+          <StaffFilters
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            mode={mode}
+            setMode={setMode}
+            unitFilter={unitFilter}
+            setUnitFilter={setUnitFilter}
+            units={units}
+            taskTypeFilter={taskTypeFilter}
+            setTaskTypeFilter={setTaskTypeFilter}
+            taskTypes={taskTypes}
+            kpiTotal={kpi.total}
+            onCreateTask={openCreateTaskModal}
+          />
         }
       />
 
       {error && (
-        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>{error}</p>
+        <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>
+          {error}
+        </p>
       )}
       {isTaskModalOpen && (
         <div
@@ -1024,939 +635,123 @@ function Staff() {
       <div style={layout}>
         {/* COLONNA SINISTRA: Manutenzione + KPI + Defaults */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          
-          {/* WIDGET TICKET MANUTENZIONE */}
-          <div style={card}>
-             <div style={sectionTitle}>🔧 Segnalazioni Aperte ({openTickets.length})</div>
-             {openTickets.length === 0 ? (
-                 <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Nessuna manutenzione pendente.</p>
-             ) : (
-                 <div style={{ maxHeight: 300, overflowY: "auto" }}>
-                     {openTickets.map(t => (
-                         <div key={t.id} style={ticketCardStyle}>
-                             <div style={{ fontWeight: 600, marginBottom: 2 }}>{t.title}</div>
-                             <div style={{ color: "var(--color-text-muted)", marginBottom: 4 }}>
-                                 {t.unit_id ? (unitMap[t.unit_id]?.name || `Unit #${t.unit_id}`) : "Struttura"} · {t.priority}
-                             </div>
-                             {t.assigned_to_id && (
-                                 <div style={{ color: "var(--color-success)" }}>
-                                     Assegnato a: {staffMembers.find(s => s.id === t.assigned_to_id)?.name || "?"}
-                                 </div>
-                             )}
-                         </div>
-                     ))}
-                 </div>
-             )}
-          </div>
+          <MaintenanceTicketsWidget
+            openTickets={openTickets}
+            unitMap={unitMap}
+            staffMembers={staffMembers}
+          />
 
-          {/* KPI Card */}
-          <div style={card}>
-            <div style={sectionTitle}>Riepilogo carico staff</div>
-            <div style={kpiGrid}>
-              <div style={kpiCard}>
-                <div style={tinyLabel}>Task totali</div>
-                <div style={tinyValue}>{kpi.total}</div>
-                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-                  Done: {kpi.byStatus.done || 0} · Planned:{" "}
-                  {kpi.byStatus.planned || 0}
-                </div>
-              </div>
-              <div style={kpiCard}>
-                <div style={tinyLabel}>Ore stimate</div>
-                <div style={tinyValue}>{kpi.hours.toFixed(1)}</div>
-                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-                  Totale task filtrate
-                </div>
-              </div>
-              <div style={kpiCard}>
-                <div style={tinyLabel}>Costo</div>
-                <div style={tinyValue}>€ {kpi.costTotal.toFixed(2)}</div>
-                <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-                  Business (Staff)
-                </div>
-              </div>
-            </div>
-          </div>
+          <StaffKpiCard kpi={kpi} />
 
-          {/* Default settings */}
-          <div style={card}>
-            <div style={sectionTitle}>Impostazioni staff & default</div>
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 8 }}>
-              Questi valori vengono usati quando il sistema crea automaticamente
-              task (es. pulizie al check-out).
-            </p>
-            {defaultsLoading ? (
-              <p style={{ fontSize: 12 }}>Caricamento impostazioni...</p>
-            ) : (
-              <form onSubmit={handleSaveDefaults}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 8,
-                  }}
-                >
-                  <div style={field}>
-                    <label style={label}>Operatore di default</label>
-                    <input
-                      style={input}
-                      value={defAssignee}
-                      onChange={(e) => setDefAssignee(e.target.value)}
-                      placeholder="Es. Operatore 1"
-                    />
-                  </div>
-                  <div style={field}>
-                    <label style={label}>Costo base (€)</label>
-                    <input
-                      style={input}
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={defCost}
-                      onChange={(e) => setDefCost(e.target.value)}
-                    />
-                  </div>
-                  <div style={field}>
-                    <label style={label}>Ore stimate per task</label>
-                    <input
-                      style={input}
-                      type="number"
-                      min="0"
-                      step="0.25"
-                      value={defHours}
-                      onChange={(e) => setDefHours(e.target.value)}
-                    />
-                  </div>
-                  <div style={field}>
-                    <label style={label}>Valuta</label>
-                    <input
-                      style={input}
-                      value={defCurrency}
-                      maxLength={3}
-                      onChange={(e) => setDefCurrency(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  style={{ marginTop: 8 }}
-                  disabled={defaultsSaving || !canManageDefaults}
-                >
-                  {defaultsSaving
-                    ? "Salvataggio..."
-                    : "Salva impostazioni automatiche"}
-                </Button>
-                {!canManageDefaults && (
-                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
-                    Ruolo in sola operativita': puoi leggere i default ma non modificarli.
-                  </p>
-                )}
-                {defaultsMessage && (
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "var(--color-text-muted)",
-                      marginTop: 4,
-                    }}
-                  >
-                    {defaultsMessage}
-                  </p>
-                )}
-              </form>
-            )}
-          </div>
+          <StaffDefaultsForm
+            defaultsLoading={defaultsLoading}
+            onSubmit={handleSaveDefaults}
+            defAssignee={defAssignee}
+            setDefAssignee={setDefAssignee}
+            defCost={defCost}
+            setDefCost={setDefCost}
+            defHours={defHours}
+            setDefHours={setDefHours}
+            defCurrency={defCurrency}
+            setDefCurrency={setDefCurrency}
+            defaultsSaving={defaultsSaving}
+            canManageDefaults={canManageDefaults}
+            defaultsMessage={defaultsMessage}
+          />
         </div>
 
         {/* COLONNA DESTRA: BOARD */}
-        <div style={card}>
-          <div style={sectionTitle}>
-            {mode === "day"
-              ? `Vista giornaliera · ${formatDate(selectedDate)}`
-              : `Vista settimanale · ${formatDate(from_date)} → ${formatDate(
-                  to_date
-                )}`}
-          </div>
-
-          {mode === "week" && assignees.length > staffColumnsPerPage && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 8,
-              }}
-            >
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setStaffPage((p) => Math.max(0, p - 1))}
-                disabled={staffPage === 0}
-              >
-                Staff precedenti
-              </Button>
-              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                Pagina staff {staffPage + 1}/{totalStaffPages}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setStaffPage((p) => Math.min(totalStaffPages - 1, p + 1))}
-                disabled={staffPage >= totalStaffPages - 1}
-              >
-                Staff successivi
-              </Button>
-            </div>
-          )}
-
-          {loading ? (
-            <p style={{ fontSize: 13 }}>Caricamento task staff...</p>
-          ) : filteredTasks.length === 0 ? (
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              Nessun task staff per il periodo e i filtri selezionati.
-            </p>
-          ) : (
-            <div style={boardWrapper}>
-              <div style={board}>
-                {/* header: colonna giorni + colonne per assignee */}
-                <div style={boardHeaderCell}>Giorno</div>
-                {visibleAssignees.map((ass) => {
-                  const color = staffColorMap[ass];
-                  return (
-                    <div key={ass} style={boardHeaderCell}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {color && (
-                          <span
-                            style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "999px",
-                              backgroundColor: color,
-                              border: "1px solid var(--color-border)",
-                            }}
-                          />
-                        )}
-                        <span>{ass}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* righe per ogni giorno */}
-                {days.map((d) => (
-                  <div key={d} style={{ display: "contents" }}>
-                    {/* prima colonna: giorno */}
-                    <div style={boardDayCell}>
-                      <div>{formatDate(d)}</div>
-                      <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{d}</div>
-                    </div>
-                    {/* celle per ogni assignee */}
-                    {visibleAssignees.map((ass) => {
-                      const list = tasksByAssigneeAndDay[ass]?.[d] || [];
-                      const isQuick =
-                        quickCreateTarget &&
-                        quickCreateTarget.date === d &&
-                        quickCreateTarget.assignee === ass;
-
-                      return (
-                        <div key={ass + d} style={boardCell}>
-                          {list.length === 0 && !isQuick && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                color: "var(--color-text-subtle)",
-                                display: "block",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Nessun task
-                            </span>
-                          )}
-
-                          {list.map((t) => {
-                            const unit = t.unit_id
-                              ? unitMap[t.unit_id]
-                              : null;
-                            const isSaving = savingTaskId === t.id;
-                            return (
-                              <div
-                                key={t.id}
-                                style={miniTaskCard(t.status)}
-                              >
-                                <div style={infoRow}>
-                                  <span
-                                    style={{
-                                      fontSize: 11,
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {t.time || "—"}
-                                  </span>
-                                  <span style={tagType(t.task_type)}>
-                                    {getTaskLabel(t.task_type)}
-                                  </span>
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 11,
-                                    color: "var(--color-text-muted)",
-                                  }}
-                                >
-                                  {unit
-                                    ? unit.name
-                                    : t.unit_id
-                                    ? `Unit #${t.unit_id}`
-                                    : "Senza unità"}
-                                </div>
-                                {t.notes && (
-                                  <div
-                                    style={{
-                                      fontSize: 10,
-                                      color: "var(--color-text-muted)",
-                                      marginTop: 2,
-                                    }}
-                                  >
-                                    {t.notes}
-                                  </div>
-                                )}
-
-                                {/* select assegnatario */}
-                                <div style={{ marginTop: 4 }}>
-                                  <select
-                                    style={inputInline}
-                                    value={t.assignee_name || "Non assegnato"}
-                                    disabled
-                                    onChange={(e) =>
-                                      handleChangeAssignee(
-                                        t,
-                                        e.target.value
-                                      )
-                                    }
-                                  >
-                                    {assigneeOptions.map((name) => (
-                                      <option key={name} value={name}>
-                                        {name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns:
-                                      "1fr 1fr auto",
-                                    gap: 4,
-                                    marginTop: 4,
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: 10,
-                                        color: "var(--color-text-muted)",
-                                        marginBottom: 2,
-                                      }}
-                                    >
-                                      Costo
-                                    </div>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      disabled
-                                      value={
-                                        t.cost === null ||
-                                        t.cost === undefined
-                                          ? ""
-                                          : t.cost
-                                      }
-                                      onChange={(e) =>
-                                        handleChangeCost(
-                                          t,
-                                          e.target.value
-                                        )
-                                      }
-                                      onBlur={() => handleBlurCost(t)}
-                                      style={inputInline}
-                                    />
-                                  </div>
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: 10,
-                                        color: "var(--color-text-muted)",
-                                        marginBottom: 2,
-                                      }}
-                                    >
-                                      Ore
-                                    </div>
-                                    <input
-                                      type="number"
-                                      step="0.25"
-                                      disabled
-                                      value={
-                                        t.estimated_hours === null ||
-                                        t.estimated_hours ===
-                                          undefined
-                                          ? ""
-                                          : t.estimated_hours
-                                      }
-                                      onChange={(e) =>
-                                        handleChangeHours(
-                                          t,
-                                          e.target.value
-                                        )
-                                      }
-                                      onBlur={() => handleBlurHours(t)}
-                                      style={inputInline}
-                                    />
-                                  </div>
-                                  <button
-                                    type="button"
-                                    style={pillStatus(t.status)}
-                                    disabled
-                                    onClick={() =>
-                                      handleToggleStatus(t)
-                                    }
-                                  >
-                                    {isSaving
-                                      ? "..."
-                                      : t.status === "done"
-                                      ? "Fatto"
-                                      : "Da fare"}
-                                  </button>
-                                </div>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  style={{ marginTop: 4 }}
-                                  onClick={() => loadTaskIntoForm(t)}
-                                >
-                                  Modifica
-                                </Button>
-                              </div>
-                            );
-                          })}
-
-                          {/* quick add */}
-                          {isQuick ? (
-                            <form
-                              style={quickForm}
-                              onSubmit={handleQuickCreate}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent:
-                                    "space-between",
-                                  alignItems: "center",
-                                  gap: 4,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  Nuovo task
-                                </span>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={closeQuickCreate}
-                                >
-                                  ×
-                                </Button>
-                              </div>
-
-                              {/* tipo + unità */}
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "1fr 1fr",
-                                  gap: 4,
-                                }}
-                              >
-                                <select
-                                  style={inputInline}
-                                  value={quickType}
-                                  onChange={(e) =>
-                                    setQuickType(e.target.value)
-                                  }
-                                >
-                                  <option value="cleaning">
-                                    Pulizia
-                                  </option>
-                                  <option value="checkin">
-                                    Check-in
-                                  </option>
-                                  <option value="checkout">
-                                    Check-out
-                                  </option>
-                                  <option value="breakfast">
-                                    Colazione
-                                  </option>
-                                  <option value="maintenance">
-                                    Manutenzione
-                                  </option>
-                                  <option value="other">
-                                    Altro
-                                  </option>
-                                </select>
-                                <select
-                                  style={inputInline}
-                                  value={quickUnitId}
-                                  onChange={(e) =>
-                                    setQuickUnitId(e.target.value)
-                                  }
-                                >
-                                  <option value="">
-                                    Nessuna unità
-                                  </option>
-                                  {units.map((u) => (
-                                    <option
-                                      key={u.id}
-                                      value={u.id}
-                                    >
-                                      {u.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* ruolo + assegnatario */}
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "1fr 1fr",
-                                  gap: 4,
-                                }}
-                              >
-                                <select
-                                  style={inputInline}
-                                  value={quickRole}
-                                  onChange={(e) => {
-                                    setQuickRole(e.target.value);
-                                    setQuickAssignee("");
-                                  }}
-                                >
-                                  <option value="">
-                                    Tutti i ruoli
-                                  </option>
-                                  {staffRoles.map((r) => (
-                                    <option key={r} value={r}>
-                                      {getRoleLabel(r)}
-                                    </option>
-                                  ))}
-                                </select>
-                                <select
-                                  style={inputInline}
-                                  value={quickAssignee}
-                                  onChange={(e) =>
-                                    setQuickAssignee(e.target.value)
-                                  }
-                                >
-                                  <option value="">
-                                    Nessun assegnatario
-                                  </option>
-                                  {quickAvailableAssignees.map((m) => (
-                                    <option key={m.id} value={m.name}>
-                                      {m.name}
-                                      {m.role
-                                        ? ` (${getRoleLabel(
-                                            m.role
-                                          )})`
-                                        : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* costi + ore */}
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "1fr 1fr",
-                                  gap: 4,
-                                }}
-                              >
-                                <input
-                                  style={inputInline}
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Costo"
-                                  value={quickCost}
-                                  onChange={(e) =>
-                                    setQuickCost(e.target.value)
-                                  }
-                                />
-                                <input
-                                  style={inputInline}
-                                  type="number"
-                                  step="0.25"
-                                  placeholder="Ore"
-                                  value={quickHours}
-                                  onChange={(e) =>
-                                    setQuickHours(e.target.value)
-                                  }
-                                />
-                              </div>
-
-                              {/* note */}
-                              <textarea
-                                style={{
-                                  ...inputInline,
-                                  minHeight: 40,
-                                  resize: "vertical",
-                                }}
-                                placeholder="Note (opzionale)"
-                                value={quickNotes}
-                                onChange={(e) =>
-                                  setQuickNotes(e.target.value)
-                                }
-                              />
-
-                              <Button
-                                type="submit"
-                                variant="primary"
-                                size="sm"
-                                style={{ alignSelf: "flex-start" }}
-                                disabled={creatingTask}
-                              >
-                                {creatingTask
-                                  ? "Creazione..."
-                                  : "Crea task"}
-                              </Button>
-                            </form>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              style={{ marginTop: 4 }}
-                              onClick={() => openQuickCreate(d, ass)}
-                            >
-                              + Aggiungi task
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Form Task Singolo in fondo alla pagina */}
-        <div
-          style={{
-            ...card,
-            display: isTaskModalOpen ? "block" : "none",
-            position: "fixed",
-            zIndex: 1200,
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "min(860px, calc(100vw - 24px))",
-            maxHeight: "90vh",
-            overflowY: "auto",
+        <StaffBoard
+          mode={mode}
+          selectedDate={selectedDate}
+          from_date={from_date}
+          to_date={to_date}
+          assignees={assignees}
+          visibleAssignees={visibleAssignees}
+          staffColumnsPerPage={staffColumnsPerPage}
+          staffPage={staffPage}
+          setStaffPage={setStaffPage}
+          totalStaffPages={totalStaffPages}
+          loading={loading}
+          filteredTasks={filteredTasks}
+          staffColorMap={staffColorMap}
+          days={days}
+          tasksByAssigneeAndDay={tasksByAssigneeAndDay}
+          quickCreateTarget={quickCreateTarget}
+          unitMap={unitMap}
+          savingTaskId={savingTaskId}
+          assigneeOptions={assigneeOptions}
+          onChangeAssignee={handleChangeAssignee}
+          onChangeCost={handleChangeCost}
+          onBlurCost={handleBlurCost}
+          onChangeHours={handleChangeHours}
+          onBlurHours={handleBlurHours}
+          onToggleStatus={handleToggleStatus}
+          onEditTask={loadTaskIntoForm}
+          onOpenQuickCreate={openQuickCreate}
+          quick={{
+            quickType,
+            setQuickType,
+            quickUnitId,
+            setQuickUnitId,
+            units,
+            quickRole,
+            setQuickRole,
+            staffRoles,
+            quickAssignee,
+            setQuickAssignee,
+            quickAvailableAssignees,
+            quickCost,
+            setQuickCost,
+            quickHours,
+            setQuickHours,
+            quickNotes,
+            setQuickNotes,
+            onSubmit: handleQuickCreate,
+            onClose: closeQuickCreate,
+            creatingTask,
           }}
-        >
-          <h2 style={{ fontSize: 14, marginBottom: 10 }}>
-            {formMode === "create"
-              ? "Nuovo task staff (dettagliato)"
-              : `Modifica task #${editingId}`}
-          </h2>
+        />
 
-          <form onSubmit={handleSubmit}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 12,
-              }}
-            >
-              <div style={field}>
-                <label style={label}>Data</label>
-                <input
-                  type="date"
-                  style={input}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
-
-              <div style={field}>
-                <label style={label}>Tipo task</label>
-                <select
-                  style={select}
-                  value={taskType}
-                  onChange={(e) => setTaskType(e.target.value)}
-                >
-                  <option value="cleaning">Pulizie</option>
-                  <option value="checkin">Check-in</option>
-                  <option value="checkout">Check-out</option>
-                  <option value="breakfast">Colazione</option>
-                  <option value="maintenance">Manutenzione</option>
-                  <option value="other">Altro</option>
-                </select>
-              </div>
-
-              <div style={field}>
-                <label style={label}>Assegnato a</label>
-                <input
-                  style={input}
-                  value={assigneeName}
-                  onChange={(e) => setAssigneeName(e.target.value)}
-                  placeholder="Nome dello staff"
-                />
-              </div>
-
-              <div style={field}>
-                <label style={label}>Appartamento (opzionale)</label>
-                <select
-                  style={select}
-                  value={unitId}
-                  onChange={(e) => setUnitId(e.target.value)}
-                >
-                  <option value="">Nessuno</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={field}>
-                <label style={label}>Ore stimate</label>
-                <input
-                  style={input}
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  value={estimatedHours}
-                  onChange={(e) => setEstimatedHours(e.target.value)}
-                  placeholder="es. 1.5"
-                />
-              </div>
-
-              <div style={field}>
-                <label style={label}>Stato</label>
-                <select
-                  style={select}
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  <option value="planned">Planned</option>
-                  <option value="in_progress">In corso</option>
-                  <option value="done">Completato</option>
-                  <option value="cancelled">Annullato</option>
-                </select>
-              </div>
-
-              <div style={field}>
-                <label style={label}>Costo stimato</label>
-                <input
-                  style={input}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  placeholder="es. 20"
-                />
-              </div>
-
-              <div style={field}>
-                <label style={label}>Valuta</label>
-                <select
-                  style={select}
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                >
-                  <option value="EUR">EUR</option>
-                  <option value="MAD">MAD</option>
-                  <option value="USD">USD</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={field}>
-              <label style={label}>Note interne</label>
-              <textarea
-                style={textarea}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Note per lo staff (es. orario preferito, richieste speciali...)"
-              />
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginTop: 10,
-              }}
-            >
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={saving}
-              >
-                {saving
-                  ? "Salvataggio..."
-                  : formMode === "create"
-                  ? "Crea task"
-                  : "Salva modifiche"}
-              </Button>
-              {formMode === "edit" && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    resetForm();
-                    setIsTaskModalOpen(false);
-                  }}
-                >
-                  Annulla modifica
-                </Button>
-              )}
-              {formMode === "create" && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    resetForm();
-                    setIsTaskModalOpen(false);
-                  }}
-                >
-                  Chiudi
-                </Button>
-              )}
-            </div>
-          </form>
-        </div>
+        {/* Form Task Singolo (modale) */}
+        <TaskFormModal
+          isOpen={isTaskModalOpen}
+          formMode={formMode}
+          editingId={editingId}
+          onSubmit={handleSubmit}
+          onClose={() => {
+            resetForm();
+            setIsTaskModalOpen(false);
+          }}
+          date={date}
+          setDate={setDate}
+          taskType={taskType}
+          setTaskType={setTaskType}
+          assigneeName={assigneeName}
+          setAssigneeName={setAssigneeName}
+          unitId={unitId}
+          setUnitId={setUnitId}
+          units={units}
+          estimatedHours={estimatedHours}
+          setEstimatedHours={setEstimatedHours}
+          status={status}
+          setStatus={setStatus}
+          cost={cost}
+          setCost={setCost}
+          currency={currency}
+          setCurrency={setCurrency}
+          notes={notes}
+          setNotes={setNotes}
+          saving={saving}
+        />
 
         {/* LISTA TASK GLOBALE */}
-        <div style={{ gridColumn: "1 / -1", ...card }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 8,
-              gap: 8,
-            }}
-          >
-            <h2 style={{ fontSize: 14 }}>Agenda staff (lista completa)</h2>
-          </div>
-
-          {filteredTasks.length === 0 ? (
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-              Nessun task staff per i filtri selezionati.
-            </p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={table}>
-                <thead>
-                  <tr>
-                    <th style={th}>Data</th>
-                    <th style={th}>Tipo</th>
-                    <th style={th}>Staff</th>
-                    <th style={th}>Unità</th>
-                    <th style={th}>Ore</th>
-                    <th style={th}>Costo</th>
-                    <th style={th}>Stato</th>
-                    <th style={th}>Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTasks
-                    .slice()
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .map((t) => {
-                      const u = t.unit_id ? unitMap[t.unit_id] : null;
-                      return (
-                        <tr key={t.id}>
-                          <td style={td}>
-                            {t.date
-                              ? new Date(t.date).toLocaleDateString("it-IT")
-                              : "—"}
-                          </td>
-                          <td style={td}>
-                            {getTaskLabel(t.task_type)}
-                          </td>
-                          <td style={td}>{t.assignee_name || "—"}</td>
-                          <td style={td}>
-                            {u
-                              ? u.name
-                              : t.unit_id
-                              ? `Unit #${t.unit_id}`
-                              : "—"}
-                          </td>
-                          <td style={td}>
-                            {t.estimated_hours != null
-                              ? t.estimated_hours.toFixed(1)
-                              : "—"}
-                          </td>
-                          <td style={td}>
-                            {t.cost != null
-                              ? `${t.currency || "EUR"} ${Number(
-                                  t.cost
-                                ).toFixed(2)}`
-                              : "—"}
-                          </td>
-                          <td style={td}>
-                            <span style={pillStatus(t.status)}>
-                              {t.status === "planned"
-                                ? "Planned"
-                                : t.status === "in_progress"
-                                ? "In corso"
-                                : t.status === "done"
-                                ? "Completato"
-                                : t.status === "cancelled"
-                                ? "Annullato"
-                                : t.status}
-                            </span>
-                          </td>
-                          <td style={{ ...td, whiteSpace: "nowrap" }}>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => loadTaskIntoForm(t)}
-                            >
-                              Modifica
-                            </Button>{" "}
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleDelete(t.id)}
-                            >
-                              Elimina
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
+        <StaffTaskTable
+          filteredTasks={filteredTasks}
+          unitMap={unitMap}
+          onEditTask={loadTaskIntoForm}
+          onDelete={handleDelete}
+        />
       </div>
     </div>
   );
