@@ -158,6 +158,26 @@ capabilities:
     domain: script
     suffix: "*climate_safe_off"
     singleton: true
+  - capability: workflow.climate_eco
+    domain: script
+    suffix: "*climate_eco"
+    singleton: true
+  - capability: workflow.climate_comfort
+    domain: script
+    suffix: "*climate_comfort"
+    singleton: true
+  - capability: workflow.housekeeping_set
+    domain: script
+    suffix: "*housekeeping_set"
+    singleton: true
+  - capability: workflow.unlock_entry
+    domain: script
+    suffix: "*unlock_entry"
+    singleton: true
+  - capability: workflow.lock_entry
+    domain: script
+    suffix: "*lock_entry"
+    singleton: true
   - capability: workflow.lights_off
     domain: script
     suffix: "*lights_all_off"
@@ -216,6 +236,22 @@ capabilities:
   - capability: status.booking_ref
     domain: input_text
     suffix: "*booking_ref"
+    singleton: true
+  - capability: status.guest_count
+    domain: input_number
+    suffix: "*guest_count"
+    singleton: true
+  - capability: setting.access_code
+    domain: input_text
+    suffix: "*access_code"
+    singleton: true
+  - capability: sensor.occupancy
+    domain: binary_sensor
+    suffix: "*occupancy_detected"
+    singleton: true
+  - capability: flag.guest_available
+    domain: binary_sensor
+    suffix: "*guest_available"
     singleton: true
 
   # --- availability and alarms (both units and facilities) ---
@@ -329,6 +365,26 @@ capabilities:
     suffix: "*openings_secure"
 
   # --- programs and schedules (read-only in the portal: HA owns scheduling) ---
+  - capability: setting.occupancy_clear_minutes
+    domain: input_number
+    suffix: "*occupancy_clear_minutes"
+    singleton: true
+  - capability: setting.vacancy_eco_minutes
+    domain: input_number
+    suffix: "*vacancy_eco_minutes"
+    singleton: true
+  - capability: setting.setpoint_comfort
+    domain: input_number
+    suffix: "*setpoint_comfort"
+    singleton: true
+  - capability: setting.setpoint_eco
+    domain: input_number
+    suffix: "*setpoint_eco"
+    singleton: true
+  - capability: setting.power_alert
+    domain: input_number
+    suffix: "*power_alert_w"
+    singleton: true
   - capability: program.enabled
     domain: input_boolean
     suffix: "*_program_enabled"
