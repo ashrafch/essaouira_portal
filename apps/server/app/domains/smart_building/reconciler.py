@@ -31,6 +31,12 @@ def _reconcile_once() -> dict[str, object] | None:
         service = SmartBuildingService(
             db=db, tenant_id=settings.admin_tenant_id, role="owner"
         )
+        # Do nothing until the link has been configured. Importing devices into a
+        # portal that has no property, no units and no provider connection yet
+        # would front-run the setup wizard and leave unbindable devices behind.
+        if not service.has_link_connection():
+            logger.debug("Smart link reconciliation skipped: no provider connection yet")
+            return None
         return service.reconcile_link()
     finally:
         db.close()

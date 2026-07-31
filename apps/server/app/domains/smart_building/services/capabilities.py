@@ -40,6 +40,10 @@ class CapabilitiesMixin:
                 return connection
         return None
 
+    def has_link_connection(self, property_id: int | None = None) -> bool:
+        """True when a building link is configured and can be talked to."""
+        return self._link_connection(property_id) is not None
+
     def get_zone_map(self, property_id: int | None = None) -> dict[str, dict]:
         """Zone -> scope binding, merging the profile with operator overrides."""
         profile = load_profile()

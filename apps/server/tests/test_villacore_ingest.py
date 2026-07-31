@@ -264,6 +264,27 @@ def test_event_carrying_state_updates_the_device():
             assert state["online"] is True
 
 
+def test_reconciler_waits_until_the_link_is_configured():
+    """It must not import into a portal that has not been set up yet."""
+    from app.domains.smart_building import reconciler
+
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            with patch.object(
+                reconciler.SmartBuildingService, "has_link_connection", return_value=False
+            ) as guard:
+                assert reconciler._reconcile_once() is None
+                assert guard.called
+
+            # With a connection present it proceeds normally.
+            _synced_client(client, headers)
+            result = reconciler._reconcile_once()
+            assert result is not None
+            assert result["provider_name"] == "villacore"
+
+
 def test_reconcile_reimports_and_repolls():
     fake = _FakeHomeAssistant()
     with _villacore_env(), _patch_ha(fake):
