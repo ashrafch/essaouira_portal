@@ -88,6 +88,12 @@ EXCLUDED_ENTITIES = [
     "input_boolean.villa_core_simulation_notifications",
     "switch.villa_technical_simulation_relay",
     "sensor.portal_link_manifest",
+    "script.portal_notify_event",
+    "sensor.runtime_pompa_piscina_oggi",
+    "sensor.energia_villa_oggi",
+    "sensor.energia_a1_oggi",
+    "sensor.energia_piscina_oggi",
+    "sensor.energia_proprieta_oggi",
     "person.owner",
     "sun.sun",
 ]

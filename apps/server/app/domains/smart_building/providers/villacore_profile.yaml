@@ -55,12 +55,21 @@ exclude:
     - "*.villa_core_simulat*"
     - "*_simulation_*"
     - "*.portal_link_*"
+    - "script.portal_notify_event"
     # Home Assistant's own integrations surface as `sensor.*`, so the domain
     # exclusions above cannot catch them. They are not building entities.
     - "sensor.sun_*"
     - "sensor.backup_*"
     - "*.hacs_*"
     - "*.updater_*"
+    # Legacy entity-registry aliases left unavailable after canonical
+    # `sensor.energy_*_daily` / `sensor.pool_pump_runtime_daily` were adopted.
+    # Keep the live canonical meters importable and report no false drift.
+    - "sensor.runtime_pompa_piscina_oggi"
+    - "sensor.energia_villa_oggi"
+    - "sensor.energia_a1_oggi"
+    - "sensor.energia_piscina_oggi"
+    - "sensor.energia_proprieta_oggi"
 
 # Zone prefixes. `kind` decides where the entity lands in the portal:
 #   unit     -> bound to a PMS unit (bookings, readiness, assistants)
