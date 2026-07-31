@@ -7,7 +7,7 @@ This folder is the working documentation hub for Essaouira Portal. Use the docum
 ### Product / architecture overview
 
 - [SMART_BUILDING_REFACTOR_SPEC.md](SMART_BUILDING_REFACTOR_SPEC.md)
-- [VILLACORE_LINK.md](VILLACORE_LINK.md) — contract with the VillaCore building platform (transport, capabilities, events, costs)
+- [VILLACORE_LINK.md](VILLACORE_LINK.md) — versioned VillaCore contract, mapping, events, token rotation and restore reconciliation
 - [PORTAL_CURRENT_STATE_ANALYSIS.md](PORTAL_CURRENT_STATE_ANALYSIS.md)
 - [PROJECT_FLOW_OVERVIEW.md](PROJECT_FLOW_OVERVIEW.md)
 
@@ -49,7 +49,8 @@ This folder is the working documentation hub for Essaouira Portal. Use the docum
 
 1. [README.md](../README.md)
 2. [DEPLOYMENT.md](DEPLOYMENT.md)
-3. [TECHNICAL_OPERATOR_MANUAL.md](TECHNICAL_OPERATOR_MANUAL.md)
+3. [VILLACORE_LINK.md](VILLACORE_LINK.md) when operating the smart-property link
+4. [TECHNICAL_OPERATOR_MANUAL.md](TECHNICAL_OPERATOR_MANUAL.md)
 
 ### If you need to use the portal
 

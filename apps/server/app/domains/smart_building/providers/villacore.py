@@ -342,6 +342,9 @@ class VillaCoreProvider(HomeAssistantProvider):
 
         return {
             "schema": schema,
+            "event_id": (str(payload.get("event_id")).strip() or None)
+            if payload.get("event_id")
+            else None,
             "event": event,
             "entity_id": entity_id,
             "zone": zone_key,

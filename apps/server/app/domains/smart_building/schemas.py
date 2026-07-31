@@ -401,6 +401,7 @@ class LinkEventIn(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     schema_version: str | None = Field(default=None, alias="schema")
+    event_id: str | None = Field(default=None, max_length=255)
     event: str | None = None
     entity_id: str | None = None
     zone: str | None = None
@@ -425,6 +426,7 @@ class LinkEventOut(BaseModel):
     alert_id: int | None = None
     resolved_alerts: int = 0
     echo_of_portal_command: bool = False
+    duplicate: bool = False
     correlation_id: str | None = None
 
 

@@ -69,6 +69,7 @@ Rules: pages call `services/api.js` (never raw `fetch`); colors/spacing/radii co
 - Smart Building **reacts** to PMS events; it never re-implements PMS rules or creates a parallel booking state machine.
 - The PMS `Unit` is the canonical unit entity everywhere.
 - **VillaCore owns physical truth and execution**: plant state machines, interlocks, timers, safety automations. The portal sends *requests* through capabilities and renders refusals verbatim; it never bypasses an interlock and never re-implements a state machine. Shared facilities are read-heavy on purpose: only `safe_off` and `alarm_reset` are exposed.
+- The VillaCore link is versioned and authenticated. Inbound `event_id` values are idempotency keys; `correlation_id` echoes are recorded but never fan out into another rule or command.
 - **Consumption becomes money only in the portal.** Telemetry stays telemetry in VillaCore; cost items, allocation and P&L are the portal's.
 
 ---

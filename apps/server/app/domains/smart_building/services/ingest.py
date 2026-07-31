@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from app.domains.smart_building.schemas import AlertCreate, DeviceEventCreate
 from app.domains.smart_building.taxonomy import CANONICAL_LINK_EVENTS
-from app.models.smart_building import Alert, Device, DeviceCommand
+from app.models.smart_building import Alert, Device, DeviceCommand, DeviceEvent
 
 # event -> (alert type, severity, title template)
 ALERT_EVENTS: dict[str, tuple[str, str, str]] = {
@@ -94,6 +94,29 @@ class IngestMixin:
         # whole plant dropped) legitimately has no single owning entity.
         if zone_key:
             return self.find_capability_device("sensor.availability", zone_key=zone_key)
+        return None
+
+    def _find_duplicate_link_event(
+        self, *, device_id: int, external_event_id: str | None
+    ) -> DeviceEvent | None:
+        """Find a previously ingested envelope without requiring a schema migration."""
+        if not external_event_id:
+            return None
+        candidates = (
+            self._scoped_query(DeviceEvent)
+            .filter(
+                DeviceEvent.device_id == device_id,
+                DeviceEvent.event_type == "provider.webhook.ingested",
+                DeviceEvent.source == "villacore",
+            )
+            .order_by(DeviceEvent.id.desc())
+            .limit(500)
+            .all()
+        )
+        for candidate in candidates:
+            stored = self._safe_json_loads(candidate.payload_json)
+            if stored.get("external_event_id") == external_event_id:
+                return candidate
         return None
 
     def _event_description(self, event: str, parsed: dict) -> str:
@@ -170,6 +193,24 @@ class IngestMixin:
             }
 
         is_echo = self._is_own_command_echo(parsed["correlation_id"])
+        duplicate = self._find_duplicate_link_event(
+            device_id=device.id, external_event_id=parsed["event_id"]
+        )
+        if duplicate is not None:
+            return {
+                "accepted": True,
+                "reason": None,
+                "event": event,
+                "event_id": duplicate.id,
+                "device_id": device.id,
+                "unit_id": device.unit_id,
+                "zone": parsed["zone"],
+                "alert_id": None,
+                "resolved_alerts": 0,
+                "echo_of_portal_command": is_echo,
+                "duplicate": True,
+                "correlation_id": parsed["correlation_id"],
+            }
 
         if parsed["state"] is not None:
             state_payload = self._state_payload_from_provider_snapshot(parsed["state"])
@@ -184,6 +225,8 @@ class IngestMixin:
                 payload_json=self._safe_json_dumps(
                     {
                         "link_event": event,
+                        "external_event_id": parsed["event_id"],
+                        "occurred_at": parsed["occurred_at"],
                         "zone": parsed["zone"],
                         "kind": parsed["kind"],
                         "reason": parsed["reason"],
@@ -234,5 +277,6 @@ class IngestMixin:
             "alert_id": alert_id,
             "resolved_alerts": resolved_alerts,
             "echo_of_portal_command": is_echo,
+            "duplicate": False,
             "correlation_id": parsed["correlation_id"],
         }

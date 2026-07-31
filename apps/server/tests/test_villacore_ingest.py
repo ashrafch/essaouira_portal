@@ -1,6 +1,7 @@
 """Inbound VillaCore events: authentication, mapping, and loop prevention."""
 
 import os
+import uuid
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -67,6 +68,51 @@ def test_ingest_accepts_the_shared_secret_without_a_portal_login():
             assert body["accepted"] is True
             assert body["event"] == "unit.checkin.completed"
             assert body["event_id"] is not None
+
+
+def test_duplicate_external_event_id_is_recorded_only_once():
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _ingest_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            _synced_client(client, headers)
+            ingest_headers = {"X-Smart-Ingest-Token": INGEST_TOKEN}
+            payload = _event(
+                "facility.safety_stop",
+                "sensor.pool_filtration_state",
+                event_id=f"pool-stop-{uuid.uuid4().hex}",
+                severity="critical",
+                reason="no_flow",
+                zone="pool",
+            )
+            alerts_before = client.get("/smart/alerts?status=open", headers=headers).json()
+            matching_before = [
+                alert
+                for alert in alerts_before
+                if alert["alert_type"] == "facility.safety_stop"
+                and alert["device_id"]
+                == next(
+                    device["id"]
+                    for device in client.get("/smart/devices", headers=headers).json()
+                    if device["external_id"] == "sensor.pool_filtration_state"
+                )
+            ]
+
+            first = client.post("/smart/link/events", headers=ingest_headers, json=payload)
+            second = client.post("/smart/link/events", headers=ingest_headers, json=payload)
+
+            assert first.status_code == second.status_code == 200
+            assert first.json()["duplicate"] is False
+            assert second.json()["duplicate"] is True
+            assert second.json()["event_id"] == first.json()["event_id"]
+            alerts = client.get("/smart/alerts?status=open", headers=headers).json()
+            matching = [
+                alert
+                for alert in alerts
+                if alert["alert_type"] == "facility.safety_stop"
+                and alert["device_id"] == first.json()["device_id"]
+            ]
+            assert len(matching) == len(matching_before) + 1
 
 
 def test_ingest_rejects_a_wrong_secret_and_requires_authentication():

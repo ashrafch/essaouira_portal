@@ -30,9 +30,9 @@ running VillaCore Home Assistant container with the alias `home-assistant`,
 verifies reachability from inside the network, and validates a token when given
 one (`-Token` / `--token`).
 
-That attachment is a *runtime* one — Docker forgets it if the VillaCore container
-is recreated. Prompt **P1** in [`VILLACORE_PROMPTS.md`](VILLACORE_PROMPTS.md)
-makes it permanent in VillaCore's own compose file.
+VillaCore's optional `docker-compose.portal.yml` now declares the same external
+network, so the attachment survives container recreation whenever that overlay
+is used. The base VillaCore stack remains independent of the network and portal.
 
 ### Environment
 
@@ -72,13 +72,11 @@ resolved in three steps, most authoritative first:
 Anything that still has no capability is reported by `GET /smart/link/drift`
 (surfaced on the **Link VillaCore** page), never silently dropped.
 
-Measured live against the running instance (Home Assistant 2026.5.2, VillaCore at
-milestone 9): **313 entities → 188 classified, 120 excluded, 5 unclassified.**
-The exclusions are automations, VillaCore's simulation helpers and Home
-Assistant's own integrations (`sun`, `backup`), none of which are building
-entities. The 5 unclassified are a VillaCore-side defect — duplicated energy and
-runtime sensors stuck at `unavailable`, addressed by prompt **P0** — and they are
-reported rather than imported, which is exactly what the drift report is for.
+Measured live after VillaCore Milestone 13 P9 (Home Assistant 2026.5.2): **694
+entities → 445 imported, 243 excluded, 0 unclassified.** The exclusions are
+automations, simulation helpers, link infrastructure, Home Assistant's own
+integrations and five explicitly named legacy aliases that remain unavailable;
+their canonical energy/runtime entities are imported normally.
 
 ### Zones
 
@@ -107,8 +105,8 @@ Callers ask for a capability, never for an entity id.
 
 | Group | Examples |
 | --- | --- |
-| Unit workflows | `workflow.checkin`, `workflow.checkout`, `workflow.mark_ready`, `workflow.safe_off`, `workflow.guest_mode_on/off` |
-| Unit status | `status.stay`, `status.housekeeping`, `flag.guest_mode`, `flag.maintenance_lock` |
+| Unit workflows | `workflow.checkin`, `workflow.checkout`, `workflow.mark_ready`, `workflow.safe_off`, `workflow.climate_safe_off`, `workflow.climate_eco/comfort`, `workflow.housekeeping_set`, `workflow.lock_entry/unlock_entry`, `workflow.guest_mode_on/off` |
+| Unit status | `status.stay`, `status.housekeeping`, `status.guest_count`, `flag.guest_mode`, `flag.guest_available`, `flag.maintenance_lock`, `sensor.occupancy` |
 | Comfort & openings | `climate.main`, `light.main`, `cover.main`, `lock.entry`, `contact.entry_door`, `contact.window` |
 | Facility | `facility.state`, `facility.mode`, `facility.supervision`, `facility.alarm`, `facility.safe_off`, `facility.alarm_reset`, `facility.zone` |
 | Interlocks (read-only) | `interlock.flow`, `interlock.thermal_trip`, `interlock.local_consent`, `interlock.obstacle`, `interlock.rain` |
@@ -149,8 +147,10 @@ data:
     source: hostara.portal
 ```
 
-Workflows: `checkin`, `checkout`, `mark_ready`, `safe_off`, `climate_safe_off`,
-`lights_off`, `guest_mode_on`, `guest_mode_off`. When VillaCore defines a
+Workflows include `checkin`, `checkout`, `mark_ready`, `safe_off`,
+`climate_safe_off`, `climate_eco`, `climate_comfort`, `housekeeping_set`,
+`lock_entry`, `unlock_entry`, `lights_off`, `guest_mode_on` and `guest_mode_off`.
+When VillaCore defines a
 dedicated script *and* a bare helper for the same thing, the script wins — it
 carries the safety conditions that flipping the helper would bypass.
 
@@ -183,6 +183,7 @@ X-Smart-Ingest-Token: <SMART_INGEST_TOKEN>
 
 {
   "schema": "villacore.event.v1",
+  "event_id": "<stable-delivery-id>",
   "site": "dev",
   "zone": "a1",
   "kind": "unit",
@@ -198,9 +199,10 @@ X-Smart-Ingest-Token: <SMART_INGEST_TOKEN>
 ```
 
 The endpoint accepts either the shared secret (Home Assistant cannot hold a
-portal JWT) or a normal portal login. A wrong secret is `401`; a valid envelope the
-portal cannot place answers `200` with `accepted: false` and a reason, so a lost
-event is visible instead of silent.
+portal JWT) or a normal portal login. A wrong secret is `401`; a valid envelope
+the portal cannot place answers `200` with `accepted: false` and a reason. A
+repeated `event_id` answers `accepted: true`, `duplicate: true` with the original
+persisted event ID, without updating state or creating another alert.
 
 | Event | Portal effect |
 | --- | --- |
@@ -220,6 +222,10 @@ Every portal command carries a `correlation_id`; VillaCore echoes it back. An
 echoed event is recorded for the timeline but does **not** re-trigger automation
 rules — otherwise the portal would react to its own action, forever.
 
+Every VillaCore delivery also carries an `event_id`. This is distinct from the
+portal's numeric event row ID and remains stable if the same envelope is sent
+again. It is the idempotency key for state, timeline, alerts and rules.
+
 ### Reconciliation
 
 Push is the fast path; reconciliation is the one that guarantees convergence,
@@ -227,6 +233,25 @@ because a missed POST is invisible. `POST /smart/link/reconcile` re-imports the
 catalog (picking up new VillaCore entities) and re-reads every state. Enable the
 in-process loop with `SMART_POLL_INTERVAL_SECONDS`, or call the endpoint from
 cron. It is off by default and never runs in `mock` mode.
+
+### Token rotation and restore
+
+Use placeholders in commands and keep both credentials in ignored environment
+or secrets files.
+
+- Rotate `HOME_ASSISTANT_TOKEN` by creating the replacement first, updating the
+  portal backend, validating with `scripts/link-villacore.ps1 -Token
+  "<NEW_HA_TOKEN>"`, reconciling, then revoking the old token.
+- Rotate `SMART_INGEST_TOKEN` by disabling VillaCore's outbound kill switch,
+  updating the portal secret, running VillaCore's
+  `configure-portal-link.ps1`, restarting the two secret consumers, sending a
+  duplicate-safe test event and confirming the old token returns `401`.
+- Back up and restore the two products separately. After either restore, keep
+  outbound push disabled, validate the contract and zone map, synchronize the
+  catalog, run `POST /smart/link/reconcile`, then re-enable automation packs.
+
+The detailed VillaCore-side procedure is
+`docs/operations/management-portal-link-runbook.md` in the sibling repository.
 
 ---
 
@@ -313,12 +338,10 @@ End-to-end checks worth running after any VillaCore milestone:
 
 ## 9. Current limitations
 
-- **A1 has no motion, lock or leak sensor** (prompt **P6**). Until then, checkout
-  vacancy validation and lock commands are reported as unavailable — not faked.
-- **Push requires prompts P2–P5 in VillaCore.** Until they are applied the portal
-  works in pull mode only: correct data, but at polling latency.
-- **`SMART_INGEST_TOKEN` is single-tenant.** The ingest identity maps to the admin
-  tenant; a multi-tenant deployment needs per-tenant secrets.
-- **Apartments A2–A6 do not exist yet** in VillaCore (prompt **P9**); only `villa`
-  and `a1` map to real units today.
-- **No hardware.** Everything above is validated against the VillaCore simulator.
+- **`SMART_INGEST_TOKEN` is single-tenant.** The ingest identity maps to the
+  configured admin tenant; a multi-tenant deployment needs per-tenant secrets.
+- **No hardware.** Villa, A1–A6, facilities, PLC contract and all 159 MQTT
+  devices are simulated. Real wiring, protections, Proxmox, NAS and commissioning
+  are not validated by this integration gate.
+- **Release remains a candidate.** The completed P1–P10 simulation work does not
+  promote VillaCore `1.0.0-rc.1` to `1.0.0`.
