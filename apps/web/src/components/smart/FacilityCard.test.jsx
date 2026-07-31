@@ -95,7 +95,9 @@ describe("FacilityCard", () => {
     expect(onAction).toHaveBeenCalledWith("pool", "safe_off");
   });
 
-  it("disables an action the building does not implement", () => {
+  it("does not offer an action the building does not implement", () => {
+    // Metering and diagnostic zones (energy, PLC) have no state machine to stop
+    // or rearm. A greyed-out button would imply an action that should exist.
     const facility = makeFacility({
       actions: [
         {
@@ -105,10 +107,19 @@ describe("FacilityCard", () => {
           available: false,
           needs_confirmation: true,
         },
+        {
+          action: "alarm_reset",
+          label: "Riarmo allarme",
+          capability_key: "facility.alarm_reset",
+          available: false,
+          needs_confirmation: true,
+        },
       ],
     });
     renderCard({ facility });
-    expect(screen.getByRole("button", { name: /Arresto sicuro/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Arresto sicuro/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Riarmo allarme/ })).toBeNull();
+    expect(screen.getByText(/Sola lettura/)).toBeInTheDocument();
   });
 
   it("disables actions for a read-only role", () => {

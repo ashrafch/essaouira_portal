@@ -65,6 +65,9 @@ function FacilityCard({ facility, cost = null, canOperate = false, onAction, haU
   }
 
   const confirmingAction = facility.actions?.find((a) => a.action === confirming);
+  // A metering or diagnostic zone (energy, PLC) has no state machine to stop or
+  // rearm. Greyed-out buttons there would imply an action that should exist.
+  const offeredActions = facility.actions?.filter((action) => action.available) || [];
 
   return (
     <AppCard>
@@ -209,7 +212,12 @@ function FacilityCard({ facility, cost = null, canOperate = false, onAction, haU
           alignItems: "center",
         }}
       >
-        {facility.actions?.map((action) => {
+        {offeredActions.length === 0 ? (
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+            Sola lettura: questa zona non espone comandi.
+          </span>
+        ) : null}
+        {offeredActions.map((action) => {
           const Icon = ACTION_ICON[action.action] || ShieldAlert;
           return (
             <Button
@@ -217,16 +225,10 @@ function FacilityCard({ facility, cost = null, canOperate = false, onAction, haU
               variant={action.action === "safe_off" ? "danger" : "secondary"}
               size="sm"
               icon={<Icon size={14} />}
-              disabled={!action.available || !canOperate}
+              disabled={!canOperate}
               loading={pending === action.action}
               onClick={() => setConfirming(action.action)}
-              title={
-                !action.available
-                  ? "Capability non configurata in VillaCore"
-                  : !canOperate
-                    ? "Permesso insufficiente"
-                    : undefined
-              }
+              title={!canOperate ? "Permesso insufficiente" : undefined}
             >
               {action.label}
             </Button>
