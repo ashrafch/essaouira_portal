@@ -334,6 +334,7 @@ function SetupWizard() {
           >
             <option value="mock">mock</option>
             <option value="home_assistant">home_assistant</option>
+            <option value="villacore">villacore</option>
           </select>
           <button
             type="button"

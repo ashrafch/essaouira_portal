@@ -138,9 +138,10 @@ function Properties() {
             >
               <option value="mock">mock</option>
               <option value="home_assistant">home_assistant</option>
+              <option value="villacore">villacore</option>
             </select>
             <input
-              placeholder="Base URL (solo Home Assistant)"
+              placeholder="Base URL (Home Assistant / VillaCore)"
               value={connectionForm.base_url}
               onChange={(e) => setConnectionForm((prev) => ({ ...prev, base_url: e.target.value }))}
             />

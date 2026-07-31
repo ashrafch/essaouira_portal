@@ -200,7 +200,7 @@ class SetupMixin:
             raise HTTPException(status_code=400, detail="Property non impostata nel wizard")
         self._property_or_404(int(property_id))
         provider_name = (payload.provider or "").strip().lower()
-        if provider_name not in {"mock", "home_assistant"}:
+        if provider_name not in {"mock", "home_assistant", "villacore"}:
             raise HTTPException(status_code=400, detail="Provider non supportato dal setup wizard")
         _ = get_provider(provider_name)
         connection = (

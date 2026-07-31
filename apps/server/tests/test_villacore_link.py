@@ -395,6 +395,53 @@ def test_link_status_separates_a_bad_token_from_an_unreachable_host():
                 assert "401" in status["last_error"]
 
 
+def test_villacore_is_selectable_wherever_a_provider_is_chosen():
+    """The onboarding paths must offer the provider the portal actually uses.
+
+    Both the provider-connection endpoint and the setup wizard validate the
+    provider name against an allowlist; leaving `villacore` out of either one
+    makes the zone map unsavable and the whole link unusable from the UI.
+    """
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            property_id = client.get("/properties", headers=headers).json()[0]["id"]
+
+            existing = [
+                c
+                for c in client.get("/smart/provider-connections", headers=headers).json()
+                if c["provider_name"] == "villacore" and c["property_id"] == property_id
+            ]
+            if not existing:
+                created = client.post(
+                    "/smart/provider-connections",
+                    headers=headers,
+                    json={
+                        "property_id": property_id,
+                        "provider_name": "villacore",
+                        "base_url": "http://home-assistant:8123",
+                        "config": {},
+                    },
+                )
+                assert created.status_code == 200, created.text
+
+            client.post("/setup/start", headers=headers)
+            client.post(
+                "/setup/property",
+                headers=headers,
+                json={"property_name": "Villa Essaouira", "timezone": "Africa/Casablanca"},
+            )
+            client.post("/setup/units", headers=headers, json={"units": ["Villa"]})
+            wizard = client.post(
+                "/setup/connect-provider",
+                headers=headers,
+                json={"provider": "villacore", "config": {"base_url": "http://home-assistant:8123"}},
+            )
+            assert wizard.status_code == 200, wizard.text
+            assert wizard.json()["metadata"]["provider_name"] == "villacore"
+
+
 def test_transport_errors_are_explained_not_just_forwarded():
     from app.domains.smart_building.providers.villacore import VillaCoreProvider
 
