@@ -17,6 +17,10 @@ from app.domains.smart_building.taxonomy import (
 class DeviceBase(BaseModel):
     unit_id: int | None = None
     zone_name: str | None = Field(default=None, max_length=128)
+    # VillaCore Link classification; null for mock / generic Home Assistant.
+    zone_key: str | None = Field(default=None, max_length=64)
+    capability_key: str | None = Field(default=None, max_length=64)
+    facility_key: str | None = Field(default=None, max_length=64)
     provider: str = Field(default="mock", max_length=64)
     external_id: str = Field(..., max_length=128)
     name: str = Field(..., max_length=128)
@@ -182,6 +186,296 @@ class ProviderPollOut(BaseModel):
     updated_states: int
     events_emitted: int
     errors: int
+
+
+class LinkZoneOut(BaseModel):
+    zone: str
+    kind: str
+    display_name: str
+    machine: str | None = None
+    known: bool = True
+    entity_count: int = 0
+
+
+class LinkUnclassifiedOut(BaseModel):
+    entity_id: str
+    domain: str | None = None
+    zone: str | None = None
+    reason: str | None = None
+
+
+class LinkStatusOut(BaseModel):
+    """Health of the building link plus what the portal has not classified yet."""
+
+    provider_name: str
+    configured: bool
+    reachable: bool
+    authenticated: bool
+    contract_version: str | None = None
+    manifest_present: bool = False
+    entity_count: int = 0
+    importable_count: int = 0
+    excluded_count: int = 0
+    imported_device_count: int = 0
+    classified_device_count: int = 0
+    pending_import_count: int = 0
+    unclassified: list[LinkUnclassifiedOut] = Field(default_factory=list)
+    unclassified_count: int = 0
+    unclassified_not_imported_count: int = 0
+    zones: list[LinkZoneOut] = Field(default_factory=list)
+    connection_id: int | None = None
+    last_sync_at: datetime | None = None
+    last_error: str | None = None
+    last_event_age_seconds: int | None = None
+    ingest_push_enabled: bool = False
+    poll_interval_seconds: int = 0
+    site_id: str | None = None
+
+
+class ZoneMapEntryIn(BaseModel):
+    kind: str | None = Field(default=None, max_length=16)
+    unit_id: int | None = None
+    display_name: str | None = Field(default=None, max_length=128)
+    rated_power_w: int | None = Field(default=None, ge=0)
+
+
+class ZoneMapIn(BaseModel):
+    zone_map: dict[str, ZoneMapEntryIn]
+
+
+class ZoneMapEntryOut(BaseModel):
+    zone: str
+    kind: str
+    display_name: str
+    machine: str | None = None
+    rated_power_w: int | None = None
+    unit_id: int | None = None
+    source: str = "profile"
+
+
+class CapabilityStateOut(BaseModel):
+    online: bool = False
+    value: str | None = None
+    temperature_c: float | None = None
+    humidity_pct: float | None = None
+    energy_w: float | None = None
+    contact_open: bool | None = None
+    motion_detected: bool | None = None
+    leak_detected: bool | None = None
+    updated_at: datetime | None = None
+
+
+class CapabilityOut(BaseModel):
+    capability_key: str
+    device_id: int
+    device_name: str
+    external_id: str
+    category: str
+    zone_key: str | None = None
+    provider: str
+    commands: list[str] = Field(default_factory=list)
+    state: CapabilityStateOut
+
+
+class UnitWorkflowOut(BaseModel):
+    workflow: str
+    label: str
+    capability_key: str
+    command_type: str
+    available: bool
+    needs_confirmation: bool = False
+
+
+class UnitCapabilitiesOut(BaseModel):
+    unit_id: int
+    unit_name: str
+    capabilities: list[CapabilityOut] = Field(default_factory=list)
+    workflows: list[UnitWorkflowOut] = Field(default_factory=list)
+
+
+class UnitWorkflowRunIn(BaseModel):
+    booking_id: int | None = None
+    variables: dict | None = None
+    correlation_id: str | None = Field(default=None, max_length=64)
+
+
+class UnitWorkflowRunOut(BaseModel):
+    unit_id: int
+    unit_name: str
+    workflow: str
+    label: str
+    capability_key: str
+    device_id: int
+    device_name: str
+    external_id: str
+    command_id: int
+    command_type: str
+    status: str
+    accepted: bool
+    error_message: str | None = None
+    correlation_id: str
+    trigger_source: str
+    booking_id: int | None = None
+
+
+class FacilityMetricOut(BaseModel):
+    capability_key: str
+    metric_type: str
+    device_id: int
+    device_name: str
+    value: str | None = None
+    temperature_c: float | None = None
+    energy_w: float | None = None
+    online: bool = False
+    updated_at: datetime | None = None
+
+
+class FacilityInterlockOut(BaseModel):
+    capability_key: str
+    name: str
+    device_id: int
+    device_name: str
+    value: str | None = None
+    online: bool = False
+
+
+class FacilityAlertOut(BaseModel):
+    id: int
+    alert_type: str
+    severity: str
+    title: str
+    last_seen_at: datetime | None = None
+
+
+class FacilityActionOut(BaseModel):
+    action: str
+    label: str
+    capability_key: str
+    available: bool
+    needs_confirmation: bool = True
+
+
+class FacilityOut(BaseModel):
+    facility_key: str
+    display_name: str
+    machine: str | None = None
+    health: str
+    state: str | None = None
+    mode: str | None = None
+    supervision_state: str | None = None
+    alarm_active: bool | None = None
+    devices_available: bool | None = None
+    device_count: int = 0
+    metrics: list[FacilityMetricOut] = Field(default_factory=list)
+    interlocks: list[FacilityInterlockOut] = Field(default_factory=list)
+    open_alerts: list[FacilityAlertOut] = Field(default_factory=list)
+    actions: list[FacilityActionOut] = Field(default_factory=list)
+
+
+class FacilityActionIn(BaseModel):
+    correlation_id: str | None = Field(default=None, max_length=64)
+
+
+class FacilityActionResultOut(BaseModel):
+    facility_key: str
+    display_name: str
+    action: str
+    label: str
+    capability_key: str
+    device_id: int
+    command_id: int
+    status: str
+    accepted: bool
+    error_message: str | None = None
+    correlation_id: str
+
+
+class LinkEventIn(BaseModel):
+    """`villacore.event.v1` envelope pushed by Home Assistant.
+
+    Deliberately permissive: Home Assistant templates the body, so unknown or
+    missing optional fields must degrade instead of returning 422 and losing the
+    event.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    schema_version: str | None = Field(default=None, alias="schema")
+    event: str | None = None
+    entity_id: str | None = None
+    zone: str | None = None
+    kind: str | None = None
+    severity: str | None = None
+    reason: str | None = None
+    correlation_id: str | None = None
+    booking_ref: str | None = None
+    site: str | None = None
+    occurred_at: str | None = None
+    state: dict | None = None
+
+
+class LinkEventOut(BaseModel):
+    accepted: bool
+    reason: str | None = None
+    event: str | None = None
+    event_id: int | None = None
+    device_id: int | None = None
+    unit_id: int | None = None
+    zone: str | None = None
+    alert_id: int | None = None
+    resolved_alerts: int = 0
+    echo_of_portal_command: bool = False
+    correlation_id: str | None = None
+
+
+class LinkReconcileOut(BaseModel):
+    provider_name: str
+    imported_devices: int
+    updated_devices: int
+    polled_devices: int
+    updated_states: int
+    events_emitted: int
+    errors: int
+    reconciled_at: datetime
+
+
+class UtilityCostRowOut(BaseModel):
+    scope: str
+    unit_id: int | None = None
+    facility_key: str | None = None
+    label: str
+    metric: str
+    quantity: float
+    unit_of_measure: str
+    unit_price: float
+    amount: float
+    # True when derived from runtime and rated power instead of a real meter.
+    estimated: bool = False
+    estimate_basis: str | None = None
+    device_count: int = 0
+
+
+class UtilityCostReportOut(BaseModel):
+    year: int
+    month: int
+    period_end: date
+    energy_price_eur_kwh: float
+    # "villacore" when the tariff comes from Home Assistant, "default" otherwise.
+    energy_price_source: str
+    rows: list[UtilityCostRowOut] = Field(default_factory=list)
+    total_amount: float = 0.0
+    has_estimates: bool = False
+
+
+class UtilityCostPostOut(BaseModel):
+    year: int
+    month: int
+    period_end: date
+    created: int
+    updated: int
+    total_amount: float
+    has_estimates: bool
+    requested_by: str | None = None
 
 
 class ProviderWebhookIn(BaseModel):

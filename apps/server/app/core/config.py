@@ -137,6 +137,29 @@ class Settings:
     def home_assistant_unit_hints(self) -> str:
         return os.getenv("HOME_ASSISTANT_UNIT_HINTS", "")
 
+    # --- VillaCore Link settings (read at access time on purpose) ---
+
+    @property
+    def smart_ingest_token(self) -> str:
+        """Shared secret VillaCore sends on the provider webhook.
+
+        Empty means inbound push is disabled: the webhook then only accepts
+        authenticated portal users, as it did before the link existed.
+        """
+        return os.getenv("SMART_INGEST_TOKEN", "").strip()
+
+    @property
+    def smart_poll_interval_seconds(self) -> int:
+        """Reconciliation loop period. ``0`` (default) keeps the loop off."""
+        try:
+            return max(0, int(os.getenv("SMART_POLL_INTERVAL_SECONDS", "0")))
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def villacore_site_id(self) -> str:
+        return os.getenv("VILLACORE_SITE_ID", "dev").strip() or "dev"
+
     # --- Safety checks ---
 
     def validate_production_safety(self) -> None:

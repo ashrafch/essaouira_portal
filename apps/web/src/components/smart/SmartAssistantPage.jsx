@@ -14,6 +14,7 @@ import FilterBar from "../dashboard/FilterBar";
 import ActivityCard from "../dashboard/ActivityCard";
 import ReadinessBadge from "./ReadinessBadge";
 import ReadinessScoreCard from "./ReadinessScoreCard";
+import UnitWorkflowPanel from "./UnitWorkflowPanel";
 import {
   acknowledgeSmartAlert,
   getProperties,
@@ -394,6 +395,33 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* Execute the arrival/departure on the building itself,
+                        with the booking context attached. */}
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--color-border)",
+                        paddingTop: 10,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: 12,
+                          color: "var(--color-text-muted)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Esegui su VillaCore
+                      </p>
+                      <UnitWorkflowPanel
+                        unitId={item.booking.unit_id}
+                        bookingId={item.booking.id}
+                        compact
+                        onDispatched={loadData}
+                      />
                     </div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

@@ -14,7 +14,7 @@ Stack:
 - `apps/web` — React 19 + Vite 7, React Router 7, plain-CSS design token system with dark mode, lazy-loaded routes
 - Docker Compose for dev / LAN / production (see `docs/DEPLOYMENT.md`)
 - Optional ops profile: Prometheus, Grafana, scheduled pg_dump backups
-- Smart providers: mock (default) and Home Assistant adapter; hardware not yet deployed — everything must stay testable in simulation
+- Smart providers: mock (default), Home Assistant adapter, and **VillaCore** (the sibling building platform — see `docs/VILLACORE_LINK.md`); hardware not yet deployed — everything must stay testable in simulation
 
 Treat the portal as a working product with real value, never as a prototype to replace.
 
@@ -39,7 +39,9 @@ apps/server/app/
 │   ├── analytics/          # KPIs, month summary/PnL, alerts-today
 │   ├── operations/         # staff tasks/members/defaults, cost items, maintenance, pricing defaults
 │   ├── revenue/            # rate calendar, recommendations, seasons, lead-time, iCal channels, comp-set, pricing alerts
-│   └── smart_building/     # devices, telemetry, alerts, scenes/rules, readiness, assistants, providers/
+│   └── smart_building/     # router/schemas/taxonomy + services/ (one module per area,
+│                           # composed as mixins by SmartBuildingService) + providers/
+│                           # (mock, home_assistant, villacore + villacore_profile.yaml)
 └── alembic/                # migrations — complete chain, source of truth in production
 ```
 
@@ -66,6 +68,8 @@ Rules: pages call `services/api.js` (never raw `fetch`); colors/spacing/radii co
 - **Smart Building owns**: device inventory/state/telemetry, smart alerts, scenes/rules, readiness and operations read models.
 - Smart Building **reacts** to PMS events; it never re-implements PMS rules or creates a parallel booking state machine.
 - The PMS `Unit` is the canonical unit entity everywhere.
+- **VillaCore owns physical truth and execution**: plant state machines, interlocks, timers, safety automations. The portal sends *requests* through capabilities and renders refusals verbatim; it never bypasses an interlock and never re-implements a state machine. Shared facilities are read-heavy on purpose: only `safe_off` and `alarm_reset` are exposed.
+- **Consumption becomes money only in the portal.** Telemetry stays telemetry in VillaCore; cost items, allocation and P&L are the portal's.
 
 ---
 
@@ -177,9 +181,9 @@ Use delegation when the runtime supports it and the task splits into bounded, no
 
 Consult `docs/GAP_ANALYSIS_AND_ROADMAP.md` for the maintained list. Headlines:
 
-1. **Hardening**: off-site backups; split `smart_building/service.py` into submodules; retire dev-only schema reconcilers.
+1. **Hardening**: off-site backups; retire dev-only schema reconcilers. (`smart_building/service.py` is now a thin facade over `services/*` mixins.)
 2. **PMS value**: iCal channel sync (double-booking prevention), guest message automation on booking lifecycle.
-3. **UI completion**: decompose `Staff.jsx` / `Bookings.jsx` onto the design system; consolidate modals; Vitest baseline.
+3. **UI completion**: decompose `Staff.jsx` / `Bookings.jsx` / `UnitTimeline.jsx` / `SmartDashboard.jsx` onto the design system; consolidate modals; extend the Vitest baseline.
 4. **Product gate** (only if sold as SaaS): tenant isolation for legacy tables, i18n, payments, public booking page.
 
 When priorities conflict with a user request, the user request wins — but flag the conflict explicitly.

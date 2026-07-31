@@ -7,7 +7,6 @@ from app.db import get_db
 from app.domains.smart_building.schemas import (
     AlertCreate,
     AlertOut,
-    AssistantQuickActionOut,
     AutomationExecutionOut,
     AutomationRuleCreate,
     AutomationRuleOut,
@@ -24,6 +23,13 @@ from app.domains.smart_building.schemas import (
     DeviceStateOut,
     DeviceStateUpdate,
     DeviceUpdate,
+    FacilityActionIn,
+    FacilityActionResultOut,
+    FacilityOut,
+    LinkEventIn,
+    LinkEventOut,
+    LinkReconcileOut,
+    LinkStatusOut,
     ProviderDebugOut,
     ProviderConnectionCreateIn,
     ProviderConnectionOut,
@@ -50,11 +56,18 @@ from app.domains.smart_building.schemas import (
     SmartOperationsOut,
     SmartOperationsUnitOut,
     TelemetryInsightOut,
+    UnitCapabilitiesOut,
     UnitReadinessOut,
+    UnitWorkflowRunIn,
+    UnitWorkflowRunOut,
     SmartUnitDetailOut,
     SmartUnitTimelineOut,
     SmartOverviewOut,
     UnitDeviceHealthOut,
+    UtilityCostPostOut,
+    UtilityCostReportOut,
+    ZoneMapEntryOut,
+    ZoneMapIn,
 )
 from app.domains.smart_building.service import SmartBuildingService
 
@@ -249,6 +262,148 @@ def get_operations_activity(
         property_id=property_id,
         unit_id=unit_id,
         severity=severity,
+    )
+
+
+@router.get("/link/status", response_model=LinkStatusOut)
+def get_link_status(
+    request: Request,
+    db: Session = Depends(get_db),
+    provider: str | None = Query(default=None),
+):
+    """Building-link health, and the entities the portal cannot classify yet."""
+    return _service(request, db).link_status(provider)
+
+
+@router.post("/link/events", response_model=LinkEventOut)
+def ingest_link_event(
+    body: LinkEventIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Receive a VillaCore event.
+
+    Authenticated either by portal JWT or by the ``X-Smart-Ingest-Token``
+    shared secret, because Home Assistant cannot hold a user session.
+    """
+    username = getattr(request.state, "user", None)
+    payload = body.model_dump(by_alias=True, exclude_none=True)
+    return _service(request, db).ingest_link_event(payload, username=username)
+
+
+@router.post("/link/reconcile", response_model=LinkReconcileOut)
+def reconcile_link(
+    request: Request,
+    db: Session = Depends(get_db),
+    provider: str | None = Query(default=None),
+):
+    """Re-import the catalog and re-read every state (missed-push safety net)."""
+    return _service(request, db).reconcile_link(provider)
+
+
+@router.get("/link/zone-map", response_model=dict[str, ZoneMapEntryOut])
+def get_link_zone_map(
+    request: Request,
+    db: Session = Depends(get_db),
+    property_id: int | None = Query(default=None),
+):
+    return _service(request, db).get_zone_map(property_id=property_id)
+
+
+@router.put("/provider-connections/{connection_id}/zone-map", response_model=ProviderConnectionOut)
+def update_link_zone_map(
+    connection_id: int,
+    payload: ZoneMapIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = getattr(request.state, "user", None) or "system"
+    zone_map = {
+        key: value.model_dump(exclude_none=True) for key, value in payload.zone_map.items()
+    }
+    return _service(request, db).set_zone_map(
+        connection_id=connection_id, zone_map=zone_map, requested_by=username
+    )
+
+
+@router.get("/utility-costs", response_model=UtilityCostReportOut)
+def get_utility_cost_report(
+    request: Request,
+    db: Session = Depends(get_db),
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+):
+    """Consumption and cost per unit and shared plant for one month."""
+    return _service(request, db).utility_cost_report(year=year, month=month)
+
+
+@router.post("/utility-costs/post", response_model=UtilityCostPostOut)
+def post_utility_costs(
+    request: Request,
+    db: Session = Depends(get_db),
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+):
+    """Write the month's utility costs as cost items (idempotent)."""
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).post_utility_costs(
+        year=year, month=month, requested_by=username
+    )
+
+
+@router.get("/facilities", response_model=list[FacilityOut])
+def list_facilities(request: Request, db: Session = Depends(get_db)):
+    """Shared plants (pool, irrigation, gate...) as an asset view."""
+    return _service(request, db).list_facilities()
+
+
+@router.get("/facilities/{facility_key}", response_model=FacilityOut)
+def get_facility(facility_key: str, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).get_facility(facility_key)
+
+
+@router.post(
+    "/facilities/{facility_key}/actions/{action}", response_model=FacilityActionResultOut
+)
+def run_facility_action(
+    facility_key: str,
+    action: str,
+    payload: FacilityActionIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Safe-off or alarm rearm. Everything else stays in Home Assistant."""
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).run_facility_action(
+        facility_key=facility_key,
+        action=action,
+        requested_by=username,
+        correlation_id=payload.correlation_id,
+    )
+
+
+@router.get("/units/{unit_id}/capabilities", response_model=UnitCapabilitiesOut)
+def get_unit_capabilities(unit_id: int, request: Request, db: Session = Depends(get_db)):
+    return _service(request, db).list_unit_capabilities(unit_id)
+
+
+@router.post("/units/{unit_id}/workflow/{workflow}", response_model=UnitWorkflowRunOut)
+def run_unit_workflow(
+    unit_id: int,
+    workflow: str,
+    payload: UnitWorkflowRunIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Ask the building to execute a unit workflow (check-in, check-out...)."""
+    username = getattr(request.state, "user", None) or "system"
+    return _service(request, db).run_unit_workflow(
+        unit_id=unit_id,
+        workflow=workflow,
+        booking_id=payload.booking_id,
+        variables=payload.variables,
+        requested_by=username,
+        correlation_id=payload.correlation_id,
     )
 
 

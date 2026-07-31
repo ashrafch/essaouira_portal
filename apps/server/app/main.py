@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,7 @@ from app.domains.inventory.router import router as inventory_router
 from app.domains.operations.router import router as operations_router
 from app.domains.platform.router import router as platform_router
 from app.domains.revenue.router import router as revenue_router
+from app.domains.smart_building.reconciler import start_reconciliation
 from app.domains.smart_building.router import router as smart_building_router
 from app.domains.smart_building.setup_router import router as setup_router
 
@@ -28,7 +30,15 @@ setup_logging()
 async def lifespan(_: FastAPI):
     settings.validate_production_safety()
     initialize_schema_and_seed()
-    yield
+    # Opt-in safety net for the building link (SMART_POLL_INTERVAL_SECONDS).
+    reconciliation = start_reconciliation()
+    try:
+        yield
+    finally:
+        if reconciliation is not None:
+            reconciliation.cancel()
+            with suppress(asyncio.CancelledError):
+                await reconciliation
 
 
 app = FastAPI(title="Portale Essaouira API", lifespan=lifespan)

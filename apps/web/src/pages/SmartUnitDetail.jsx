@@ -27,6 +27,7 @@ import EnvironmentSummaryCard from "../components/smart/EnvironmentSummaryCard";
 import TelemetryInsightCard from "../components/smart/TelemetryInsightCard";
 import TimelineItem from "../components/smart/TimelineItem";
 import UnitReadinessPanel from "../components/smart/UnitReadinessPanel";
+import UnitWorkflowPanel from "../components/smart/UnitWorkflowPanel";
 import useAutoRefresh from "../hooks/useAutoRefresh";
 import {
   getSmartUnitDetail,
@@ -272,6 +273,10 @@ function SmartUnitDetail() {
         <StatCard label="Warning" value={healthSummary?.warning_devices ?? summary.warning_devices ?? 0} tone="warning" />
         <StatCard label="Critical" value={healthSummary?.critical_devices ?? summary.critical_devices ?? 0} tone="danger" />
         <StatCard label="Alert aperti" value={summary.open_alerts} icon={<AlertTriangle size={15} />} tone="warning" />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <UnitWorkflowPanel unitId={Number(unitId)} />
       </div>
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", marginBottom: 12 }}>

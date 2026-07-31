@@ -56,17 +56,20 @@ Key toggles:
 
 - `APP_ENV=production` — fail-fast on weak secrets
 - `RUN_MIGRATIONS=true` — apply Alembic migrations at container startup (production default)
-- `SMART_PROVIDER_MODE=mock|home_assistant` — smart provider selection
-- `HOME_ASSISTANT_URL` / `HOME_ASSISTANT_TOKEN` — HA lab connection (see docs/DEPLOYMENT.md §6)
+- `SMART_PROVIDER_MODE=mock|home_assistant|villacore` — smart provider selection
+- `HOME_ASSISTANT_URL` / `HOME_ASSISTANT_TOKEN` — Home Assistant connection (see docs/DEPLOYMENT.md §6)
+- `SMART_INGEST_TOKEN` / `SMART_POLL_INTERVAL_SECONDS` — VillaCore Link push + reconciliation (see [docs/VILLACORE_LINK.md](docs/VILLACORE_LINK.md))
 
 ## API surface
 
-Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/revenue/*` (rate calendar, recommendations, seasons, lead-time rules, iCal channels, comp-set, pricing alerts), `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs).
+Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth`, `/users`, `/units`, `/properties`, `/bookings`, `/analytics/*`, `/staff-*`, `/cost-items`, `/maintenance`, `/revenue/*` (rate calendar, recommendations, seasons, lead-time rules, iCal channels, comp-set, pricing alerts), `/setup/*`, `/smart/*` (devices, health, telemetry, readiness, operations, assistants, scenario packs, unit capabilities & workflows, shared facilities, utility costs, `/smart/link/*` for the VillaCore Link).
 
 ## Documentation
 
 - [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) — index by audience
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — dev / LAN / production deployment
+- [docs/VILLACORE_LINK.md](docs/VILLACORE_LINK.md) — contract with the VillaCore building platform (setup: `scripts/link-villacore.ps1` then `python scripts/get_villacore_token.py`)
+- [docs/VILLACORE_PROMPTS.md](docs/VILLACORE_PROMPTS.md) — ready-to-paste prompts for the VillaCore repository
 - [docs/GAP_ANALYSIS_AND_ROADMAP.md](docs/GAP_ANALYSIS_AND_ROADMAP.md) — current gaps and roadmap
 - [docs/PROJECT_STRUCTURE_GUIDE.md](docs/PROJECT_STRUCTURE_GUIDE.md) — where to change what
 - [docs/TECHNICAL_OPERATOR_MANUAL.md](docs/TECHNICAL_OPERATOR_MANUAL.md) — run & troubleshoot

@@ -19,13 +19,25 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
     supports_webhook_ingest = True
     supports_command_execution = True
 
+    # Mirrors the shape a VillaCore site exposes — units with a workflow and a
+    # shared plant with a state machine — so capabilities, unit workflows and
+    # facility actions stay testable without any Home Assistant instance.
     _mock_catalog = [
-        {"external_id": "mock-unit-a-temp-1", "name": "Unit A Temp Sensor", "category": "temperature_humidity_sensor", "zone_name": "Unit A - Living", "unit_hint": "unit a"},
-        {"external_id": "mock-unit-a-door-1", "name": "Unit A Door Sensor", "category": "door_window_sensor", "zone_name": "Unit A - Entry", "unit_hint": "unit a"},
-        {"external_id": "mock-unit-b-motion-1", "name": "Unit B Motion Sensor", "category": "motion_sensor", "zone_name": "Unit B - Hall", "unit_hint": "unit b"},
-        {"external_id": "mock-unit-c-leak-1", "name": "Unit C Leak Sensor", "category": "leak_sensor", "zone_name": "Unit C - Bathroom", "unit_hint": "unit c"},
-        {"external_id": "mock-pool-relay-1", "name": "Pool Pump Relay", "category": "smart_relay", "zone_name": "Pool Plant Room", "unit_hint": None},
-        {"external_id": "mock-garden-meter-1", "name": "Garden Energy Meter", "category": "energy_meter", "zone_name": "Garden", "unit_hint": None},
+        {"external_id": "mock-unit-a-temp-1", "name": "Unit A Temp Sensor", "category": "temperature_humidity_sensor", "zone_name": "Unit A - Living", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "metric.temperature", "metric_type": "temperature"},
+        {"external_id": "mock-unit-a-door-1", "name": "Unit A Door Sensor", "category": "door_window_sensor", "zone_name": "Unit A - Entry", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "contact.entry_door"},
+        {"external_id": "mock-unit-a-checkin", "name": "Unit A Check-in", "category": "unit_workflow", "zone_name": "Unit A", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "workflow.checkin"},
+        {"external_id": "mock-unit-a-checkout", "name": "Unit A Check-out", "category": "unit_workflow", "zone_name": "Unit A", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "workflow.checkout"},
+        {"external_id": "mock-unit-a-ready", "name": "Unit A Mark Ready", "category": "unit_workflow", "zone_name": "Unit A", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "workflow.mark_ready"},
+        {"external_id": "mock-unit-a-guest-mode", "name": "Unit A Guest Mode", "category": "guest_mode_flag", "zone_name": "Unit A", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "flag.guest_mode"},
+        {"external_id": "mock-unit-a-stay", "name": "Unit A Stay Status", "category": "stay_status", "zone_name": "Unit A", "unit_hint": "unit a", "zone_key": "a1", "capability_key": "status.stay"},
+        {"external_id": "mock-unit-b-motion-1", "name": "Unit B Motion Sensor", "category": "motion_sensor", "zone_name": "Unit B - Hall", "unit_hint": "unit b", "zone_key": "a2", "capability_key": "sensor.motion"},
+        {"external_id": "mock-unit-c-leak-1", "name": "Unit C Leak Sensor", "category": "leak_sensor", "zone_name": "Unit C - Bathroom", "unit_hint": "unit c", "zone_key": "a3", "capability_key": "sensor.leak"},
+        {"external_id": "mock-pool-relay-1", "name": "Pool Pump Relay", "category": "smart_relay", "zone_name": "Pool Plant Room", "unit_hint": None, "zone_key": "pool", "facility_key": "pool", "capability_key": "facility.request"},
+        {"external_id": "mock-pool-state", "name": "Pool Filtration State", "category": "facility_state", "zone_name": "Pool Plant Room", "unit_hint": None, "zone_key": "pool", "facility_key": "pool", "capability_key": "facility.state"},
+        {"external_id": "mock-pool-alarm", "name": "Pool Alarm", "category": "facility_alarm", "zone_name": "Pool Plant Room", "unit_hint": None, "zone_key": "pool", "facility_key": "pool", "capability_key": "facility.alarm"},
+        {"external_id": "mock-pool-safe-off", "name": "Pool Safe Off", "category": "facility_control", "zone_name": "Pool Plant Room", "unit_hint": None, "zone_key": "pool", "facility_key": "pool", "capability_key": "facility.safe_off"},
+        {"external_id": "mock-pool-alarm-reset", "name": "Pool Alarm Reset", "category": "facility_control", "zone_name": "Pool Plant Room", "unit_hint": None, "zone_key": "pool", "facility_key": "pool", "capability_key": "facility.alarm_reset"},
+        {"external_id": "mock-garden-meter-1", "name": "Garden Energy Meter", "category": "energy_meter", "zone_name": "Garden", "unit_hint": None, "zone_key": "garden", "facility_key": "garden", "capability_key": "metric.energy", "metric_type": "energy"},
     ]
 
     def pull_state(self, external_id: str) -> ProviderStateSnapshot:
@@ -69,6 +81,10 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
                     health_status="healthy" if state.online else "degraded",
                     battery_level=state.raw_payload.get("battery_level") if state.raw_payload else None,
                     state=state,
+                    zone_key=d.get("zone_key"),
+                    capability_key=d.get("capability_key"),
+                    facility_key=d.get("facility_key"),
+                    metric_type=d.get("metric_type"),
                 )
             )
         return snapshots
@@ -157,6 +173,131 @@ class MockSmartDeviceProvider(SmartDeviceProvider):
                 provider_ref=provider_ref,
                 executed=False,
                 result_payload={"target": target, "note": "mock placeholder for future lock hardware"},
+            )
+
+        if command_type in {"device.script.run", "script_run"}:
+            variables = payload.get("variables")
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={
+                    "script": request.external_id,
+                    "variables": variables if isinstance(variables, dict) else {},
+                },
+            )
+
+        if command_type in {"device.scene.apply", "scene_apply"}:
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"scene": request.external_id},
+            )
+
+        if command_type in {"device.boolean.set_state", "boolean_set_state"}:
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"on", "off"}:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid boolean target",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"target": target},
+            )
+
+        if command_type in {"device.select.set_option", "select_set_option"}:
+            option = str(payload.get("option", "")).strip()
+            if not option:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Missing select option",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"option": option},
+            )
+
+        if command_type in {"device.cover.set_state", "cover_set_state"}:
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"open", "close", "stop"}:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid cover target",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"target": target},
+            )
+
+        if command_type in {"device.number.set_value", "number_set_value"}:
+            try:
+                value = float(payload.get("value"))
+            except (TypeError, ValueError):
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid numeric value",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"value": value},
+            )
+
+        if command_type in {"device.text.set_value", "text_set_value"}:
+            value = payload.get("value")
+            if not isinstance(value, str) or not value.strip():
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid text value",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"value": value.strip()},
+            )
+
+        if command_type in {"device.climate.set_power", "climate_set_power"}:
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"on", "off"}:
+                return ProviderCommandResult(
+                    accepted=False,
+                    lifecycle_status="failed",
+                    provider_ref=provider_ref,
+                    error_message="Invalid climate power target",
+                )
+            return ProviderCommandResult(
+                accepted=True,
+                lifecycle_status="executed",
+                provider_ref=provider_ref,
+                executed=True,
+                result_payload={"target": target},
             )
 
         return ProviderCommandResult(

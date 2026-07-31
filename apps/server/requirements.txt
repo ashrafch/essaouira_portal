@@ -6,3 +6,6 @@ pydantic==2.11.9
 PyJWT==2.10.1
 alembic==1.14.1
 prometheus-fastapi-instrumentator==7.1.0
+# Reads the VillaCore Link entity profile (providers/villacore_profile.yaml).
+# Already pulled in by uvicorn[standard]; declared because we import it directly.
+PyYAML==6.0.3

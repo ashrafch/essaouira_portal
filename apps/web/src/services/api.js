@@ -628,6 +628,64 @@ export function setupComplete() {
   return apiPost("/setup/complete", {});
 }
 
+/* --------- VILLACORE LINK --------- */
+
+// Health of the building link + entities the portal has not classified yet.
+export function getSmartLinkStatus(params = {}) {
+  return apiGet("/smart/link/status", params);
+}
+
+export function getSmartLinkZoneMap(params = {}) {
+  return apiGet("/smart/link/zone-map", params);
+}
+
+export function updateSmartLinkZoneMap(connectionId, zoneMap) {
+  return apiPut(`/smart/provider-connections/${connectionId}/zone-map`, {
+    zone_map: zoneMap,
+  });
+}
+
+// Re-import the catalog and re-read every state: the safety net for a missed push.
+export function reconcileSmartLink(provider) {
+  return apiPost(`/smart/link/reconcile${buildQuery({ provider })}`, {});
+}
+
+/* --------- SMART UNIT CAPABILITIES & WORKFLOWS --------- */
+
+export function getSmartUnitCapabilities(unitId) {
+  return apiGet(`/smart/units/${unitId}/capabilities`);
+}
+
+// Ask the building to run a unit workflow (check-in, check-out, mark ready...).
+export function runSmartUnitWorkflow(unitId, workflow, payload = {}) {
+  return apiPost(`/smart/units/${unitId}/workflow/${workflow}`, payload);
+}
+
+/* --------- SHARED FACILITIES (pool, irrigation, gate...) --------- */
+
+export function getSmartFacilities() {
+  return apiGet("/smart/facilities");
+}
+
+export function getSmartFacility(facilityKey) {
+  return apiGet(`/smart/facilities/${facilityKey}`);
+}
+
+// Only safe-off and alarm rearm: every other control stays in Home Assistant.
+export function runSmartFacilityAction(facilityKey, action, payload = {}) {
+  return apiPost(`/smart/facilities/${facilityKey}/actions/${action}`, payload);
+}
+
+/* --------- UTILITY COSTS FROM TELEMETRY --------- */
+
+export function getSmartUtilityCosts(year, month) {
+  return apiGet("/smart/utility-costs", { year, month });
+}
+
+export function postSmartUtilityCosts(year, month) {
+  return apiPost(`/smart/utility-costs/post${buildQuery({ year, month })}`, {});
+}
+
 /* --------- DASHBOARD & REPORTS --------- */
 
 // Single lightweight call powering sidebar badges + the mission-control home.

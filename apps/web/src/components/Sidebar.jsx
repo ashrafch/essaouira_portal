@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Cpu,
+  Droplets,
   Eye,
   Gauge,
   Home,
@@ -30,6 +31,7 @@ import {
   Wrench,
   ArrowRightLeft,
   Workflow,
+  Waypoints,
 } from "lucide-react";
 import { canAccessRoute, getRole } from "../config/rbac";
 import { getDashboardSummary } from "../services/api";
@@ -153,6 +155,7 @@ function Sidebar({ className = "", onNavigate = null }) {
         { to: "/smart-dashboard", label: "Smart dashboard", badge: null, routeKey: "smartDashboard", icon: Gauge },
         { to: "/smart-operations", label: "Smart operations", badge: null, routeKey: "smartOperations", icon: Activity },
         { to: "/smart-overview", label: "Smart overview", badge: null, routeKey: "smartOverview", icon: Eye },
+        { to: "/smart-facilities", label: "Impianti e aree comuni", badge: null, routeKey: "smartFacilities", icon: Droplets },
         { to: "/smart-devices", label: "Dispositivi", badge: null, routeKey: "smartDevices", icon: Router },
         { to: "/smart-alerts", label: "Alert smart", badge: null, routeKey: "smartAlerts", icon: Siren },
         { to: "/smart-automation", label: "Automazioni smart", badge: null, routeKey: "smartAutomation", icon: Workflow },
@@ -165,6 +168,7 @@ function Sidebar({ className = "", onNavigate = null }) {
       title: "Admin",
       icon: Settings,
       items: [
+        { to: "/smart-link", label: "Link VillaCore", badge: null, routeKey: "smartLink", icon: Waypoints },
         { to: "/setup", label: "Setup Wizard", badge: null, routeKey: "setupWizard", icon: Wand2 },
         { to: "/admin-control", label: "Admin & Config", badge: null, routeKey: "adminControl", icon: ShieldCheck },
       ],

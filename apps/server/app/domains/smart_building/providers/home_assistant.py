@@ -133,6 +133,49 @@ class HomeAssistantProvider(SmartDeviceProvider):
             if target not in {"lock", "unlock"}:
                 raise RuntimeError("Invalid lock target")
             return "lock", "lock" if target == "lock" else "unlock", {"entity_id": entity_id}
+        if command_type == "device.climate.set_power":
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"on", "off"}:
+                raise RuntimeError("Invalid climate power target")
+            return "climate", f"turn_{target}", {"entity_id": entity_id}
+        if command_type == "device.cover.set_state":
+            target = str(payload.get("target", "")).strip().lower()
+            service = {"open": "open_cover", "close": "close_cover", "stop": "stop_cover"}.get(target)
+            if service is None:
+                raise RuntimeError("Invalid cover target")
+            return "cover", service, {"entity_id": entity_id}
+        if command_type == "device.script.run":
+            # Variables become script `fields`, which is how VillaCore receives
+            # booking context (booking_ref, guests, correlation_id...).
+            variables = payload.get("variables")
+            service_payload: dict[str, Any] = {"entity_id": entity_id}
+            if isinstance(variables, dict) and variables:
+                service_payload["variables"] = variables
+            return "script", "turn_on", service_payload
+        if command_type == "device.scene.apply":
+            return "scene", "turn_on", {"entity_id": entity_id}
+        if command_type == "device.select.set_option":
+            option = payload.get("option")
+            if not isinstance(option, str) or not option.strip():
+                raise RuntimeError("Missing select option")
+            service_domain = domain if domain in {"input_select", "select"} else "input_select"
+            return service_domain, "select_option", {"entity_id": entity_id, "option": option}
+        if command_type == "device.number.set_value":
+            value = payload.get("value")
+            if value is None:
+                raise RuntimeError("Missing numeric value")
+            service_domain = domain if domain in {"input_number", "number"} else "input_number"
+            return service_domain, "set_value", {"entity_id": entity_id, "value": float(value)}
+        if command_type == "device.text.set_value":
+            value = payload.get("value")
+            if not isinstance(value, str):
+                raise RuntimeError("Missing text value")
+            return "input_text", "set_value", {"entity_id": entity_id, "value": value}
+        if command_type == "device.boolean.set_state":
+            target = str(payload.get("target", "")).strip().lower()
+            if target not in {"on", "off"}:
+                raise RuntimeError("Invalid boolean target")
+            return "input_boolean", f"turn_{target}", {"entity_id": entity_id}
         raise RuntimeError(f"Unsupported command type '{command_type}' for Home Assistant provider")
 
     def pull_state(self, external_id: str) -> ProviderStateSnapshot:

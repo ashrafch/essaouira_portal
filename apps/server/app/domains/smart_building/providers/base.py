@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -33,6 +33,31 @@ class ProviderDeviceSnapshot:
     health_status: str = "unknown"
     battery_level: int | None = None
     state: ProviderStateSnapshot | None = None
+    # --- optional classification, filled by providers that understand the
+    # site's naming convention (VillaCore). Plain providers leave them unset
+    # and the portal keeps behaving as before.
+    zone_key: str | None = None
+    capability_key: str | None = None
+    facility_key: str | None = None
+    metric_type: str | None = None
+
+
+@dataclass
+class ProviderLinkStatus:
+    """Health of the connection between the portal and the provider."""
+
+    provider_name: str
+    configured: bool
+    reachable: bool
+    authenticated: bool
+    contract_version: str | None = None
+    manifest_present: bool = False
+    entity_count: int = 0
+    importable_count: int = 0
+    excluded_count: int = 0
+    unclassified: list[dict[str, Any]] = field(default_factory=list)
+    zones: list[dict[str, Any]] = field(default_factory=list)
+    error_message: str | None = None
 
 
 @dataclass
@@ -84,3 +109,12 @@ class SmartDeviceProvider:
 
     def execute_command(self, request: ProviderCommandRequest) -> ProviderCommandResult:
         raise NotImplementedError
+
+    def describe_link(self) -> ProviderLinkStatus:
+        """Report link health. Providers without a remote side report themselves."""
+        return ProviderLinkStatus(
+            provider_name=self.provider_name,
+            configured=True,
+            reachable=True,
+            authenticated=True,
+        )

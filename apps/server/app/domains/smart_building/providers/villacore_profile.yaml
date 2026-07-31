@@ -1,0 +1,470 @@
+# VillaCore Link — entity classification profile (data, not code).
+#
+# The portal never hardcodes "pool" or "a1". It classifies Home Assistant
+# entities through the rules below, so a new VillaCore milestone usually needs
+# nothing more than an entry here — and often nothing at all, because VillaCore
+# repeats the same naming shape for every plant (ADR 0007:
+# `<domain>.<zone>_<function>`).
+#
+# Resolution order, most authoritative first:
+#   1. the manifest published by VillaCore (sensor.portal_link_manifest)
+#   2. this profile
+#   3. naming inference, with an unknown zone becoming a generic facility
+#
+# Anything the portal could not classify is reported by GET /smart/link/drift
+# instead of being silently dropped.
+---
+schema_version: 1
+contract_version: villacore.link.v1
+
+# Entity domains imported as devices. Everything else is ignored.
+include_domains:
+  - light
+  - switch
+  - climate
+  - lock
+  - cover
+  - sensor
+  - binary_sensor
+  - input_boolean
+  - input_select
+  - input_number
+  - input_text
+  - input_datetime
+  - script
+  - scene
+  - timer
+  - number
+
+# Never imported: HA plumbing, VillaCore's own simulation helpers (they would
+# double every real device) and the link's own diagnostics entities.
+exclude:
+  domains:
+    - automation
+    - person
+    - zone
+    - sun
+    - tts
+    - update
+    - conversation
+    - todo
+    - assist_satellite
+    - device_tracker
+    - weather
+  entity_patterns:
+    - "*.villa_core_simulat*"
+    - "*_simulation_*"
+    - "*.portal_link_*"
+
+# Zone prefixes. `kind` decides where the entity lands in the portal:
+#   unit     -> bound to a PMS unit (bookings, readiness, assistants)
+#   facility -> shared plant (status, alarms, costs, maintenance)
+#   common   -> site-wide helpers, property scope only
+zones:
+  villa:
+    kind: unit
+    display_name: Villa
+  a1:
+    kind: unit
+    display_name: Appartamento A1
+  a2:
+    kind: unit
+    display_name: Appartamento A2
+  a3:
+    kind: unit
+    display_name: Appartamento A3
+  a4:
+    kind: unit
+    display_name: Appartamento A4
+  a5:
+    kind: unit
+    display_name: Appartamento A5
+  a6:
+    kind: unit
+    display_name: Appartamento A6
+  pool:
+    kind: facility
+    display_name: Piscina
+    machine: filtration
+    # Used to estimate energy when no kWh meter exists yet (VillaCore M8).
+    # Clearly reported as an estimate, never as a measurement.
+    rated_power_w: 750
+  garden:
+    kind: facility
+    display_name: Giardino e irrigazione
+    machine: irrigation
+    rated_power_w: 0
+  gate:
+    kind: facility
+    display_name: Cancello
+    machine: gate
+  outdoor:
+    kind: facility
+    display_name: Esterni e cancello
+    machine: gate
+  energy:
+    kind: facility
+    display_name: Energia
+    # Site metering: its entities describe *other* zones
+    # (`sensor.energy_a1_daily`), so the classifier extracts that subject zone
+    # and the portal attributes the reading to the right unit or plant.
+    subject_zones: true
+  plc:
+    kind: facility
+    display_name: PLC e sicurezza
+  villa_core:
+    kind: common
+    display_name: Sistema VillaCore
+
+# Capability rules, evaluated in order; the first match wins.
+#
+# `suffix` matches what follows the zone prefix in the entity id. Most rules
+# start with `*` on purpose: VillaCore interposes the machine name between zone
+# and function (`outdoor_gate_alarm_active` = zone `outdoor` + machine `gate` +
+# function `alarm_active`), so a leading wildcard is what makes one rule cover
+# every plant — present and future.
+#
+# `singleton: true` means "at most one per zone": if several entities match, the
+# portal keeps the first and reports the rest through /smart/link/drift.
+capabilities:
+  # --- unit workflows (VillaCore owns the safety conditions inside them) ---
+  - capability: workflow.checkin
+    domain: script
+    suffix: "*check_in"
+    singleton: true
+  - capability: workflow.checkout
+    domain: script
+    suffix: "*check_out"
+    singleton: true
+  - capability: workflow.mark_ready
+    domain: script
+    suffix: "*mark_ready"
+    singleton: true
+  - capability: workflow.guest_mode_on
+    domain: script
+    suffix: "*enable_guest_mode"
+    singleton: true
+  - capability: workflow.guest_mode_off
+    domain: script
+    suffix: "*disable_guest_mode"
+    singleton: true
+  - capability: workflow.climate_safe_off
+    domain: script
+    suffix: "*climate_safe_off"
+    singleton: true
+  - capability: workflow.lights_off
+    domain: script
+    suffix: "*lights_all_off"
+    singleton: true
+
+  # --- site-wide helpers (zone kind `common`) ---
+  - capability: site.mode
+    domain: input_select
+    suffix: mode
+    singleton: true
+  - capability: site.set_mode
+    domain: script
+    suffix: set_mode_*
+  - capability: flag.occupancy_override
+    domain: input_boolean
+    suffix: "*occupancy_override"
+    singleton: true
+  - capability: sensor.occupancy
+    domain: binary_sensor
+    suffix: occupied
+    singleton: true
+  - capability: flag.maintenance_active
+    domain: binary_sensor
+    suffix: maintenance_active
+    singleton: true
+  - capability: flag.presence_lighting
+    domain: input_boolean
+    suffix: "*presence_lighting_enabled"
+    singleton: true
+
+  # --- unit status and flags ---
+  - capability: status.stay
+    domain: input_select
+    suffix: "*stay_status"
+    singleton: true
+  - capability: status.housekeeping
+    domain: input_select
+    suffix: "*housekeeping"
+    singleton: true
+  - capability: flag.guest_mode
+    domain: input_boolean
+    suffix: "*guest_mode"
+    singleton: true
+  - capability: flag.maintenance_lock
+    domain: input_boolean
+    suffix: "*maintenance_lock"
+    singleton: true
+  - capability: status.last_check_in
+    domain: input_datetime
+    suffix: "*last_check_in"
+    singleton: true
+  - capability: status.last_check_out
+    domain: input_datetime
+    suffix: "*last_check_out"
+    singleton: true
+  - capability: status.booking_ref
+    domain: input_text
+    suffix: "*booking_ref"
+    singleton: true
+
+  # --- availability and alarms (both units and facilities) ---
+  - capability: sensor.availability
+    domain: binary_sensor
+    suffix: "*devices_available"
+    singleton: true
+  - capability: sensor.availability
+    domain: binary_sensor
+    suffix: "*data_available"
+    singleton: true
+  - capability: facility.alarm
+    domain: binary_sensor
+    suffix: "*alarm_active"
+    singleton: true
+  - capability: facility.alarm
+    domain: binary_sensor
+    suffix: "*anomaly_active"
+    singleton: true
+
+  # --- facility state machine (pool M5, garden M6, gate M7, ... same shape) ---
+  - capability: facility.state
+    domain: sensor
+    suffix: "*_state"
+    singleton: true
+  - capability: facility.supervision
+    domain: input_select
+    suffix: "*supervision_state"
+    singleton: true
+  - capability: facility.mode
+    domain: input_select
+    suffix: "*_mode"
+    singleton: true
+  - capability: facility.alarm_reset
+    domain: script
+    suffix: "*alarm_reset"
+    singleton: true
+  - capability: facility.safe_off
+    domain: script
+    suffix: "*safe_off"
+    singleton: true
+  - capability: facility.zone_start
+    domain: script
+    suffix: "*start_zone*"
+  - capability: facility.run_all
+    domain: script
+    suffix: "*run_all_zones"
+    singleton: true
+  - capability: facility.open
+    domain: script
+    suffix: "*_open"
+  - capability: facility.close
+    domain: script
+    suffix: "*_close"
+  - capability: facility.lights_off
+    domain: script
+    suffix: "*lights_off"
+    singleton: true
+  - capability: facility.start
+    domain: script
+    suffix: "*_start"
+  - capability: facility.stop
+    domain: script
+    suffix: "*_stop"
+  - capability: facility.request
+    domain: switch
+    suffix: "*_request"
+  - capability: facility.zone
+    domain: switch
+    suffix: "*zone_*"
+  - capability: facility.timer
+    domain: timer
+    suffix: "*"
+
+  # --- facility interlock feedback (read-only, VillaCore owns the logic) ---
+  - capability: interlock.pump_running
+    domain: binary_sensor
+    suffix: "*pump_running"
+  - capability: interlock.motor_running
+    domain: binary_sensor
+    suffix: "*motor_running"
+  - capability: interlock.flow
+    domain: binary_sensor
+    suffix: "*flow"
+  - capability: interlock.thermal_trip
+    domain: binary_sensor
+    suffix: "*thermal_trip"
+  - capability: interlock.local_consent
+    domain: binary_sensor
+    suffix: "*local_consent"
+  - capability: interlock.master_valve
+    domain: binary_sensor
+    suffix: "*master_valve_open"
+  - capability: interlock.rain
+    domain: binary_sensor
+    suffix: "*rain"
+  - capability: interlock.obstacle
+    domain: binary_sensor
+    suffix: "*obstacle"
+  - capability: interlock.limit_open
+    domain: binary_sensor
+    suffix: "*open_limit"
+  - capability: interlock.limit_closed
+    domain: binary_sensor
+    suffix: "*closed_limit"
+  - capability: sensor.ambient_dark
+    domain: binary_sensor
+    suffix: "*ambient_dark"
+  - capability: sensor.openings_secure
+    domain: binary_sensor
+    suffix: "*openings_secure"
+
+  # --- programs and schedules (read-only in the portal: HA owns scheduling) ---
+  - capability: program.enabled
+    domain: input_boolean
+    suffix: "*_program_enabled"
+  - capability: program.start_time
+    domain: input_datetime
+    suffix: "*_start"
+  - capability: program.duration_minutes
+    domain: input_number
+    suffix: "*_minutes"
+
+  # --- deterministic safety layer (PLC) ---
+  # Not business metrics: these say whether the layer that owns the interlocks is
+  # itself healthy. The portal shows them and raises work when they degrade; it
+  # never tries to compensate for them.
+  - capability: diagnostic.heartbeat
+    domain: sensor
+    suffix: "*heartbeat"
+  - capability: diagnostic.watchdog
+    domain: sensor
+    suffix: "*watchdog_status"
+    singleton: true
+  - capability: diagnostic.watchdog
+    domain: binary_sensor
+    suffix: "*watchdog_ok"
+    singleton: true
+  - capability: diagnostic.watchdog_code
+    domain: sensor
+    suffix: "*watchdog_code"
+    singleton: true
+  - capability: diagnostic.contract_version
+    domain: sensor
+    suffix: "*contract_version"
+    singleton: true
+  - capability: diagnostic.contract_compatible
+    domain: binary_sensor
+    suffix: "*contract_compatible"
+    singleton: true
+  - capability: diagnostic.alarm_code
+    domain: sensor
+    suffix: "*alarm_bitmask"
+    singleton: true
+  - capability: interlock.healthy
+    domain: binary_sensor
+    suffix: "*_healthy"
+
+  # --- site metering (VillaCore M8) ---
+  # The tariff lives in Home Assistant, so the portal reads the operator's real
+  # price instead of keeping a second copy of it.
+  - capability: setting.energy_price
+    domain: input_number
+    suffix: "*price_per_kwh"
+    singleton: true
+  - capability: setting.anomaly_threshold
+    domain: input_number
+    suffix: "*anomaly_threshold"
+    singleton: true
+  - capability: metric.energy_daily
+    domain: sensor
+    suffix: "*_daily"
+    metric: energy
+  - capability: metric.energy_total
+    domain: sensor
+    suffix: "*_total"
+    metric: energy
+  - capability: metric.cost
+    domain: sensor
+    suffix: "*cost_today"
+    metric: cost
+  - capability: sensor.invalid_reading
+    domain: binary_sensor
+    suffix: "*invalid_reading"
+
+  # --- metrics -> telemetry ---
+  - capability: metric.temperature
+    domain: sensor
+    suffix: "*temperature"
+    metric: temperature
+  - capability: metric.humidity
+    domain: sensor
+    suffix: "*humidity"
+    metric: humidity
+  - capability: metric.power
+    domain: sensor
+    suffix: "*power"
+    metric: power
+  - capability: metric.energy
+    domain: sensor
+    suffix: "*energy"
+    metric: energy
+  - capability: metric.pressure
+    domain: sensor
+    suffix: "*pressure"
+    metric: pressure
+  - capability: metric.runtime
+    domain: sensor
+    suffix: "*runtime"
+    metric: runtime
+  - capability: metric.flow_rate
+    domain: sensor
+    suffix: "*flow_rate"
+    metric: flow_rate
+  - capability: metric.water_volume
+    domain: sensor
+    suffix: "*water_volume"
+    metric: water_volume
+  - capability: metric.soil_moisture
+    domain: sensor
+    suffix: "*soil_moisture*"
+    metric: moisture
+  - capability: metric.position
+    domain: sensor
+    suffix: "*position"
+    metric: position
+
+  # --- unit comfort and openings ---
+  - capability: climate.main
+    domain: climate
+    suffix: "*"
+  - capability: light.main
+    domain: light
+    suffix: "*"
+  - capability: cover.main
+    domain: cover
+    suffix: "*"
+  - capability: lock.entry
+    domain: lock
+    suffix: "*"
+  - capability: contact.entry_door
+    domain: binary_sensor
+    suffix: entry_door
+  - capability: contact.window
+    domain: binary_sensor
+    suffix: "*window"
+  - capability: sensor.leak
+    domain: binary_sensor
+    suffix: "*leak*"
+  - capability: sensor.motion
+    domain: binary_sensor
+    suffix: "*motion*"
+  - capability: sensor.presence
+    domain: binary_sensor
+    suffix: "*presence*"
+  - capability: scene.preset
+    domain: scene
+    suffix: "*"

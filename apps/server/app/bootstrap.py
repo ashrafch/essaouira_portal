@@ -69,6 +69,11 @@ def _reconcile_devices_table_schema() -> None:
         statements.append(
             "ALTER TABLE devices ADD COLUMN signal_strength INTEGER NULL"
         )
+    # VillaCore Link classification columns (migration 0015). Nullable, so an
+    # existing dev database keeps working before the first provider sync.
+    for column_name in ("zone_key", "capability_key", "facility_key"):
+        if column_name not in existing_cols:
+            statements.append(f"ALTER TABLE devices ADD COLUMN {column_name} VARCHAR(64) NULL")
 
     if not statements:
         return
@@ -76,7 +81,7 @@ def _reconcile_devices_table_schema() -> None:
     with engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
-    logger.warning("Reconciled devices table schema: added missing health columns.")
+    logger.warning("Reconciled devices table schema: added missing columns.")
 
 
 def _reconcile_units_table_schema() -> None:

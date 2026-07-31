@@ -112,7 +112,7 @@ docker compose --profile ops up -d
 
 - **db-backup**: `pg_dump | gzip` into the `db_backups` volume every `BACKUP_INTERVAL_HOURS` (default 24h), retention `BACKUP_RETENTION_DAYS` (default 7).
 - **Prometheus**: http://localhost:9090 (scrapes backend `/metrics`).
-- **Grafana**: http://localhost:3000 (`GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`).
+- **Grafana**: http://localhost:3001 (`GRAFANA_PORT`, `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`). Defaults to 3001 because VillaCore's own Grafana owns 3000 on a shared host.
 
 Restore a backup:
 
@@ -144,9 +144,61 @@ Schedule it hourly/daily via host cron or Windows Task Scheduler. The script exp
 
 ## 6. Home Assistant connection
 
-Set in `.env` (dev) or `.env.production`:
+### 6a. VillaCore (recommended): shared Docker network
 
+The VillaCore building platform runs its own stack. The portal joins it on a
+shared network and reaches Home Assistant by service name — no host IP, no
+published HA port, identical in dev and on Proxmox.
+
+```bash
+scripts/link-villacore.ps1            # Windows  (add -Token "<token>" to validate auth)
+scripts/link-villacore.sh             # Linux/WSL
 ```
+
+The script creates the `villacore_link` network, attaches the VillaCore Home
+Assistant container with the alias `home-assistant`, and verifies reachability
+from inside the network. It is idempotent and never restarts a container.
+
+Create the Home Assistant token without leaving the terminal (the password is
+read interactively, never stored or echoed; only the token is written):
+
+```bash
+python scripts/get_villacore_token.py                    # writes HOME_ASSISTANT_TOKEN into .env
+python scripts/get_villacore_token.py --also-server-env  # also apps/server/.env
+```
+
+Then in `.env` / `.env.production`:
+
+```ini
+SMART_PROVIDER_MODE=villacore
+HOME_ASSISTANT_URL=http://home-assistant:8123
+HOME_ASSISTANT_TOKEN=<long-lived token, never committed>
+SMART_INGEST_TOKEN=<shared secret, must match VillaCore's secrets.yaml>
+SMART_POLL_INTERVAL_SECONDS=300
+```
+
+Start with the link overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.villacore.yml up -d --build
+```
+
+Verify on the **Link VillaCore** page (owner only) or via
+`GET /smart/link/status`. Full contract: [VILLACORE_LINK.md](VILLACORE_LINK.md).
+
+Note: the runtime network attachment is lost if the VillaCore container is
+recreated — prompt **P1** in [VILLACORE_PROMPTS.md](VILLACORE_PROMPTS.md) makes it
+permanent on the VillaCore side.
+
+Port collisions on a host running both stacks: VillaCore's `mock-api` must move
+off `8000` (P1) and the portal's ops Grafana now defaults to `3001` since
+VillaCore's owns `3000`.
+
+### 6b. Generic Home Assistant
+
+For an instance that is not VillaCore:
+
+```ini
 SMART_PROVIDER_MODE=home_assistant
 HOME_ASSISTANT_URL=http://host.docker.internal:8123   # or the HA LAN IP
 HOME_ASSISTANT_TOKEN=<long-lived token, never committed>
@@ -154,7 +206,8 @@ HOME_ASSISTANT_TOKEN=<long-lived token, never committed>
 
 Then rebuild the backend: `docker compose up -d --build backend`.
 
-Security: tokens live only in git-ignored `.env*` files. Rotate the HA token if a machine is compromised or disposed.
+Security: tokens live only in git-ignored `.env*` files. Rotate the HA token and
+`SMART_INGEST_TOKEN` if a machine is compromised or disposed.
 
 ---
 

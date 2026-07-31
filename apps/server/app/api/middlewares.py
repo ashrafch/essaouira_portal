@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -17,6 +19,15 @@ AUTH_EXCLUDED_PATHS = {
 # Public, token-protected prefixes (validated by the route itself, not by JWT):
 # the iCal export must be fetchable anonymously by external channels (Airbnb…).
 AUTH_EXCLUDED_PREFIXES = ("/revenue/ical/",)
+
+# Machine-to-machine ingest: Home Assistant cannot hold a portal JWT, so the
+# VillaCore event endpoint also accepts a shared secret. Enabled only when
+# SMART_INGEST_TOKEN is set, only on this exact path, only for POST.
+INGEST_PATH = "/smart/link/events"
+INGEST_TOKEN_HEADER = "X-Smart-Ingest-Token"
+INGEST_IDENTITY_USER = "villacore-link"
+# Write access is required to record events and raise alerts; nothing more.
+INGEST_IDENTITY_ROLE = "manager"
 
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -66,6 +77,31 @@ async def request_logging(request: Request, call_next):
     return await log_request_middleware(request, call_next)
 
 
+def _ingest_token_identity(request: Request) -> bool | None:
+    """Authenticate a VillaCore push by shared secret.
+
+    Returns ``True`` when the request is an authenticated ingest call, ``False``
+    when the header was supplied but wrong, and ``None`` when this is not an
+    ingest attempt at all (fall through to the normal JWT path, so an operator
+    can still call the endpoint from the UI).
+    """
+    if request.url.path != INGEST_PATH or request.method.upper() != "POST":
+        return None
+    supplied = (request.headers.get(INGEST_TOKEN_HEADER) or "").strip()
+    if not supplied:
+        return None
+    expected = settings.smart_ingest_token
+    if not expected:
+        return False
+    if not secrets.compare_digest(supplied, expected):
+        return False
+
+    request.state.user = INGEST_IDENTITY_USER
+    request.state.role = INGEST_IDENTITY_ROLE
+    request.state.tenant_id = settings.admin_tenant_id
+    return True
+
+
 async def authentication(request: Request, call_next):
     if not settings.auth_enabled:
         return await call_next(request)
@@ -74,6 +110,12 @@ async def authentication(request: Request, call_next):
         request.url.path, AUTH_EXCLUDED_PREFIXES
     ):
         return await call_next(request)
+
+    ingest = _ingest_token_identity(request)
+    if ingest is True:
+        return await call_next(request)
+    if ingest is False:
+        return JSONResponse(status_code=401, content={"detail": "Invalid ingest token"})
 
     header = request.headers.get("Authorization", "")
     if not header.lower().startswith("bearer "):

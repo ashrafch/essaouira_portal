@@ -235,14 +235,45 @@ Implemented:
 - UX refresh baseline (cards, timeline, command palette, responsive improvements)
 
 Open areas:
-- deeper Home Assistant command coverage and validation
-- optional MQTT ingestion layer (future)
-- migration from deprecated FastAPI startup hooks to lifespan
-- Pydantic v2 cleanup (`ConfigDict`, serializer migration)
-- chunk size optimization for large frontend bundles
+- optional MQTT ingestion layer (future; today VillaCore pushes over HTTP)
+- structural decomposition of `UnitTimeline.jsx` and `SmartDashboard.jsx`
 - final go-live QA checklist for all mobile breakpoints
 
 Current architecture rule remains:
 - PMS/Ops owns operational workflow automation
 - Smart Building reacts via smart scenes/rules/alerts
 - Unit from PMS remains source of truth at unit level
+
+---
+
+## Update — July 31, 2026: VillaCore Link v1
+
+The "future Home Assistant-based device layer" this spec anticipated now exists as
+a separate project, **VillaCore** (villa, apartment A1, pool, irrigation, gate and
+outdoor, metering, PLC contract). The integration is specified in
+[`VILLACORE_LINK.md`](VILLACORE_LINK.md); the prompts to complete it on the
+building side are in [`VILLACORE_PROMPTS.md`](VILLACORE_PROMPTS.md).
+
+What changed relative to the plan above:
+
+- **The service layer is decomposed.** `SmartBuildingService` is an 86-line facade
+  over `smart_building/services/*` mixins (devices, commands, alerts, telemetry,
+  automation, readiness, assistants, operations, read models, scenario packs,
+  provider link, setup, capabilities, facilities, workflows, ingest, utility
+  costs).
+- **Integration is data-driven, not code-driven.** Entities are classified through
+  `providers/villacore_profile.yaml` plus a manifest published by VillaCore, so a
+  new building milestone is absorbed without portal code. Verified against the real
+  registry at milestone 9: 290 entities, 0 unclassified.
+- **Devices are addressed by capability.** `workflow.checkin`, `facility.alarm`,
+  `metric.energy_daily`… never by Home Assistant entity id.
+- **Two new first-class concepts**: *unit workflows* (the portal states an
+  intention, VillaCore executes it with its own safety conditions) and *shared
+  facilities* (pool, irrigation, gate, metering — an asset and cost view, not a
+  second remote control).
+- **Costs**: telemetry becomes `utilities` cost items in the monthly P&L, measured
+  where a meter exists and explicitly labelled as estimated where it does not.
+- **Boundary sharpened**: VillaCore owns plant state machines and interlocks. The
+  portal sends requests and renders refusals verbatim. Only `safe_off` and
+  `alarm_reset` are exposed for plants; mode changes and manual starts stay in Home
+  Assistant on purpose.

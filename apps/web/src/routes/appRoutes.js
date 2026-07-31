@@ -17,6 +17,7 @@ export const APP_ROUTES = [
   { path: "/smart-overview", key: "smartOverview", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-dashboard", key: "smartDashboard", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-operations", key: "smartOperations", allowedRoles: ["owner", "manager", "operator", "viewer"] },
+  { path: "/smart-facilities", key: "smartFacilities", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-devices", key: "smartDevices", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-devices/:deviceId", key: "smartDeviceDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-alerts", key: "smartAlerts", allowedRoles: ["owner", "manager", "operator", "viewer"] },
@@ -24,6 +25,8 @@ export const APP_ROUTES = [
   { path: "/smart-assistant/checkin", key: "smartCheckinAssistant", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-assistant/checkout", key: "smartCheckoutAssistant", allowedRoles: ["owner", "manager", "operator", "viewer"] },
   { path: "/smart-units/:unitId", key: "smartUnitDetail", allowedRoles: ["owner", "manager", "operator", "viewer"] },
+  // Link VillaCore: token, mappa zone e drift sono configurazione di sistema.
+  { path: "/smart-link", key: "smartLink", allowedRoles: ["owner"] },
   { path: "/setup", key: "setupWizard", allowedRoles: ["owner"] },
   // Standalone = rendered full-page OUTSIDE the app Layout (printable document),
   // but its RBAC still lives here (single source of truth).

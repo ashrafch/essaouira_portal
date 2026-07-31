@@ -13,6 +13,18 @@ DOMAIN_CATEGORY_MAP: dict[str, str] = {
     "lock": "smart_lock",
     "sensor": "temperature_humidity_sensor",
     "binary_sensor": "motion_sensor",
+    # Domains a scripted Home Assistant setup exposes as controllable objects.
+    # Without these they would all land on "unknown" and refuse every command.
+    "cover": "shutter",
+    "script": "workflow_script",
+    "scene": "scene_preset",
+    "timer": "timer",
+    "input_boolean": "toggle_flag",
+    "input_select": "option_selector",
+    "input_number": "numeric_setting",
+    "number": "numeric_setting",
+    "input_text": "text_setting",
+    "input_datetime": "schedule_setting",
 }
 
 BINARY_SENSOR_DEVICE_CLASS_MAP: dict[str, str] = {
@@ -29,8 +41,15 @@ SENSOR_DEVICE_CLASS_MAP: dict[str, str] = {
     "humidity": "temperature_humidity_sensor",
     "power": "energy_meter",
     "energy": "energy_meter",
+    "pressure": "pressure_sensor",
+    "moisture": "moisture_sensor",
+    "water": "water_meter",
+    "volume": "water_meter",
+    "duration": "runtime_meter",
 }
 
+# Default allowlist for the generic Home Assistant provider. It stays
+# conservative on purpose; the VillaCore provider widens it from its profile.
 SUPPORTED_ENTITY_DOMAINS = {"switch", "light", "climate", "lock", "sensor", "binary_sensor"}
 
 

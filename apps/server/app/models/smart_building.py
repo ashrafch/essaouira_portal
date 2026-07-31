@@ -25,6 +25,11 @@ class Device(TenantScopedMixin, Base):
     id = Column(Integer, primary_key=True, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
     zone_name = Column(String(128), nullable=True)
+    # VillaCore Link classification (see providers/villacore_profile.yaml).
+    # Null for mock devices and generic Home Assistant entities.
+    zone_key = Column(String(64), nullable=True, index=True)
+    capability_key = Column(String(64), nullable=True, index=True)
+    facility_key = Column(String(64), nullable=True, index=True)
     provider = Column(String(64), nullable=False, default="mock")
     external_id = Column(String(128), nullable=False)
     name = Column(String(128), nullable=False)

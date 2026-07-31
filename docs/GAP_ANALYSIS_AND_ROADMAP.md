@@ -27,7 +27,8 @@ Legend: ✅ done · 🔶 partially addressed · ⛔ open gap (roadmap).
 | Config fragmented across 4 modules | ✅ | Single source of truth in `app/core/config.py`. |
 | Incomplete Alembic chain (9 smart tables only via `create_all`) | ✅ | Migration `0009_smart_core_tables` + complete `env.py` model imports; production uses migrations only. |
 | Weak secrets accepted silently | ✅ | `APP_ENV=production` fails fast on default/weak `AUTH_SECRET_KEY` / `ADMIN_PASSWORD`. |
-| `SmartBuildingService` god-class (~5,700 lines) | ⛔ | Works and is well tested; split into submodules (inventory / telemetry / readiness / automation / operations) in a dedicated refactor. |
+| `SmartBuildingService` god-class (~5,700 lines) | ✅ | Split into `smart_building/services/*` (16 modules, largest ~760 lines) composed as mixins by an 86-line facade. Method bodies moved verbatim, 155 routes unchanged, tests green without edits. |
+| Building integration was a single generic HA adapter | ✅ | **VillaCore Link v1**: `villacore` provider + data-driven `villacore_profile.yaml`, capability/zone/facility classification, unit workflows, shared facilities, token-authenticated event ingest, reconciliation loop, utility costs. See `docs/VILLACORE_LINK.md`. |
 | **Tenant isolation broken for legacy tables** (`units`, `bookings`, `staff_*`, `cost_items`, `maintenance_tickets`, `pricing_defaults` have no `tenant_id`) | ⛔ | **Highest-priority open gap** if the product is ever sold multi-tenant. For single-owner operation it is not blocking. Requires: column + backfill migration, filter on every legacy query, test coverage. |
 | RBAC enforced by path-prefix matching in middleware, duplicated by service checks | ⛔ | Replace with dependency-based permissions per router; unify the two enforcement points. |
 | Runtime schema "reconcilers" in `bootstrap.py` (raw `ALTER TABLE`) | 🔶 | Still present for dev fast-path; production no longer depends on them. Remove after one release cycle. |

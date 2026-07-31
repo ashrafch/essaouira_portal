@@ -1,0 +1,26 @@
+# VillaCore Link overlay.
+#
+# Opt-in: joins the backend to the shared `villacore_link` bridge so it can
+# reach the VillaCore Home Assistant container by service name, with no host
+# loopback dependency and no published HA port. Same behaviour in dev and on
+# Proxmox.
+#
+#   scripts/link-villacore.ps1     (creates the network, checks HA, guides token)
+#   docker compose -f docker-compose.yml -f docker-compose.villacore.yml up -d
+#
+# The base stack stays runnable on its own; without this overlay the portal
+# simply keeps using SMART_PROVIDER_MODE=mock.
+
+services:
+  backend:
+    environment:
+      SMART_PROVIDER_MODE: ${SMART_PROVIDER_MODE:-villacore}
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-http://home-assistant:8123}
+    networks:
+      - default
+      - villacore_link
+
+networks:
+  villacore_link:
+    external: true
+    name: ${VILLACORE_LINK_NETWORK:-villacore_link}

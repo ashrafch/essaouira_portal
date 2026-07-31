@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, time
 from typing import Optional
 
@@ -10,6 +11,8 @@ from app.models.pricing_defaults import PricingDefaults
 from app.models.staff_defaults import StaffDefaults
 from app.models.staff_member import StaffMember
 from app.models.staff_task import StaffTask
+
+logger = logging.getLogger("app.operations")
 
 TERMINAL_TASK_STATUSES = {"done", "completed"}
 
@@ -151,6 +154,7 @@ def trigger_smart_reaction_on_staff_task_completion(
     if not tenant_id:
         return
 
+    requested_by = getattr(request.state, "user", None) or "system"
     service = SmartBuildingService(db=db, tenant_id=tenant_id)
     service.trigger_rules_for_business_event(
         trigger_type=trigger_type,
@@ -162,5 +166,29 @@ def trigger_smart_reaction_on_staff_task_completion(
             "task_type": task.task_type,
             "task_date": str(task.date) if task.date else None,
         },
-        requested_by=getattr(request.state, "user", None) or "system",
+        requested_by=requested_by,
     )
+
+    # Ask the building to run its own check-in / check-out orchestration. PMS
+    # stays the source of truth for the booking; VillaCore stays the source of
+    # truth for what is safe to switch on. A site that has not wired the
+    # workflow simply has no capability, which is not an operational error, so
+    # the staff task must still complete.
+    workflow = "checkin" if task_type == "checkin" else "checkout"
+    try:
+        service.run_unit_workflow(
+            unit_id=task.unit_id,
+            workflow=workflow,
+            booking_id=task.booking_id,
+            requested_by=requested_by,
+            trigger_source="auto.ops.staff_task",
+        )
+    except HTTPException as exc:
+        if exc.status_code not in {403, 409}:
+            raise
+        logger.info(
+            "Smart workflow '%s' not dispatched for unit %s: %s",
+            workflow,
+            task.unit_id,
+            exc.detail,
+        )

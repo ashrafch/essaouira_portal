@@ -37,8 +37,11 @@ services:
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
       HOME_ASSISTANT_TOKEN: ${HOME_ASSISTANT_TOKEN:-}
       HOME_ASSISTANT_TIMEOUT_SECONDS: ${HOME_ASSISTANT_TIMEOUT_SECONDS:-10}
-      HOME_ASSISTANT_INCLUDE_DOMAINS: ${HOME_ASSISTANT_INCLUDE_DOMAINS:-binary_sensor,sensor,switch,climate,input_boolean,input_number}
+      HOME_ASSISTANT_INCLUDE_DOMAINS: ${HOME_ASSISTANT_INCLUDE_DOMAINS:-}
       HOME_ASSISTANT_UNIT_HINTS: ${HOME_ASSISTANT_UNIT_HINTS:-{}}
+      SMART_INGEST_TOKEN: ${SMART_INGEST_TOKEN:-}
+      SMART_POLL_INTERVAL_SECONDS: ${SMART_POLL_INTERVAL_SECONDS:-0}
+      VILLACORE_SITE_ID: ${VILLACORE_SITE_ID:-dev}
     depends_on:
       db:
         condition: service_healthy
@@ -90,7 +93,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     ports:
-      - "127.0.0.1:3000:3000"
+      # 3001 by default: VillaCore's own Grafana already owns 3000 on this host.
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
     depends_on:
       - prometheus
 
