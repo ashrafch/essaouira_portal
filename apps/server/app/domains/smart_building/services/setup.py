@@ -1,8 +1,11 @@
 """Resumable setup wizard sessions.
 
-Split out of the former single-file ``service.py``; the method bodies are
-unchanged. Every module is a mixin combined by ``SmartBuildingService``,
-so cross-module ``self`` calls keep working exactly as before.
+The guided sequence is property -> units -> connect provider -> import devices ->
+map zones -> automations -> complete. The mapping step is the important one: the
+building exposes *zones* (`a1`, `villa`, `pool`), and binding a zone to a PMS unit
+is what makes workflows, readiness and costs land on the right unit. Assigning
+devices one at a time used to be the alternative, and it made it far too easy to
+attach an entire building to a single apartment.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from app.domains.smart_building.schemas import (
     SetupConnectProviderIn,
     SetupEnableAutomationsIn,
     SetupImportDevicesIn,
+    SetupMapZonesIn,
     SetupPropertyIn,
     SetupUnitsIn,
 )
@@ -106,6 +110,25 @@ class SetupMixin:
         self.db.commit()
         self.db.refresh(session)
         return {"session": self._session_to_dict(session)}
+
+    def setup_restart(self) -> dict[str, object]:
+        """Abandon the session in progress and start a clean one.
+
+        Getting lost halfway through is the normal case, not an edge case: without
+        this the wizard would stay stuck on whatever step it had reached. Only the
+        session is abandoned — properties, units, devices and mappings all stay.
+        """
+        self._require_owner_access()
+        current = (
+            self._scoped_query(SetupSession)
+            .filter(SetupSession.status == "in_progress")
+            .order_by(SetupSession.created_at.desc(), SetupSession.id.desc())
+            .first()
+        )
+        if current is not None:
+            current.status = "abandoned"
+            self.db.commit()
+        return self.setup_start()
 
     def get_setup_session(self) -> dict[str, object] | None:
         self._require_owner_access()
@@ -264,11 +287,141 @@ class SetupMixin:
             self.db.commit()
         session = self._update_setup_session(
             session,
-            current_step="assign_devices",
+            current_step="map_zones",
             metadata_updates={
                 "provider_name": provider_name,
                 "import_result": sync_result,
                 "imported_device_ids": [d.id for d in imported_devices],
+            },
+        )
+        return self._session_to_dict(session)
+
+    def setup_zone_suggestions(self) -> dict[str, object]:
+        """What the wizard shows on the mapping step.
+
+        Lists the zones actually discovered in the building with how many devices
+        each holds, the units available to bind them to, and a pre-selection only
+        when a unit name matches unambiguously. A zone is never guessed onto a
+        unit: choosing which apartment is `a1` is the operator's decision, and
+        guessing it wrong is exactly what makes an onboarding confusing.
+        """
+        self._require_owner_access()
+        session = self._latest_setup_session()
+        metadata = self._safe_json_loads(session.metadata_json) if session else {}
+        property_id = metadata.get("property_id")
+
+        connection = self._link_connection(int(property_id) if property_id else None)
+        zone_map = self.get_zone_map(int(property_id) if property_id else None)
+
+        units = self.db.query(Unit).order_by(Unit.name.asc(), Unit.id.asc()).all()
+        if property_id:
+            units = [u for u in units if u.property_id in {None, int(property_id)}] or units
+
+        device_counts: dict[str, int] = {}
+        bound_counts: dict[str, int] = {}
+        for device in self._scoped_query(Device).filter(Device.zone_key.isnot(None)).all():
+            key = str(device.zone_key)
+            device_counts[key] = device_counts.get(key, 0) + 1
+            if device.unit_id is not None:
+                bound_counts[key] = bound_counts.get(key, 0) + 1
+
+        def suggest(zone_key: str, display_name: str) -> int | None:
+            """Only an unambiguous name match, never an ordinal guess."""
+            candidates = [zone_key.lower(), display_name.lower()]
+            matches = [
+                unit
+                for unit in units
+                if any(
+                    candidate and candidate in (unit.name or "").strip().lower()
+                    for candidate in candidates
+                )
+            ]
+            return matches[0].id if len(matches) == 1 else None
+
+        zones: list[dict[str, object]] = []
+        for key, entry in sorted(zone_map.items()):
+            discovered = device_counts.get(key, 0)
+            if discovered == 0 and entry.get("kind") != "unit":
+                # Do not clutter the step with plants this site does not have.
+                continue
+            zones.append(
+                {
+                    "zone": key,
+                    "kind": entry.get("kind"),
+                    "display_name": entry.get("display_name"),
+                    "machine": entry.get("machine"),
+                    "device_count": discovered,
+                    "bound_device_count": bound_counts.get(key, 0),
+                    "unit_id": entry.get("unit_id"),
+                    "suggested_unit_id": (
+                        entry.get("unit_id")
+                        or (suggest(key, str(entry.get("display_name") or key))
+                            if entry.get("kind") == "unit"
+                            else None)
+                    ),
+                    "source": entry.get("source"),
+                }
+            )
+
+        return {
+            "connection_id": connection.id if connection else None,
+            "provider_name": connection.provider_name if connection else None,
+            "units": [{"id": unit.id, "name": unit.name} for unit in units],
+            "zones": zones,
+            "unmapped_unit_zones": [
+                z["zone"]
+                for z in zones
+                if z["kind"] == "unit" and not z["unit_id"] and z["device_count"]
+            ],
+        }
+
+    def setup_map_zones(self, payload: SetupMapZonesIn) -> dict[str, object]:
+        """Bind building zones to PMS units, then re-sync so it takes effect now."""
+        self._require_owner_access()
+        session = self._active_setup_session_or_404()
+        metadata = self._safe_json_loads(session.metadata_json)
+        property_id = payload.property_id or metadata.get("property_id")
+
+        connection_id = payload.connection_id or metadata.get("provider_connection_id")
+        if not connection_id:
+            connection = self._link_connection(int(property_id) if property_id else None)
+            connection_id = connection.id if connection else None
+        if not connection_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Nessuna provider connection: completa prima lo step di connessione",
+            )
+
+        zone_map = {
+            zone: {"kind": "unit", "unit_id": unit_id}
+            for zone, unit_id in (payload.zone_map or {}).items()
+            if unit_id
+        }
+        self.set_zone_map(int(connection_id), zone_map, requested_by="setup_wizard")
+
+        # Re-sync immediately: without this the operator would see the mapping
+        # saved but no device attached until the next reconciliation cycle.
+        provider_name = (metadata.get("provider_name") or "").strip().lower() or None
+        connection = self._get_provider_connection(int(connection_id))
+        sync_result = self.sync_catalog_from_provider(
+            provider_name or connection.provider_name, provider_connection=connection
+        )
+
+        bound = (
+            self._scoped_query(Device)
+            .filter(Device.unit_id.isnot(None), Device.zone_key.isnot(None))
+            .count()
+        )
+        session = self._update_setup_session(
+            session,
+            current_step="enable_automations",
+            metadata_updates={
+                "zone_map": zone_map,
+                "zone_map_result": {
+                    "zones_mapped": len(zone_map),
+                    "devices_bound": bound,
+                    "resync": sync_result,
+                },
             },
         )
         return self._session_to_dict(session)

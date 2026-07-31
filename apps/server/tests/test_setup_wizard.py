@@ -26,7 +26,7 @@ def test_setup_session_lifecycle_and_completion():
             "units",
             "connect_provider",
             "import_devices",
-            "assign_devices",
+            "map_zones",
             "enable_automations",
             "complete",
         }
@@ -58,19 +58,30 @@ def test_setup_session_lifecycle_and_completion():
 
         step_import = client.post("/setup/import-devices", headers=_headers(), json={})
         assert step_import.status_code == 200
-        assert step_import.json()["current_step"] == "assign_devices"
+        # Zone mapping replaced per-device assignment in the guided flow.
+        assert step_import.json()["current_step"] == "map_zones"
 
         units = client.get("/units", headers=_headers()).json()
         unit_id = next(u["id"] for u in units if u["name"] == unit_name)
         imported_ids = step_import.json()["metadata"]["imported_device_ids"]
         assert len(imported_ids) >= 1
-        step_assign = client.post(
-            "/setup/assign-devices",
+
+        suggestions = client.get("/setup/zone-suggestions", headers=_headers())
+        assert suggestions.status_code == 200, suggestions.text
+        payload = suggestions.json()
+        assert {u["id"] for u in payload["units"]} >= {unit_id}
+        unit_zones = [z for z in payload["zones"] if z["kind"] == "unit"]
+        assert unit_zones, payload
+
+        step_map = client.post(
+            "/setup/map-zones",
             headers=_headers(),
-            json={"assignments": [{"device_id": imported_ids[0], "unit_id": unit_id}]},
+            json={"zone_map": {unit_zones[0]["zone"]: unit_id}},
         )
-        assert step_assign.status_code == 200
-        assert step_assign.json()["current_step"] == "enable_automations"
+        assert step_map.status_code == 200, step_map.text
+        assert step_map.json()["current_step"] == "enable_automations"
+        result = step_map.json()["metadata"]["zone_map_result"]
+        assert result["zones_mapped"] == 1
 
         step_auto = client.post(
             "/setup/enable-automations",
@@ -97,7 +108,7 @@ def test_setup_templates_create_automation_rules():
         client.post("/setup/units", headers=_headers(), json={"units": [_create_unit_name()]})
         client.post("/setup/connect-provider", headers=_headers(), json={"provider": "mock", "config": {}})
         client.post("/setup/import-devices", headers=_headers(), json={})
-        client.post("/setup/assign-devices", headers=_headers(), json={"assignments": []})
+        client.post("/setup/map-zones", headers=_headers(), json={"zone_map": {}})
         auto = client.post(
             "/setup/enable-automations",
             headers=_headers(),
@@ -125,3 +136,37 @@ def test_setup_session_tenant_isolation():
         assert session_other.status_code == 200
         assert session_default.json()["tenant_id"] == "default"
         assert session_other.json()["tenant_id"] == "other"
+
+
+def test_assign_devices_remains_available_as_a_manual_escape_hatch():
+    """The guided flow maps zones, but per-device correction must still work."""
+    with TestClient(app) as client:
+        client.post("/setup/start", headers=_headers())
+        client.post(
+            "/setup/property",
+            headers=_headers(),
+            json={"property_name": "Manual Assign", "timezone": "Africa/Casablanca"},
+        )
+        unit_name = _create_unit_name()
+        client.post("/setup/units", headers=_headers(), json={"units": [unit_name]})
+        client.post("/setup/connect-provider", headers=_headers(), json={"provider": "mock", "config": {}})
+        client.post("/setup/import-devices", headers=_headers(), json={})
+        unit_id = next(
+            u["id"] for u in client.get("/units", headers=_headers()).json() if u["name"] == unit_name
+        )
+        # An unbound device: assignment deliberately refuses to steal one that is
+        # already attached to another unit.
+        free_device_id = next(
+            d["id"]
+            for d in client.get("/smart/devices", headers=_headers()).json()
+            if d["unit_id"] is None
+        )
+
+        assigned = client.post(
+            "/setup/assign-devices",
+            headers=_headers(),
+            json={"assignments": [{"device_id": free_device_id, "unit_id": unit_id}]},
+        )
+        assert assigned.status_code == 200, assigned.text
+        assert assigned.json()["current_step"] == "enable_automations"
+        assert assigned.json()["metadata"]["assignment_result"]["assigned"] == 1

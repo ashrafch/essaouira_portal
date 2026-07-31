@@ -683,6 +683,40 @@ class SetupAssignDevicesIn(BaseModel):
     assignments: list[dict] = Field(default_factory=list)
 
 
+class SetupMapZonesIn(BaseModel):
+    """zone key -> unit id. Only unit-kind zones are bound here."""
+
+    zone_map: dict[str, int] = Field(default_factory=dict)
+    property_id: int | None = None
+    connection_id: int | None = None
+
+
+class SetupZoneOut(BaseModel):
+    zone: str
+    kind: str | None = None
+    display_name: str | None = None
+    machine: str | None = None
+    device_count: int = 0
+    bound_device_count: int = 0
+    unit_id: int | None = None
+    # Pre-selected only on an unambiguous name match, never guessed.
+    suggested_unit_id: int | None = None
+    source: str | None = None
+
+
+class SetupUnitOptionOut(BaseModel):
+    id: int
+    name: str
+
+
+class SetupZoneSuggestionsOut(BaseModel):
+    connection_id: int | None = None
+    provider_name: str | None = None
+    units: list[SetupUnitOptionOut] = Field(default_factory=list)
+    zones: list[SetupZoneOut] = Field(default_factory=list)
+    unmapped_unit_zones: list[str] = Field(default_factory=list)
+
+
 class SetupEnableAutomationsIn(BaseModel):
     property_id: int | None = None
     templates: list[str] = Field(default_factory=list)

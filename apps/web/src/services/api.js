@@ -616,6 +616,22 @@ export function setupImportDevices(payload = {}) {
   return apiPost("/setup/import-devices", payload);
 }
 
+// Zones discovered in the building + the units they can be bound to.
+// Abandon the session in progress and begin again. Deletes no data.
+export function setupRestart() {
+  return apiPost("/setup/restart", {});
+}
+
+export function setupZoneSuggestions() {
+  return apiGet("/setup/zone-suggestions");
+}
+
+// Bind zones to units; the backend re-syncs so it takes effect immediately.
+export function setupMapZones(payload) {
+  return apiPost("/setup/map-zones", payload);
+}
+
+// Manual per-device correction; the guided flow uses setupMapZones instead.
 export function setupAssignDevices(payload) {
   return apiPost("/setup/assign-devices", payload);
 }

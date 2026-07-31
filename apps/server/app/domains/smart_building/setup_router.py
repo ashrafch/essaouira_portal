@@ -7,10 +7,12 @@ from app.domains.smart_building.schemas import (
     SetupConnectProviderIn,
     SetupEnableAutomationsIn,
     SetupImportDevicesIn,
+    SetupMapZonesIn,
     SetupPropertyIn,
     SetupSessionOut,
     SetupStartOut,
     SetupUnitsIn,
+    SetupZoneSuggestionsOut,
 )
 from app.domains.smart_building.service import SmartBuildingService
 
@@ -29,6 +31,12 @@ def _service(request: Request, db: Session) -> SmartBuildingService:
 @router.post("/start", response_model=SetupStartOut)
 def start_setup(request: Request, db: Session = Depends(get_db)):
     return _service(request, db).setup_start()
+
+
+@router.post("/restart", response_model=SetupStartOut)
+def restart_setup(request: Request, db: Session = Depends(get_db)):
+    """Abandon the session in progress and begin again. Deletes no data."""
+    return _service(request, db).setup_restart()
 
 
 @router.get("/session", response_model=SetupSessionOut | None)
@@ -60,6 +68,19 @@ def setup_import_devices(
     return _service(request, db).setup_import_devices(payload)
 
 
+@router.get("/zone-suggestions", response_model=SetupZoneSuggestionsOut)
+def setup_zone_suggestions(request: Request, db: Session = Depends(get_db)):
+    """Zones discovered in the building, with the units they can be bound to."""
+    return _service(request, db).setup_zone_suggestions()
+
+
+@router.post("/map-zones", response_model=SetupSessionOut)
+def setup_map_zones(payload: SetupMapZonesIn, request: Request, db: Session = Depends(get_db)):
+    """Bind zones to units and re-sync, so the mapping takes effect immediately."""
+    return _service(request, db).setup_map_zones(payload)
+
+
+# Kept for manual, per-device corrections; the guided flow uses /map-zones.
 @router.post("/assign-devices", response_model=SetupSessionOut)
 def setup_assign_devices(
     payload: SetupAssignDevicesIn, request: Request, db: Session = Depends(get_db)

@@ -89,7 +89,12 @@ reported rather than imported, which is exactly what the drift report is for.
 | `common` | Site-wide helpers (`villa_core`) | Property scope only |
 
 Zone → PMS unit binding lives in the provider connection's `zone_map`, editable
-from the Link page. No migration is needed to rebind a zone.
+from the Link page and set during onboarding by the wizard's **mapping** step
+(`POST /setup/map-zones`). Binding a zone attaches all of its devices at once and
+re-syncs immediately, which is why per-device assignment is no longer part of the
+guided flow: one careless click there used to attach an entire building to a
+single apartment. `POST /setup/assign-devices` remains for manual corrections.
+No migration is needed to rebind a zone.
 
 Site metering is a special case worth knowing: `sensor.energy_a1_daily` *lives* in
 zone `energy` but *measures* unit `a1`, so the classifier extracts that subject
@@ -260,7 +265,26 @@ in the UI and in the cost description. It is never presented as a measurement.
 
 ---
 
-## 7. Verification
+## 7. Starting over
+
+`scripts/reset_smart_layer.py` clears what the portal derived from the building —
+devices and everything hanging off them, provider connections, scenario packs,
+setup sessions, and optionally scenes and rules — and never touches bookings,
+staff tasks, maintenance tickets or cost items. Units and properties are only
+removed when named explicitly with `--drop-unit` / `--drop-property`, and the
+script refuses when the business still references them.
+
+```bash
+python scripts/reset_smart_layer.py                       # dry run, prints the plan
+python scripts/reset_smart_layer.py --yes                 # apply
+python scripts/reset_smart_layer.py --yes --drop-unit 7 --drop-property 2
+```
+
+To redo the onboarding without deleting anything, use **Riavvia procedura** in the
+wizard (`POST /setup/restart`): it abandons the session in progress and starts
+from step one, leaving properties, units, devices and mappings intact.
+
+## 8. Verification
 
 ```bash
 # static
@@ -287,7 +311,7 @@ End-to-end checks worth running after any VillaCore milestone:
 
 ---
 
-## 8. Current limitations
+## 9. Current limitations
 
 - **A1 has no motion, lock or leak sensor** (prompt **P6**). Until then, checkout
   vacancy validation and lock commands are reported as unavailable — not faked.

@@ -70,6 +70,10 @@ Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — dev / LAN / production deployment
 - [docs/VILLACORE_LINK.md](docs/VILLACORE_LINK.md) — contract with the VillaCore building platform (setup: `scripts/link-villacore.ps1` then `python scripts/get_villacore_token.py`)
 - [docs/VILLACORE_PROMPTS.md](docs/VILLACORE_PROMPTS.md) — ready-to-paste prompts for the VillaCore repository
+
+Onboarding is guided by the Setup Wizard (`/setup`), which explains every step and
+binds building zones to units. `scripts/reset_smart_layer.py` starts the smart
+layer over without touching PMS data.
 - [docs/GAP_ANALYSIS_AND_ROADMAP.md](docs/GAP_ANALYSIS_AND_ROADMAP.md) — current gaps and roadmap
 - [docs/PROJECT_STRUCTURE_GUIDE.md](docs/PROJECT_STRUCTURE_GUIDE.md) — where to change what
 - [docs/TECHNICAL_OPERATOR_MANUAL.md](docs/TECHNICAL_OPERATOR_MANUAL.md) — run & troubleshoot

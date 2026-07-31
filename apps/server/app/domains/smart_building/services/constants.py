@@ -101,12 +101,17 @@ SMART_MAINTENANCE_KEYWORDS = {
 READINESS_STATUSES = {"READY", "NEEDS_ATTENTION", "BLOCKED", "UNKNOWN"}
 BLOCKING_MAINTENANCE_PRIORITIES = {"urgent"}
 BLOCKING_MAINTENANCE_KEYWORDS = {"blocking", "bloccante", "unsafe", "perdita", "allag", "non abitabile"}
+# Guided onboarding sequence. `map_zones` replaced per-device assignment: the
+# link binds a whole building zone to a unit, so assigning devices one by one was
+# both tedious and easy to get wrong (a single click could attach every villa
+# device to one apartment). Manual per-device assignment still exists as an
+# escape hatch on the devices page and through /setup/assign-devices.
 SETUP_STEPS = (
     "property",
     "units",
     "connect_provider",
     "import_devices",
-    "assign_devices",
+    "map_zones",
     "enable_automations",
     "complete",
 )
