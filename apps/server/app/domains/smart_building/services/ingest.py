@@ -60,6 +60,7 @@ REASON_LABELS: dict[str, str] = {
     "sensor_invalid": "sensore non valido",
     "max_runtime": "runtime massimo superato",
     "obstacle": "ostacolo rilevato",
+    "contract_mismatch": "contratto PLC incompatibile",
 }
 
 
