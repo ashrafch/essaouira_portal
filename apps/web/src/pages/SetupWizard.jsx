@@ -142,6 +142,9 @@ function SetupWizard() {
       } else if ((propertyData || []).length === 1) {
         setPropertyId(String(propertyData[0].id));
       }
+      // On a fresh install there is nothing to reuse, so start on "create new":
+      // defaulting to the existing-property choice would be a dead end.
+      setPropertyMode((propertyData || []).length ? "existing" : "new");
 
       const step = sessionData?.current_step;
       if (step && stepIndex(step) >= stepIndex("connect_provider")) {

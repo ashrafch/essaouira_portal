@@ -18,12 +18,24 @@ Units and properties are never guessed at: pass --drop-unit / --drop-property
 explicitly, and the script still refuses when a unit carries bookings, staff
 tasks, maintenance tickets or cost items, or when a property would keep units.
 
+--wipe-business removes that operational data too (bookings, staff tasks,
+maintenance, cost items, rate calendar, channels, market rates, revenue rules).
+It exists for one purpose: emptying a demo or simulation database before building
+the real structure. On a live property it destroys the business record, so it
+always prints exactly what it will remove and needs --yes like everything else.
+
 Dry run by default: it prints the plan and changes nothing until --yes.
 
     python scripts/reset_smart_layer.py                        # show the plan
     python scripts/reset_smart_layer.py --yes                  # apply
     python scripts/reset_smart_layer.py --yes --provider home_assistant
     python scripts/reset_smart_layer.py --yes --drop-unit 7 --drop-property 2
+    python scripts/reset_smart_layer.py --yes --wipe-business --drop-all-units \
+        --drop-all-properties          # empty a simulation database completely
+
+Note: with AUTO_SEED_DATA=true the backend recreates the demo units and the
+default property at the next start. Set it to false in .env first, or the clean
+slate lasts until the next restart.
 """
 
 from __future__ import annotations
@@ -41,9 +53,13 @@ from sqlalchemy.orm import Session  # noqa: E402
 import app.models  # noqa: F401,E402  (register every model on Base.metadata)
 from app.db import SessionLocal  # noqa: E402
 from app.models.booking import Booking  # noqa: E402
+from app.models.channel_connection import ChannelConnection  # noqa: E402
 from app.models.cost_item import CostItem  # noqa: E402
 from app.models.maintenance import MaintenanceTicket  # noqa: E402
+from app.models.market_rate import MarketRate  # noqa: E402
 from app.models.property import Property  # noqa: E402
+from app.models.rate_calendar import RateCalendar  # noqa: E402
+from app.models.revenue_rules import LeadTimeRule, PricingSeason  # noqa: E402
 from app.models.smart_building import (  # noqa: E402
     Alert,
     AutomationExecution,
@@ -86,6 +102,19 @@ AUTOMATION_SCOPED = (
     ("scene actions", SceneAction),
     ("automation rules", AutomationRule),
     ("scenes", Scene),
+)
+# Business/operational tables, only touched with --wipe-business. Ordered so a
+# child row never outlives the parent it points at.
+BUSINESS_SCOPED = (
+    ("rate calendar entries", RateCalendar),
+    ("channel connections", ChannelConnection),
+    ("market rates", MarketRate),
+    ("lead-time rules", LeadTimeRule),
+    ("pricing seasons", PricingSeason),
+    ("staff tasks", StaffTask),
+    ("cost items", CostItem),
+    ("maintenance tickets", MaintenanceTicket),
+    ("bookings", Booking),
 )
 
 
@@ -135,6 +164,25 @@ def main() -> int:
         default=[],
         metavar="ID",
         help="delete this property (repeatable). Refused if it would keep units",
+    )
+    parser.add_argument(
+        "--drop-all-units",
+        action="store_true",
+        help="target every unit (still refused unless nothing references them)",
+    )
+    parser.add_argument(
+        "--drop-all-properties",
+        action="store_true",
+        help="target every property",
+    )
+    parser.add_argument(
+        "--wipe-business",
+        action="store_true",
+        help=(
+            "DESTRUCTIVE: also delete bookings, staff tasks, maintenance, cost items, "
+            "rate calendar, channels, market rates and revenue rules. For demo or "
+            "simulation databases only"
+        ),
     )
     args = parser.parse_args()
 
@@ -187,25 +235,42 @@ def main() -> int:
             for label, model in AUTOMATION_SCOPED:
                 line(f"delete {count(db, model)} {label}")
 
+        # --- optional business wipe (simulation databases) ---------------------
+        if args.wipe_business:
+            step("Business data to remove (--wipe-business)")
+            for label, model in BUSINESS_SCOPED:
+                line(f"delete {count(db, model)} {label}")
+            line("this is the operational record: only do it on a demo/simulation database")
+            print()
+
         # --- explicit PMS deletions, validated ---------------------------------
         drop_units: list[Unit] = []
         drop_properties: list[Property] = []
         refusals: list[str] = []
 
-        for unit_id in dict.fromkeys(args.drop_unit):
+        unit_targets = list(args.drop_unit)
+        if args.drop_all_units:
+            unit_targets = [unit.id for unit in db.query(Unit).order_by(Unit.id.asc()).all()]
+        property_targets = list(args.drop_property)
+        if args.drop_all_properties:
+            property_targets = [
+                prop.id for prop in db.query(Property).order_by(Property.id.asc()).all()
+            ]
+
+        for unit_id in dict.fromkeys(unit_targets):
             unit = db.query(Unit).filter(Unit.id == unit_id).first()
             if unit is None:
                 refusals.append(f"unit #{unit_id} does not exist")
                 continue
             references = {k: v for k, v in unit_references(db, unit.id).items() if v}
-            if references:
+            if references and not args.wipe_business:
                 detail = ", ".join(f"{v} {k}" for k, v in references.items())
                 refusals.append(f"unit #{unit_id} '{unit.name}' is still referenced: {detail}")
                 continue
             drop_units.append(unit)
 
         dropped_unit_ids = {unit.id for unit in drop_units}
-        for property_id in dict.fromkeys(args.drop_property):
+        for property_id in dict.fromkeys(property_targets):
             prop = db.query(Property).filter(Property.id == property_id).first()
             if prop is None:
                 refusals.append(f"property #{property_id} does not exist")
@@ -280,6 +345,12 @@ def main() -> int:
         line(f"deleted {deleted} setup sessions")
         deleted = db.query(SmartProviderConnection).delete(synchronize_session=False)
         line(f"deleted {deleted} provider connections")
+
+        if args.wipe_business:
+            for label, model in BUSINESS_SCOPED:
+                deleted = db.query(model).delete(synchronize_session=False)
+                line(f"deleted {deleted} {label}")
+            db.flush()
 
         for unit in drop_units:
             db.delete(unit)
