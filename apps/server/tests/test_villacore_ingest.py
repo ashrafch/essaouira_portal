@@ -6,6 +6,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.core.auth import create_access_token
+from app.domains.smart_building.services.ingest import REASON_LABELS
 from app.main import app
 from tests.test_villacore_link import (
     _FakeHomeAssistant,
@@ -16,6 +17,10 @@ from tests.test_villacore_link import (
 )
 
 INGEST_TOKEN = "test-ingest-secret-value"
+
+
+def test_plc_contract_mismatch_reason_is_operator_friendly():
+    assert REASON_LABELS["contract_mismatch"] == "contratto PLC incompatibile"
 
 
 def _headers(username: str = "owner", role: str = "owner", tenant_id: str = "default"):
