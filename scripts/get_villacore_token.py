@@ -223,11 +223,33 @@ def main() -> int:
         return 1
     ok("reachable")
 
-    username = args.user or input("Home Assistant username: ").strip()
+    # The password must be typed by a human at a real terminal: it is never a CLI
+    # argument, so there is nothing to read when input is not interactive.
+    def no_terminal(reason: str) -> int:
+        fail(reason)
+        print(
+            "    Run this script yourself in PowerShell or a shell:\n"
+            "        python scripts/get_villacore_token.py\n"
+            "    Alternatively create the token in the Home Assistant UI\n"
+            "    (profile -> Security -> Long-lived access tokens) and paste it into\n"
+            "    HOME_ASSISTANT_TOKEN in .env."
+        )
+        return 2
+
+    if not sys.stdin.isatty():
+        return no_terminal("this script needs an interactive terminal to read the password")
+
+    try:
+        username = args.user or input("Home Assistant username: ").strip()
+    except EOFError:
+        return no_terminal("no username provided (input is not interactive)")
     if not username:
         fail("username is required")
         return 1
-    password = getpass.getpass(f"Home Assistant password for '{username}': ")
+    try:
+        password = getpass.getpass(f"Home Assistant password for '{username}': ")
+    except (EOFError, getpass.GetPassWarning):
+        return no_terminal("could not read the password from this terminal")
     if not password:
         fail("password is required")
         return 1
