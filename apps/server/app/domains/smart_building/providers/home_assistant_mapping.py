@@ -52,6 +52,11 @@ SENSOR_DEVICE_CLASS_MAP: dict[str, str] = {
 # conservative on purpose; the VillaCore provider widens it from its profile.
 SUPPORTED_ENTITY_DOMAINS = {"switch", "light", "climate", "lock", "sensor", "binary_sensor"}
 
+# Domains whose reported state says nothing about reachability: a scene holds the
+# timestamp of its last activation, a script/scene never run reads `unknown`.
+# They are always considered online, so health monitoring does not invent alerts.
+STATELESS_DOMAINS = {"scene"}
+
 
 def parse_entity_domain(entity_id: str) -> str:
     return (entity_id.split(".", 1)[0] if entity_id and "." in entity_id else "").strip().lower()
@@ -107,6 +112,11 @@ def map_entity_to_state(entity: dict[str, Any]) -> ProviderStateSnapshot:
     state_value = str(entity.get("state", "")).strip().lower()
     domain = parse_entity_domain(str(entity.get("entity_id", "")))
     online = state_value not in {"", "unavailable", "unknown"}
+    # A scene's state is the timestamp of its last activation, so one that was
+    # never activated reads `unknown`. That is not an offline device, and treating
+    # it as one produced permanent false "device offline" alerts.
+    if domain in STATELESS_DOMAINS:
+        online = True
 
     motion = None
     contact_open = None
