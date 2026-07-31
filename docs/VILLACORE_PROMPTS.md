@@ -12,9 +12,11 @@ Il contratto che implementano è descritto in [`VILLACORE_LINK.md`](VILLACORE_LI
 ## Stato al 31 luglio 2026
 
 VillaCore ha completato le milestone 0→8 (villa, A1, piscina, giardino, cancello
-ed esterni, energia) e sta lavorando alla 9 (contratto PLC). Il portale **classifica
-già tutte le 290 entità del registry senza modifiche di codice**: le milestone
-future vengono assorbite dal profilo e dal manifest.
+ed esterni, energia) e sta lavorando alla 9 (contratto PLC). Il link è attivo e
+autenticato contro l'istanza reale: su **313 entità live** il portale ne classifica
+188, ne esclude 120 (automazioni, simulazione, integrazioni di sistema HA) e ne
+lascia 5 non classificate, che sono il difetto trattato in P0. Le milestone future
+vengono assorbite dal profilo e dal manifest senza modifiche di codice.
 
 Quindi questi prompt **non servono per far funzionare la lettura**, che funziona
 già. Servono per: rendere permanente il trasporto (P1), attivare il push in tempo
@@ -23,6 +25,7 @@ reale (P2–P5), e colmare le lacune funzionali che il portale non può inventar
 
 | # | Prompt | Serve per | Dipendenze |
 | --- | --- | --- | --- |
+| **P0** | **Correzione: 5 sensori energia/runtime duplicati e non disponibili** | **Difetto reale rilevato dal link** | nessuna |
 | P1 | Rete `villacore_link` + porta mock-api | Trasporto permanente | nessuna |
 | P2 | Package `portal_link.yaml` (rest_command, kill switch, stato) | Base del push | P1 |
 | P3 | `sensor.portal_link_manifest` | Auto-discovery dichiarata | P2 |
@@ -33,9 +36,81 @@ reale (P2–P5), e colmare le lacune funzionali che il portale non può inventar
 | P8 | Handshake housekeeping/manutenzione | Allineamento pulizie e blocchi | P2 |
 | P9 | Generatore appartamenti A2–A6 | Mappatura 1:1 con le 6 unità | nessuna |
 
-Ordine consigliato: **P1 → P2 → P3 → P4 → P5**, poi P6 → P7 → P8, e P9 quando
-serve scalare. Dopo ogni prompt, sul portale: apri **Link VillaCore**, premi
-*Sincronizza catalogo* e controlla che "Non classificate" resti a zero.
+Ordine consigliato: **P0 → P1 → P2 → P3 → P4 → P5**, poi P6 → P7 → P8, e P9
+quando serve scalare. P0 è una correzione di un difetto rilevato dal primo sync
+reale, indipendente dalle milestone.
+
+Dopo ogni prompt, sul portale: apri **Link VillaCore**, premi *Sincronizza
+catalogo* e controlla che "Non classificate" resti a zero.
+
+---
+
+## P0 — Correzione: sensori energia e runtime duplicati
+
+Rilevato dal primo sync reale del portale contro Home Assistant 2026.5.2
+(313 entità live). Non è un problema del portale: le entità corrette esistono e
+funzionano, ma accanto a ognuna ce n'è una gemella permanentemente
+`unavailable`, con `entity_id` e `friendly_name` invertiti.
+
+| entity_id presente in HA | friendly_name | stato |
+| --- | --- | --- |
+| `sensor.energia_villa_oggi` | `energy_villa_daily` | unavailable |
+| `sensor.energia_a1_oggi` | `energy_a1_daily` | unavailable |
+| `sensor.energia_piscina_oggi` | `energy_pool_daily` | unavailable |
+| `sensor.energia_proprieta_oggi` | `energy_site_daily` | unavailable |
+| `sensor.runtime_pompa_piscina_oggi` | `pool_pump_runtime_today` | unavailable |
+
+```text
+Obiettivo: rimuovere cinque entità duplicate e permanentemente non disponibili
+introdotte con le milestone 5 e 8, e impedire che il problema si ripresenti.
+
+Diagnosi: in alcuni template sensor il campo `name` contiene lo slug tecnico
+inglese (es. name: energy_villa_daily) mentre l'entity_id effettivo è stato
+derivato dal nome italiano visualizzato (sensor.energia_villa_oggi). Sono quindi
+scambiati `name` (nome visualizzato, italiano) e l'identificatore tecnico
+(unique_id / default_entity_id, inglese). Il risultato sono due entità: quella
+corretta che funziona e una gemella che resta `unavailable` per sempre.
+
+Le entità corrette e funzionanti sono:
+  sensor.energy_villa_daily = 0.2 kWh    (friendly_name "Energia villa oggi")
+  sensor.energy_a1_daily    = 0.1 kWh
+  sensor.energy_pool_daily  = 0.1 kWh
+  sensor.energy_site_daily  = 0.4 kWh
+  sensor.pool_pump_runtime  = 125.000 h
+
+Le duplicate da eliminare sono:
+  sensor.energia_villa_oggi, sensor.energia_a1_oggi,
+  sensor.energia_piscina_oggi, sensor.energia_proprieta_oggi,
+  sensor.runtime_pompa_piscina_oggi
+
+Modifiche richieste:
+1. In home-assistant/packages/energy.yaml e pool.yaml, individua i template
+   sensor coinvolti e verifica che per ognuno valga la convenzione dell'ADR
+   0007:
+     - `name:` = nome visualizzato in italiano
+     - `unique_id:` = identificatore tecnico inglese, stabile
+     - `default_entity_id:` = l'entity_id dichiarato in config/entity-registry.yaml
+   Correggi dove i due sono invertiti o dove manca default_entity_id.
+2. Verifica anche sensor.a1_energy: il suo friendly_name risulta duplicato
+   ("Energia appartamento A1 Energia appartamento A1"), sintomo dello stesso
+   errore (nome impostato due volte, o name che ripete l'attributo).
+3. Rimuovi le cinque entità orfane dal registro entità di Home Assistant
+   (Impostazioni -> Dispositivi e servizi -> Entità, filtra per non disponibili),
+   perché restano nel registry anche dopo la correzione dello YAML.
+4. Controlla che config/entity-registry.yaml elenchi solo gli entity_id reali:
+   deve essere la verità, non l'intenzione.
+5. Aggiungi un test che confronti gli entity_id dichiarati in
+   config/entity-registry.yaml con i `default_entity_id` presenti nei package,
+   così una futura inversione fallisce in CI invece di creare un fantasma.
+
+Validazione: dopo check_config e riavvio, nessuna entità `unavailable` fra
+quelle di energia e runtime; il portale (pagina Link VillaCore) deve mostrare
+"Non classificate: 0".
+```
+
+Finché non è applicato il portale non perde nulla: le entità corrette vengono
+importate e i costi si calcolano su quelle. Le cinque gemelle restano soltanto
+elencate nel drift report, non diventano dispositivi.
 
 ---
 

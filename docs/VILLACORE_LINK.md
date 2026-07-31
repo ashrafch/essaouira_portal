@@ -72,9 +72,13 @@ resolved in three steps, most authoritative first:
 Anything that still has no capability is reported by `GET /smart/link/drift`
 (surfaced on the **Link VillaCore** page), never silently dropped.
 
-Measured on VillaCore's real registry at milestone 9: **290 entities → 188
-classified, 102 excluded, 0 unclassified.** The 102 exclusions are 52 automations
-and 50 simulation helpers, which must never become portal devices.
+Measured live against the running instance (Home Assistant 2026.5.2, VillaCore at
+milestone 9): **313 entities → 188 classified, 120 excluded, 5 unclassified.**
+The exclusions are automations, VillaCore's simulation helpers and Home
+Assistant's own integrations (`sun`, `backup`), none of which are building
+entities. The 5 unclassified are a VillaCore-side defect — duplicated energy and
+runtime sensors stuck at `unavailable`, addressed by prompt **P0** — and they are
+reported rather than imported, which is exactly what the drift report is for.
 
 ### Zones
 

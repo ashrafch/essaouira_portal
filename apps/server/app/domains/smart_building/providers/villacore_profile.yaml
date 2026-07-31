@@ -55,6 +55,12 @@ exclude:
     - "*.villa_core_simulat*"
     - "*_simulation_*"
     - "*.portal_link_*"
+    # Home Assistant's own integrations surface as `sensor.*`, so the domain
+    # exclusions above cannot catch them. They are not building entities.
+    - "sensor.sun_*"
+    - "sensor.backup_*"
+    - "*.hacs_*"
+    - "*.updater_*"
 
 # Zone prefixes. `kind` decides where the entity lands in the portal:
 #   unit     -> bound to a PMS unit (bookings, readiness, assistants)
