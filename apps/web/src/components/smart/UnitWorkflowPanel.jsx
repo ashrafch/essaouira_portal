@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { LogIn, LogOut, PowerOff, Sparkles, ThermometerSnowflake } from "lucide-react";
+import {
+  Leaf,
+  Lock,
+  LockOpen,
+  LogIn,
+  LogOut,
+  PowerOff,
+  Sparkles,
+  ThermometerSnowflake,
+  ThermometerSun,
+} from "lucide-react";
 import { AppCard, Button, EmptyState, LoadingSkeleton, Modal, useToast } from "../ui";
 import { getRole } from "../../config/rbac";
 import { getSmartUnitCapabilities, runSmartUnitWorkflow } from "../../services/api";
@@ -13,6 +23,10 @@ const WORKFLOW_ICON = {
   safe_off: PowerOff,
   climate_safe_off: ThermometerSnowflake,
   lights_off: PowerOff,
+  lock_entry: Lock,
+  unlock_entry: LockOpen,
+  climate_eco: Leaf,
+  climate_comfort: ThermometerSun,
 };
 
 // Order shown to the operator: the two everyday actions first.
@@ -20,6 +34,10 @@ const WORKFLOW_ORDER = [
   "checkin",
   "checkout",
   "mark_ready",
+  "unlock_entry",
+  "lock_entry",
+  "climate_comfort",
+  "climate_eco",
   "climate_safe_off",
   "lights_off",
   "safe_off",
@@ -70,12 +88,14 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
     load();
   }, [load]);
 
-  async function dispatch(workflow) {
+  async function dispatch(workflow, variables = null) {
     setConfirming(null);
-    setPending(workflow);
+    setPending(variables?.status ? `${workflow}:${variables.status}` : workflow);
     try {
-      const result = await runSmartUnitWorkflow(unitId, workflow,
-        bookingId ? { booking_id: bookingId } : {});
+      const result = await runSmartUnitWorkflow(unitId, workflow, {
+        ...(bookingId ? { booking_id: bookingId } : {}),
+        ...(variables ? { variables } : {}),
+      });
       setLastResult(result);
       if (result.accepted) {
         toast.success(`${result.label} eseguito su VillaCore`);
@@ -95,10 +115,13 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
   if (error) return <p style={{ color: "var(--color-danger)" }}>{error}</p>;
   if (!data) return null;
 
-  const workflows = [...(data.workflows || [])].sort(
-    (a, b) => WORKFLOW_ORDER.indexOf(a.workflow) - WORKFLOW_ORDER.indexOf(b.workflow)
-  );
-  const availableCount = workflows.filter((w) => w.available).length;
+  const all = data.workflows || [];
+  // Housekeeping takes a target state, so it renders as a choice, not a button.
+  const housekeeping = all.find((item) => item.options?.length);
+  const workflows = all
+    .filter((item) => !item.options?.length)
+    .sort((a, b) => WORKFLOW_ORDER.indexOf(a.workflow) - WORKFLOW_ORDER.indexOf(b.workflow));
+  const availableCount = all.filter((w) => w.available).length;
   const capabilityByKey = Object.fromEntries(
     (data.capabilities || []).map((item) => [item.capability_key, item])
   );
@@ -148,6 +171,35 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
           })}
         </div>
       )}
+
+      {housekeeping?.available ? (
+        <div
+          style={{
+            marginTop: 10,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            {housekeeping.label}:
+          </span>
+          {housekeeping.options.map((option) => (
+            <Button
+              key={option}
+              variant="secondary"
+              size="sm"
+              disabled={!canOperate}
+              loading={pending === `${housekeeping.workflow}:${option}`}
+              onClick={() => dispatch(housekeeping.workflow, { status: option })}
+              title={!canOperate ? "Permesso insufficiente" : undefined}
+            >
+              {option}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {!compact ? (
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>

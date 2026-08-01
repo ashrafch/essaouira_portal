@@ -148,7 +148,16 @@ CANONICAL_UNIT_WORKFLOWS: Final[set[str]] = {
     "lights_off",
     "guest_mode_on",
     "guest_mode_off",
+    "lock_entry",
+    "unlock_entry",
+    "climate_eco",
+    "climate_comfort",
+    "housekeeping_set",
 }
+
+# Housekeeping states the building accepts. They mirror VillaCore's own
+# `input_select`, which stays the source of truth for the cleaning state.
+CANONICAL_HOUSEKEEPING_STATES: Final[tuple[str, ...]] = ("Da fare", "In corso", "Fatto")
 
 CANONICAL_FACILITY_ACTIONS: Final[set[str]] = {
     "start",

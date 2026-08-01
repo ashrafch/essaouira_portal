@@ -284,6 +284,9 @@ class UnitWorkflowOut(BaseModel):
     command_type: str
     available: bool
     needs_confirmation: bool = False
+    # Set when the workflow takes a target state rather than being a single
+    # action (housekeeping), so the UI can render a choice.
+    options: list[str] = Field(default_factory=list)
 
 
 class UnitCapabilitiesOut(BaseModel):

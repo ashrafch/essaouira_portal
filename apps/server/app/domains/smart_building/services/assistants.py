@@ -133,6 +133,32 @@ class AssistantsMixin:
             return raw_state == "unlocked"
         return False
 
+    def _unit_occupancy_state(self, unit_id: int | None) -> bool | None:
+        """Is somebody still inside the unit?
+
+        ``None`` when the building exposes no presence at all — a site without
+        those sensors must not be told the unit is empty, only that it is
+        unknown. Prefers the aggregated occupancy sensor, which VillaCore
+        debounces, over a raw motion reading.
+        """
+        if unit_id is None:
+            return None
+        for capability in ("sensor.occupancy", "sensor.motion"):
+            device = self.find_capability_device(capability, unit_id=unit_id)
+            if device is None:
+                continue
+            state = self._state_value(device)
+            if not state.get("online"):
+                continue
+            if state.get("motion_detected") is not None:
+                return bool(state["motion_detected"])
+            raw = str(state.get("value") or "").strip().lower()
+            if raw in {"on", "true", "detected", "occupied"}:
+                return True
+            if raw in {"off", "false", "clear", "vacant"}:
+                return False
+        return None
+
     def _assistant_recent_failures_by_unit(self, unit_ids: set[int]) -> dict[int, list[AutomationExecution]]:
         if not unit_ids:
             return {}
@@ -353,6 +379,11 @@ class AssistantsMixin:
                 warning_reasons.append(f"{len(pending_relevant_tasks)} task post-checkout aperte")
             if scene is None:
                 warning_reasons.append("Scena eco / checkout non configurata")
+            occupancy = self._unit_occupancy_state(booking.unit_id)
+            if occupancy is True:
+                # Closing a stay while someone is still inside is worth stopping
+                # for, so this is a blocker rather than a warning.
+                blocking_reasons.append("Presenza ancora rilevata nell'unita")
 
         if automation_failures:
             warning_reasons.append(f"{len(automation_failures)} failure automazione recenti")

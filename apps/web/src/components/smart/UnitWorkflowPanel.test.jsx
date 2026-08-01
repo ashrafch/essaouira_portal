@@ -156,4 +156,38 @@ describe("UnitWorkflowPanel", () => {
     await waitFor(() => expect(screen.getByText(/Stato soggiorno/)).toBeInTheDocument());
     expect(screen.getByText("Libero")).toBeInTheDocument();
   });
+
+  it("renders housekeeping as a choice of states, not a single button", async () => {
+    getSmartUnitCapabilities.mockResolvedValue(
+      capabilities({
+        workflows: [
+          {
+            workflow: "housekeeping_set",
+            label: "Stato pulizie",
+            capability_key: "workflow.housekeeping_set",
+            command_type: "device.script.run",
+            available: true,
+            needs_confirmation: false,
+            options: ["Da fare", "In corso", "Fatto"],
+          },
+        ],
+      }),
+    );
+    runSmartUnitWorkflow.mockResolvedValue({
+      workflow: "housekeeping_set",
+      label: "Pulizie: Da fare",
+      accepted: true,
+      status: "executed",
+      correlation_id: "abc",
+    });
+    renderPanel();
+    await waitFor(() => expect(screen.getByText(/Stato pulizie/)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Da fare" }));
+    await waitFor(() =>
+      expect(runSmartUnitWorkflow).toHaveBeenCalledWith(3, "housekeeping_set", {
+        variables: { status: "Da fare" },
+      }),
+    );
+  });
 });

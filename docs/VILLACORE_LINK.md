@@ -152,7 +152,19 @@ Workflows include `checkin`, `checkout`, `mark_ready`, `safe_off`,
 `lock_entry`, `unlock_entry`, `lights_off`, `guest_mode_on` and `guest_mode_off`.
 When VillaCore defines a
 dedicated script *and* a bare helper for the same thing, the script wins — it
-carries the safety conditions that flipping the helper would bypass.
+carries the safety conditions that flipping the helper would bypass. That is why
+`unlock_entry` drives `script.a1_unlock_entry` rather than `lock.a1_entry`, and
+`housekeeping_set` prefers the script over the bare `input_select`.
+
+`housekeeping_set` takes a target state (`Da fare` | `In corso` | `Fatto`) in
+`variables.status`; the others take no argument. Opening a door and closing a
+stay ask for confirmation in the UI.
+
+**Checkout vacancy.** With `sensor.occupancy` (or, failing that, `sensor.motion`)
+reporting presence, the checkout assistant marks the booking `BLOCKED` rather than
+merely warning: ending a stay while somebody is still inside is worth stopping
+for. A site that exposes no presence at all reports *unknown* and is never told
+the unit is empty.
 
 Command types added for scripted objects: `device.script.run`,
 `device.scene.apply`, `device.select.set_option`, `device.number.set_value`,
@@ -338,6 +350,9 @@ End-to-end checks worth running after any VillaCore milestone:
 
 ## 9. Current limitations
 
+- **Facility actions stay at two.** Shared plants expose only `safe_off` and
+  `alarm_reset` by design; modes, manual starts, timers and setpoints remain in
+  Home Assistant, which owns the interlocks.
 - **`SMART_INGEST_TOKEN` is single-tenant.** The ingest identity maps to the
   configured admin tenant; a multi-tenant deployment needs per-tenant secrets.
 - **No hardware.** Villa, A1–A6, facilities, PLC contract and all 159 MQTT

@@ -18,6 +18,7 @@ from fastapi import HTTPException
 
 from app.domains.smart_building.schemas import DeviceCommandCreate
 from app.domains.smart_building.taxonomy import (
+    CANONICAL_HOUSEKEEPING_STATES,
     CANONICAL_UNIT_WORKFLOWS,
     normalize_trigger_source,
 )
@@ -45,7 +46,27 @@ WORKFLOW_SPECS: dict[str, tuple[tuple[str, str, dict], ...]] = {
         ("workflow.guest_mode_off", "device.script.run", {}),
         ("flag.guest_mode", "device.boolean.set_state", {"target": "off"}),
     ),
+    # Guest access. The lock script carries VillaCore's own conditions; the lock
+    # entity is the fallback for a site that exposes the hardware directly.
+    "lock_entry": (
+        ("workflow.lock_entry", "device.script.run", {}),
+        ("lock.entry", "device.lock.set_state", {"target": "lock"}),
+    ),
+    "unlock_entry": (
+        ("workflow.unlock_entry", "device.script.run", {}),
+        ("lock.entry", "device.lock.set_state", {"target": "unlock"}),
+    ),
+    # Comfort profiles: eco while the unit is empty, comfort before an arrival.
+    # VillaCore refuses comfort when its own safety conditions are not met.
+    "climate_eco": (("workflow.climate_eco", "device.script.run", {}),),
+    "climate_comfort": (("workflow.climate_comfort", "device.script.run", {}),),
 }
+
+# Housekeeping is a status, not a switch: it takes the target state as an
+# argument, so it is dispatched separately from the fixed workflows above.
+HOUSEKEEPING_WORKFLOW = "housekeeping_set"
+HOUSEKEEPING_CAPABILITY = "workflow.housekeeping_set"
+HOUSEKEEPING_FALLBACK_CAPABILITY = "status.housekeeping"
 
 WORKFLOW_LABELS: dict[str, str] = {
     "checkin": "Check-in",
@@ -56,10 +77,21 @@ WORKFLOW_LABELS: dict[str, str] = {
     "lights_off": "Spegni luci",
     "guest_mode_on": "Attiva modalita ospite",
     "guest_mode_off": "Disattiva modalita ospite",
+    "lock_entry": "Chiudi ingresso",
+    "unlock_entry": "Apri ingresso",
+    "climate_eco": "Clima eco",
+    "climate_comfort": "Clima comfort",
 }
 
-# Workflows an operator can trigger without extra confirmation in the UI.
-WORKFLOW_DESTRUCTIVE = {"checkout", "safe_off", "climate_safe_off", "lights_off"}
+# Workflows that ask for confirmation: they cut services to a unit that may be
+# occupied, or they open a door.
+WORKFLOW_DESTRUCTIVE = {
+    "checkout",
+    "safe_off",
+    "climate_safe_off",
+    "lights_off",
+    "unlock_entry",
+}
 
 
 class WorkflowsMixin:
@@ -84,6 +116,29 @@ class WorkflowsMixin:
                     "needs_confirmation": key in WORKFLOW_DESTRUCTIVE,
                 }
             )
+
+        # Housekeeping takes a target state, so it is described separately and
+        # the UI renders it as a choice rather than a single button.
+        housekeeping_capability = (
+            HOUSEKEEPING_CAPABILITY
+            if HOUSEKEEPING_CAPABILITY in available_capabilities
+            else HOUSEKEEPING_FALLBACK_CAPABILITY
+        )
+        rows.append(
+            {
+                "workflow": HOUSEKEEPING_WORKFLOW,
+                "label": "Stato pulizie",
+                "capability_key": housekeeping_capability,
+                "command_type": (
+                    "device.script.run"
+                    if housekeeping_capability == HOUSEKEEPING_CAPABILITY
+                    else "device.select.set_option"
+                ),
+                "available": housekeeping_capability in available_capabilities,
+                "needs_confirmation": False,
+                "options": list(CANONICAL_HOUSEKEEPING_STATES),
+            }
+        )
         return rows
 
     def _resolve_workflow_candidate(
@@ -119,6 +174,78 @@ class WorkflowsMixin:
             variables["arrival_time"] = booking.estimated_arrival_time.strftime("%H:%M")
         return variables
 
+    def _run_housekeeping_workflow(
+        self,
+        unit_id: int,
+        *,
+        variables: dict | None,
+        requested_by: str | None,
+        correlation_id: str | None,
+        trigger_source: str,
+    ) -> dict[str, object]:
+        """Set the cleaning state on the building side.
+
+        VillaCore owns the housekeeping state; the portal reflects the decision
+        the operator already took here (a task marked done, a unit released), so
+        the two never disagree about whether a unit has been cleaned.
+        """
+        unit = self._ensure_unit_visible(unit_id)
+        status = str((variables or {}).get("status", "")).strip()
+        if status not in CANONICAL_HOUSEKEEPING_STATES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "housekeeping_set richiede status fra "
+                    + " | ".join(CANONICAL_HOUSEKEEPING_STATES)
+                ),
+            )
+
+        effective_correlation_id = self._make_correlation_id(correlation_id)
+        device = self.find_capability_device(HOUSEKEEPING_CAPABILITY, unit_id=unit_id)
+        if device is not None:
+            command_type = "device.script.run"
+            payload: dict[str, object] = {
+                "variables": {
+                    "status": status,
+                    "correlation_id": effective_correlation_id,
+                    "source": "hostara.portal",
+                }
+            }
+        else:
+            # No dedicated script: drive the select the building exposes.
+            device = self.require_capability_device(
+                HOUSEKEEPING_FALLBACK_CAPABILITY,
+                unit_id=unit_id,
+                subject=f"unita '{unit.name}'",
+            )
+            command_type = "device.select.set_option"
+            payload = {"option": status}
+
+        command = self.create_device_command(
+            device.id,
+            DeviceCommandCreate(command_type=command_type, payload=payload, ttl_seconds=300),
+            requested_by=requested_by,
+            correlation_id=effective_correlation_id,
+        )
+        return {
+            "unit_id": unit.id,
+            "unit_name": unit.name,
+            "workflow": HOUSEKEEPING_WORKFLOW,
+            "label": f"Pulizie: {status}",
+            "capability_key": device.capability_key or HOUSEKEEPING_CAPABILITY,
+            "device_id": device.id,
+            "device_name": device.name,
+            "external_id": device.external_id,
+            "command_id": command.id,
+            "command_type": command.command_type,
+            "status": command.status,
+            "accepted": command.status in {"accepted", "executed"},
+            "error_message": command.error_message,
+            "correlation_id": effective_correlation_id,
+            "trigger_source": normalize_trigger_source(trigger_source),
+            "booking_id": None,
+        }
+
     def run_unit_workflow(
         self,
         unit_id: int,
@@ -132,7 +259,17 @@ class WorkflowsMixin:
     ) -> dict[str, object]:
         self._require_write_access()
         key = (workflow or "").strip().lower()
-        if key not in CANONICAL_UNIT_WORKFLOWS or key not in WORKFLOW_SPECS:
+        if key not in CANONICAL_UNIT_WORKFLOWS:
+            raise HTTPException(status_code=400, detail=f"Workflow '{workflow}' non supportato")
+        if key == HOUSEKEEPING_WORKFLOW:
+            return self._run_housekeeping_workflow(
+                unit_id,
+                variables=variables,
+                requested_by=requested_by,
+                correlation_id=correlation_id,
+                trigger_source=trigger_source,
+            )
+        if key not in WORKFLOW_SPECS:
             raise HTTPException(status_code=400, detail=f"Workflow '{workflow}' non supportato")
 
         unit = self._ensure_unit_visible(unit_id)

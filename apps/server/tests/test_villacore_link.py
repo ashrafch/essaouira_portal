@@ -40,6 +40,19 @@ def _villacore_states():
         _entity("binary_sensor.a1_devices_available", "on", device_class="connectivity"),
         _entity("sensor.a1_living_temperature", "21.5", device_class="temperature", unit_of_measurement="°C"),
         _entity("light.a1_living_kitchen_main", "off"),
+        # --- hospitality controls added by VillaCore prompts P6/P7/P8 ---
+        _entity("lock.a1_entry", "locked"),
+        _entity("script.a1_lock_entry", "off"),
+        _entity("script.a1_unlock_entry", "off"),
+        _entity("binary_sensor.a1_occupancy_detected", "off", device_class="occupancy"),
+        _entity("script.a1_climate_eco", "off"),
+        _entity("script.a1_climate_comfort", "off"),
+        _entity("script.a1_housekeeping_set", "off"),
+        _entity(
+            "input_select.a1_housekeeping",
+            "Fatto",
+            options=["Da fare", "In corso", "Fatto"],
+        ),
         # --- pool plant ---
         _entity("sensor.pool_filtration_state", "idle"),
         _entity("input_select.pool_filtration_mode", "Automatico"),
@@ -440,6 +453,133 @@ def test_villacore_is_selectable_wherever_a_provider_is_chosen():
             )
             assert wizard.status_code == 200, wizard.text
             assert wizard.json()["metadata"]["provider_name"] == "villacore"
+
+
+def test_hospitality_controls_are_exposed_as_workflows():
+    """Lock, eco/comfort and housekeeping arrived with VillaCore P6-P8."""
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            unit_id = _unit_id(client, headers)
+            _bind_zone_map(client, headers, unit_id)
+            client.post("/smart/providers/sync?provider=villacore", headers=headers)
+
+            payload = client.get(f"/smart/units/{unit_id}/capabilities", headers=headers).json()
+            workflows = {item["workflow"]: item for item in payload["workflows"]}
+            for key in ("lock_entry", "unlock_entry", "climate_eco", "climate_comfort"):
+                assert workflows[key]["available"] is True, key
+            # Opening a door is not a routine click.
+            assert workflows["unlock_entry"]["needs_confirmation"] is True
+            assert workflows["lock_entry"]["needs_confirmation"] is False
+
+            housekeeping = workflows["housekeeping_set"]
+            assert housekeeping["available"] is True
+            assert housekeeping["options"] == ["Da fare", "In corso", "Fatto"]
+
+
+def test_housekeeping_workflow_sends_the_requested_state():
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            unit_id = _unit_id(client, headers)
+            _bind_zone_map(client, headers, unit_id)
+            client.post("/smart/providers/sync?provider=villacore", headers=headers)
+
+            response = client.post(
+                f"/smart/units/{unit_id}/workflow/housekeeping_set",
+                headers=headers,
+                json={"variables": {"status": "Da fare"}},
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["accepted"] is True
+
+            service, payload = next(
+                call
+                for call in fake.service_calls
+                if call[1].get("entity_id") == "script.a1_housekeeping_set"
+            )
+            assert service == "script/turn_on"
+            assert payload["variables"]["status"] == "Da fare"
+
+            rejected = client.post(
+                f"/smart/units/{unit_id}/workflow/housekeeping_set",
+                headers=headers,
+                json={"variables": {"status": "Inventato"}},
+            )
+            assert rejected.status_code == 400
+
+
+def test_unlock_prefers_the_villacore_script_over_the_bare_lock():
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            unit_id = _unit_id(client, headers)
+            _bind_zone_map(client, headers, unit_id)
+            client.post("/smart/providers/sync?provider=villacore", headers=headers)
+
+            response = client.post(
+                f"/smart/units/{unit_id}/workflow/unlock_entry", headers=headers, json={}
+            )
+            assert response.status_code == 200, response.text
+            # The script carries VillaCore's own conditions; driving lock.a1_entry
+            # directly would bypass them.
+            assert response.json()["capability_key"] == "workflow.unlock_entry"
+            assert any(
+                call[1].get("entity_id") == "script.a1_unlock_entry"
+                for call in fake.service_calls
+            )
+
+
+def test_checkout_is_blocked_while_presence_is_still_detected():
+    """The vacancy check that P6's occupancy sensor finally makes possible."""
+    occupied = [
+        dict(entity, state="on") if entity["entity_id"] == "binary_sensor.a1_occupancy_detected"
+        else entity
+        for entity in _villacore_states()
+    ]
+
+    class _OccupiedHomeAssistant(_FakeHomeAssistant):
+        def __call__(self, provider, method, path, payload=None):
+            if method == "GET" and path == "/api/states":
+                return occupied
+            if method == "GET" and path.startswith("/api/states/"):
+                entity_id = path.rsplit("/", 1)[-1]
+                match = next((e for e in occupied if e["entity_id"] == entity_id), None)
+                if match is None:
+                    raise RuntimeError("Home Assistant API error 404: not found")
+                return match
+            return super().__call__(provider, method, path, payload)
+
+    fake = _OccupiedHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            unit_id = _unit_id(client, headers)
+            _bind_zone_map(client, headers, unit_id)
+            client.post("/smart/providers/sync?provider=villacore", headers=headers)
+
+            booking = client.post(
+                "/bookings",
+                headers=headers,
+                json={
+                    "unit_id": unit_id,
+                    "guest_name": "Ancora dentro",
+                    "num_adults": 1,
+                    "checkin_date": "2027-09-01",
+                    "checkout_date": "2027-09-04",
+                },
+            )
+            assert booking.status_code in {200, 201}, booking.text
+            booking_id = booking.json()["id"]
+
+            item = client.get(
+                f"/smart/assistant/checkout/{booking_id}", headers=headers
+            ).json()
+            assert item["assistant_status"] == "BLOCKED"
+            assert any("Presenza ancora rilevata" in reason for reason in item["blocking_reasons"])
 
 
 def test_transport_errors_are_explained_not_just_forwarded():
