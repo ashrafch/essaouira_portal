@@ -176,7 +176,11 @@ class ProviderDebugOut(BaseModel):
 class ProviderSyncOut(BaseModel):
     provider_name: str
     imported_devices: int
+    # Existing devices seen by the sync.
     updated_devices: int
+    # Of those, the ones whose catalog data actually moved. A quiet
+    # reconciliation pass reports 0 here.
+    changed_devices: int = 0
     synced_states: int
 
 

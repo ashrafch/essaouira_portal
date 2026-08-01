@@ -582,6 +582,37 @@ def test_checkout_is_blocked_while_presence_is_still_detected():
             assert any("Presenza ancora rilevata" in reason for reason in item["blocking_reasons"])
 
 
+def test_a_quiet_resync_writes_no_catalog_events():
+    """Reconciliation runs on a timer: a no-op pass must stay silent.
+
+    One event per device per pass is ~450 rows every five minutes here, which
+    buried the real push events under tens of thousands of no-ops within hours.
+    """
+    fake = _FakeHomeAssistant()
+    with _villacore_env(), _patch_ha(fake):
+        with TestClient(app) as client:
+            headers = _headers()
+            unit_id = _unit_id(client, headers)
+            _bind_zone_map(client, headers, unit_id)
+
+            first = client.post("/smart/providers/sync?provider=villacore", headers=headers)
+            assert first.status_code == 200, first.text
+
+            def catalog_event_count() -> int:
+                events = client.get("/smart/events?limit=500", headers=headers).json()
+                return len([e for e in events if e["event_type"] == "provider.catalog.synced"])
+
+            before = catalog_event_count()
+            second = client.post("/smart/providers/sync?provider=villacore", headers=headers)
+            assert second.status_code == 200, second.text
+            body = second.json()
+
+            # Devices are still visited, but nothing moved.
+            assert body["updated_devices"] >= 1
+            assert body["changed_devices"] == 0
+            assert catalog_event_count() == before
+
+
 def test_transport_errors_are_explained_not_just_forwarded():
     from app.domains.smart_building.providers.villacore import VillaCoreProvider
 

@@ -295,7 +295,12 @@ class ProviderLinkMixin:
 
         imported_devices = 0
         updated_devices = 0
+        # `updated_devices` keeps its original meaning (existing devices seen).
+        # `changed_devices` counts the ones whose catalog data actually moved,
+        # and only those are worth an audit event.
+        changed_devices = 0
         synced_states = 0
+        imported_ids: set[int] = set()
 
         try:
             snapshots = provider.list_devices(self.tenant_id)
@@ -330,7 +335,26 @@ class ProviderLinkMixin:
                 self.db.add(device)
                 self.db.flush()
                 imported_devices += 1
+                imported_ids.add(device.id)
+                catalog_changed = True
             else:
+                # Only a real change is worth an audit entry: reconciliation
+                # revisits every device on a timer, and writing one event per
+                # device per pass buries the meaningful ones under tens of
+                # thousands of no-ops.
+                before = (
+                    device.name,
+                    device.category,
+                    device.model,
+                    device.manufacturer,
+                    device.zone_name,
+                    device.zone_key,
+                    device.capability_key,
+                    device.facility_key,
+                    device.unit_id,
+                    device.is_active,
+                    device.health_status,
+                )
                 device.name = snapshot.name
                 device.category = snapshot.category
                 device.model = snapshot.model
@@ -349,7 +373,23 @@ class ProviderLinkMixin:
                 device.health_status = snapshot.health_status
                 if snapshot.battery_level is not None:
                     device.battery_level = snapshot.battery_level
+                after = (
+                    device.name,
+                    device.category,
+                    device.model,
+                    device.manufacturer,
+                    device.zone_name,
+                    device.zone_key,
+                    device.capability_key,
+                    device.facility_key,
+                    device.unit_id,
+                    device.is_active,
+                    device.health_status,
+                )
+                catalog_changed = before != after
                 updated_devices += 1
+                if catalog_changed:
+                    changed_devices += 1
 
             if snapshot.state is not None:
                 state_payload = self._state_payload_from_provider_snapshot(snapshot.state)
@@ -372,26 +412,29 @@ class ProviderLinkMixin:
                     )
                 synced_states += 1
 
-            self.create_device_event(
-                device_id=device.id,
-                payload=DeviceEventCreate(
-                    event_type="provider.catalog.synced",
-                    severity="info",
-                    source=provider.provider_name,
-                    payload_json=json.dumps(
-                        {
-                            "external_id": snapshot.external_id,
-                            "unit_hint": snapshot.unit_hint,
-                        },
-                        ensure_ascii=True,
+            if catalog_changed:
+                self.create_device_event(
+                    device_id=device.id,
+                    payload=DeviceEventCreate(
+                        event_type="provider.catalog.synced",
+                        severity="info",
+                        source=provider.provider_name,
+                        payload_json=json.dumps(
+                            {
+                                "external_id": snapshot.external_id,
+                                "unit_hint": snapshot.unit_hint,
+                                "imported": device.id in imported_ids,
+                            },
+                            ensure_ascii=True,
+                        ),
                     ),
-                ),
-            )
+                )
 
         return {
             "provider_name": provider.provider_name,
             "imported_devices": imported_devices,
             "updated_devices": updated_devices,
+            "changed_devices": changed_devices,
             "synced_states": synced_states,
         }
 
