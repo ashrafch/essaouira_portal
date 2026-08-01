@@ -57,6 +57,11 @@ SUPPORTED_ENTITY_DOMAINS = {"switch", "light", "climate", "lock", "sensor", "bin
 # They are always considered online, so health monitoring does not invent alerts.
 STATELESS_DOMAINS = {"scene"}
 
+# Helper domains where an empty state is a legitimate value, not a fault: an
+# access code not yet issued or a booking reference not yet set is simply empty.
+# Home Assistant says `unavailable` / `unknown` when something is actually wrong.
+EMPTY_IS_A_VALUE_DOMAINS = {"input_text", "input_select", "input_number", "input_datetime"}
+
 
 def parse_entity_domain(entity_id: str) -> str:
     return (entity_id.split(".", 1)[0] if entity_id and "." in entity_id else "").strip().lower()
@@ -117,6 +122,8 @@ def map_entity_to_state(entity: dict[str, Any]) -> ProviderStateSnapshot:
     # it as one produced permanent false "device offline" alerts.
     if domain in STATELESS_DOMAINS:
         online = True
+    elif domain in EMPTY_IS_A_VALUE_DOMAINS:
+        online = state_value not in {"unavailable", "unknown"}
 
     motion = None
     contact_open = None

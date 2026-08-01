@@ -582,6 +582,25 @@ def test_checkout_is_blocked_while_presence_is_still_detected():
             assert any("Presenza ancora rilevata" in reason for reason in item["blocking_reasons"])
 
 
+def test_empty_helpers_and_unused_scenes_are_not_offline_devices():
+    """Neither state means a fault, and both used to raise device.offline alerts."""
+    from app.domains.smart_building.providers.home_assistant_mapping import map_entity_to_state
+
+    # An access code not yet issued, a booking reference not yet set.
+    empty_text = map_entity_to_state(_entity("input_text.a1_access_code", ""))
+    assert empty_text.online is True
+
+    # A scene holds the timestamp of its last activation; never run reads unknown.
+    unused_scene = map_entity_to_state(_entity("scene.villa_evening", "unknown"))
+    assert unused_scene.online is True
+
+    # A genuine fault must still be reported.
+    broken = map_entity_to_state(_entity("input_text.a1_booking_ref", "unavailable"))
+    assert broken.online is False
+    missing_sensor = map_entity_to_state(_entity("sensor.a1_living_temperature", "unavailable"))
+    assert missing_sensor.online is False
+
+
 def test_a_quiet_resync_writes_no_catalog_events():
     """Reconciliation runs on a timer: a no-op pass must stay silent.
 
