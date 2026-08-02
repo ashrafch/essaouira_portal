@@ -15,9 +15,23 @@ Neither re-implements the other. Where they meet, this contract applies.
 
 ## 1. Transport
 
-The portal reaches Home Assistant by service name over a shared Docker network,
-so nothing depends on a host IP or a published port and dev behaves like
-production.
+There are two supported topologies, and which one applies depends on how Home
+Assistant runs. Only the value of `HOME_ASSISTANT_URL` changes; the contract,
+the capabilities and the events are identical.
+
+**A — Home Assistant as a container (one host).** The portal reaches it by
+service name over a shared Docker network: no host IP, no published HA port. This
+is the development setup and it is also a perfectly good single-server
+production setup.
+
+**B — Home Assistant OS in its own VM.** This is VillaCore's stated production
+target (HAOS VM + a separate Linux Docker host on Proxmox). There is no shared
+Docker network to join, so the two sides talk over the server VLAN:
+`HOME_ASSISTANT_URL=http://<haos-ip>:8123`, and HAOS posts events to
+`http://<docker-host>:<WEB_PORT>/api/smart/link/events` through the portal's
+nginx proxy — the API itself stays bound to loopback. See §7.
+
+The rest of this section describes topology A.
 
 ```bash
 scripts/link-villacore.ps1            # Windows
@@ -302,7 +316,64 @@ in the UI and in the cost description. It is never presented as a measurement.
 
 ---
 
-## 7. Starting over
+## 7. Production topologies
+
+### A — One Linux server, both stacks in Docker
+
+The simplest deployment and the closest to development. On the property's server:
+
+```bash
+# once
+docker network create villacore_link
+# VillaCore, with its portal overlay so the attachment survives recreation
+docker compose -f docker-compose.yml -f docker-compose.portal.yml up -d
+# the portal
+docker compose --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.villacore.yml up -d
+```
+
+`HOME_ASSISTANT_URL=http://home-assistant:8123`, `portal_base_url: http://backend:8000`
+in VillaCore's secrets. Nothing crosses the LAN, so the ingest token never leaves
+the host.
+
+### B — Proxmox: HAOS VM + Docker host VM
+
+VillaCore's stated production target. Home Assistant is no longer a container, so
+there is no shared Docker network:
+
+| | Value |
+| --- | --- |
+| Portal → HAOS | `HOME_ASSISTANT_URL=http://<haos-ip>:8123` (no link overlay) |
+| HAOS → portal | `portal_base_url: http://<docker-host-ip>:<WEB_PORT>/api` |
+
+The second one matters: the portal's API is bound to loopback by design, so HAOS
+must post through the nginx proxy (`/api/smart/link/events`), which forwards the
+`X-Smart-Ingest-Token` header unchanged. Nothing needs to be exposed beyond the
+port the portal already publishes.
+
+What to settle at commissioning:
+
+- **Fixed addresses.** Both sides reference the other by IP or internal DNS; a
+  DHCP change silently breaks the link. `GET /smart/link/status` reports it, and
+  a name that stops resolving is explained in the error rather than left as an
+  errno.
+- **VLAN rules.** HAOS and the Docker host both sit on the server VLAN in
+  VillaCore's plan; the two ports above must be allowed between them.
+- **TLS.** The shared secret travels in a header. Inside a trusted server VLAN
+  plain HTTP is defensible; across anything else, terminate TLS in front of the
+  portal and use `https://` in `portal_base_url`.
+- **Reconciliation as the safety net.** Set `SMART_POLL_INTERVAL_SECONDS` (300 is
+  a good default): if HAOS reboots or a POST is lost, the portal converges anyway.
+- **Backups are separate.** HAOS backs itself up natively; the portal's data lives
+  in PostgreSQL and needs `--profile ops` plus `scripts/offsite-sync.sh`. RAID is
+  not a backup, and neither is a snapshot on the same host.
+
+Either way the portal is a normal Compose stack: nothing about it requires
+Proxmox, and moving from A to B is a change of two URLs.
+
+---
+
+## 8. Starting over
 
 `scripts/reset_smart_layer.py` clears what the portal derived from the building —
 devices and everything hanging off them, provider connections, scenario packs,
@@ -321,7 +392,7 @@ To redo the onboarding without deleting anything, use **Riavvia procedura** in t
 wizard (`POST /setup/restart`): it abandons the session in progress and starts
 from step one, leaving properties, units, devices and mappings intact.
 
-## 8. Verification
+## 9. Verification
 
 ```bash
 # static
@@ -348,7 +419,7 @@ End-to-end checks worth running after any VillaCore milestone:
 
 ---
 
-## 9. Current limitations
+## 10. Current limitations
 
 - **Facility actions stay at two.** Shared plants expose only `safe_off` and
   `alarm_reset` by design; modes, manual starts, timers and setpoints remain in

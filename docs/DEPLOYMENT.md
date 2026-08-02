@@ -186,6 +186,12 @@ docker compose -f docker-compose.yml -f docker-compose.villacore.yml up -d --bui
 Verify on the **Link VillaCore** page (owner only) or via
 `GET /smart/link/status`. Full contract: [VILLACORE_LINK.md](VILLACORE_LINK.md).
 
+This shared-network setup assumes Home Assistant runs as a container. On
+VillaCore's Proxmox target Home Assistant is an OS VM, so there is no network to
+share: the portal points at the HAOS address and HAOS posts events through the
+portal's nginx proxy. Both topologies are laid out in
+[VILLACORE_LINK.md](VILLACORE_LINK.md) section 7.
+
 Note: the runtime network attachment is lost if the VillaCore container is
 recreated — prompt **P1** in [VILLACORE_PROMPTS.md](VILLACORE_PROMPTS.md) makes it
 permanent on the VillaCore side.
