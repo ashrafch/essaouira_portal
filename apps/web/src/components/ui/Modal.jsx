@@ -38,7 +38,18 @@ function Modal({
 }) {
   const dialogRef = useRef(null);
   const lastFocusedRef = useRef(null);
+  const onCloseRef = useRef(onClose);
 
+  // Callers pass `onClose` as an inline arrow, so its identity changes on every
+  // parent render. Reading it through a ref keeps it out of the effect
+  // dependencies below — otherwise each keystroke inside the dialog would tear
+  // down and re-run the focus effect, moving focus off the field being typed in.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Focus lifecycle: entering the dialog on open, restoring the trigger on
+  // close. Depends on `open` alone — it must run exactly once per open/close.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -47,11 +58,24 @@ function Modal({
     const firstFocusable = node?.querySelector(FOCUSABLE_SELECTOR);
     (firstFocusable || node)?.focus();
 
+    return () => {
+      const trigger = lastFocusedRef.current;
+      lastFocusedRef.current = null;
+      if (trigger && typeof trigger.focus === "function") {
+        trigger.focus();
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
     function handleKeyDown(event) {
       if (event.key === "Escape") {
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
+      const node = dialogRef.current;
       if (!trapFocus || event.key !== "Tab" || !node) return;
       const focusableEls = node.querySelectorAll(FOCUSABLE_SELECTOR);
       if (focusableEls.length === 0) return;
@@ -67,13 +91,8 @@ function Modal({
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      if (lastFocusedRef.current && typeof lastFocusedRef.current.focus === "function") {
-        lastFocusedRef.current.focus();
-      }
-    };
-  }, [open, onClose, trapFocus]);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, trapFocus]);
 
   if (!open) return null;
 
