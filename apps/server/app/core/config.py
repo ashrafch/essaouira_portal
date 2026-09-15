@@ -162,19 +162,42 @@ class Settings:
 
     # --- Safety checks ---
 
+    @property
+    def is_production(self) -> bool:
+        return (self.app_env or "").strip().lower() == "production"
+
     def validate_production_safety(self) -> None:
         """Refuse to start in production with known-weak credentials."""
-        if (self.app_env or "").strip().lower() != "production":
+        if not self.is_production:
             return
 
         problems: list[str] = []
         secret = (self.auth_secret_key or "").strip()
-        if not secret or secret in WEAK_AUTH_SECRET_KEYS:
+        if len(secret) < 32 or secret in WEAK_AUTH_SECRET_KEYS:
             problems.append(
                 "AUTH_SECRET_KEY is missing or set to a known weak default"
             )
         if (self.admin_password or "") in WEAK_ADMIN_PASSWORDS:
             problems.append("ADMIN_PASSWORD is set to the known weak default")
+
+        if not self.auth_enabled:
+            problems.append("AUTH_ENABLED must be true")
+        if self.auto_create_schema or self.auto_seed_data:
+            problems.append("AUTO_CREATE_SCHEMA and AUTO_SEED_DATA must be false; run migrations")
+        # Legacy PMS tables are global. Until they are tenant-scoped, never
+        # advertise or admit another owner's tenant in production.
+        if self.admin_tenant_id != "default":
+            problems.append("ADMIN_TENANT_ID must be default for single-owner production")
+        if self.admin_role != "owner":
+            problems.append("ADMIN_ROLE must be owner")
+        if not (self.admin_username or "").strip():
+            problems.append("ADMIN_USERNAME must not be empty")
+        if not self.admin_password_hash and len(self.admin_password or "") < max(12, self.password_min_length):
+            problems.append("ADMIN_PASSWORD must contain at least 12 characters or provide a password hash")
+        if self.auth_algorithm not in {"HS256", "HS384", "HS512"}:
+            problems.append("AUTH_ALGORITHM must be an HMAC SHA-2 algorithm")
+        if self.auth_access_token_minutes <= 0:
+            problems.append("AUTH_ACCESS_TOKEN_MINUTES must be positive")
 
         if problems:
             raise RuntimeError(

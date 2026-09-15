@@ -45,7 +45,7 @@ class SmartServiceBase:
         return connection
 
     def _require_write_access(self) -> None:
-        if self.role in {"operator", "viewer"}:
+        if self.role not in {"owner", "manager"}:
             raise HTTPException(status_code=403, detail="Permesso insufficiente per modifiche smart")
 
     def _ensure_unit_visible(self, unit_id: int) -> Unit:

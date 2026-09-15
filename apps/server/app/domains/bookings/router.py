@@ -6,10 +6,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.domains.bookings.schemas import BookingCreate, BookingOut, BookingUpdate
 from app.domains.bookings.service import (
-    compute_booking_financials,
-    create_auto_staff_tasks_for_booking,
+    save_booking,
 )
-from app.domains.revenue.service import get_min_stay
 from app.models.booking import Booking
 from app.models.staff_task import StaffTask
 from app.models.unit import Unit
@@ -28,144 +26,12 @@ def list_bookings(db: Session = Depends(get_db)):
 
 @router.post("/bookings", response_model=BookingOut)
 def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
-    unit = db.query(Unit).filter(Unit.id == payload.unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=400, detail="Unità inesistente")
-
-    if payload.checkout_date <= payload.checkin_date:
-        raise HTTPException(
-            status_code=400,
-            detail="checkout_date deve essere dopo checkin_date",
-        )
-
-    conflict = (
-        db.query(Booking)
-        .filter(
-            Booking.unit_id == payload.unit_id,
-            Booking.checkin_date < payload.checkout_date,
-            Booking.checkout_date > payload.checkin_date,
-        )
-        .first()
-    )
-    if conflict:
-        raise HTTPException(
-            status_code=400,
-            detail="Esiste già una prenotazione per questa unità nelle date selezionate.",
-        )
-
-    min_stay = get_min_stay(db, payload.unit_id, payload.checkin_date)
-    if min_stay and (payload.checkout_date - payload.checkin_date).days < min_stay:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Soggiorno minimo di {min_stay} notti per la data di arrivo selezionata.",
-        )
-
-    financials = compute_booking_financials(db, payload, unit)
-
-    booking = Booking(
-        unit_id=payload.unit_id,
-        guest_name=payload.guest_name,
-        guest_email=payload.guest_email,
-        guest_phone=payload.guest_phone,
-        num_adults=payload.num_adults,
-        num_children=payload.num_children,
-        estimated_arrival_time=payload.estimated_arrival_time,
-
-        source=payload.source,
-        status=payload.status,
-        checkin_date=payload.checkin_date,
-        checkout_date=payload.checkout_date,
-        notes=payload.notes,
-        nightly_rate=financials["nightly_rate"],
-        total_price=financials["total_price"],
-        cleaning_fee=financials["cleaning_fee"],
-        city_tax=financials["city_tax"],
-        channel_fee=financials["channel_fee"],
-        currency=payload.currency,
-        is_paid=payload.is_paid,
-        has_late_checkout=payload.has_late_checkout,
-    )
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
-
-    create_auto_staff_tasks_for_booking(db, booking)
-
-    return booking
+    return save_booking(db, payload)
 
 
 @router.put("/bookings/{booking_id}", response_model=BookingOut)
-def update_booking(
-    booking_id: int, payload: BookingUpdate, db: Session = Depends(get_db)
-):
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
-    if not booking:
-        raise HTTPException(status_code=404, detail="Prenotazione non trovata")
-
-    unit = db.query(Unit).filter(Unit.id == payload.unit_id).first()
-    if not unit:
-        raise HTTPException(status_code=400, detail="Unità inesistente")
-
-    if payload.checkout_date <= payload.checkin_date:
-        raise HTTPException(
-            status_code=400,
-            detail="checkout_date deve essere dopo checkin_date",
-        )
-
-    conflict = (
-        db.query(Booking)
-        .filter(
-            Booking.unit_id == payload.unit_id,
-            Booking.id != booking_id,
-            Booking.checkin_date < payload.checkout_date,
-            Booking.checkout_date > payload.checkin_date,
-        )
-        .first()
-    )
-    if conflict:
-        raise HTTPException(
-            status_code=400,
-            detail="Esiste già una prenotazione per questa unità nelle date selezionate.",
-        )
-
-    min_stay = get_min_stay(db, payload.unit_id, payload.checkin_date)
-    if min_stay and (payload.checkout_date - payload.checkin_date).days < min_stay:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Soggiorno minimo di {min_stay} notti per la data di arrivo selezionata.",
-        )
-
-    financials = compute_booking_financials(db, payload, unit)
-
-    booking.unit_id = payload.unit_id
-    booking.guest_name = payload.guest_name
-    booking.guest_email = payload.guest_email
-
-    booking.guest_phone = payload.guest_phone
-    booking.num_adults = payload.num_adults
-    booking.num_children = payload.num_children
-    booking.estimated_arrival_time = payload.estimated_arrival_time
-
-    booking.source = payload.source
-    booking.status = payload.status
-    booking.checkin_date = payload.checkin_date
-    booking.checkout_date = payload.checkout_date
-    booking.notes = payload.notes
-    booking.nightly_rate = financials["nightly_rate"]
-    booking.total_price = financials["total_price"]
-    booking.cleaning_fee = financials["cleaning_fee"]
-    booking.city_tax = financials["city_tax"]
-    booking.channel_fee = financials["channel_fee"]
-    booking.currency = payload.currency
-    booking.is_paid = payload.is_paid
-    booking.has_late_checkout = payload.has_late_checkout
-
-    db.commit()
-    db.refresh(booking)
-
-    create_auto_staff_tasks_for_booking(db, booking)
-
-    return booking
+def update_booking(booking_id: int, payload: BookingUpdate, db: Session = Depends(get_db)):
+    return save_booking(db, payload, booking_id)
 
 
 @router.delete("/bookings/{booking_id}", status_code=204)
@@ -174,6 +40,10 @@ def delete_booking(booking_id: int, db: Session = Depends(get_db)):
     if not booking:
         raise HTTPException(status_code=404, detail="Prenotazione non trovata")
 
+    # Cancel pending work before detaching history from a deleted reservation.
+    for task in booking.staff_tasks:
+        if task.auto_key and task.status not in {"done", "completed"}:
+            task.status = "cancelled"
     db.delete(booking)
     db.commit()
     return
@@ -207,6 +77,7 @@ def get_unit_schedule(
         db.query(Booking)
         .filter(
             Booking.unit_id == unit_id,
+            Booking.status != "cancelled",
             Booking.checkin_date < to_date,
             Booking.checkout_date > from_date,
         )

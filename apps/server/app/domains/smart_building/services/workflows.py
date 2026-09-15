@@ -287,6 +287,8 @@ class WorkflowsMixin:
                 raise HTTPException(
                     status_code=400, detail="La prenotazione non appartiene a questa unita"
                 )
+            if booking.status != "confirmed":
+                raise HTTPException(status_code=409, detail="Workflow requires a confirmed booking")
 
         effective_correlation_id = self._make_correlation_id(correlation_id)
         payload: dict[str, object] = dict(static_payload)
@@ -298,6 +300,8 @@ class WorkflowsMixin:
             script_variables.update(self._booking_workflow_variables(booking))
             for name, value in (variables or {}).items():
                 clean_name = str(name).strip()
+                if clean_name in {"correlation_id", "source", "booking_ref", "guest_name", "guests", "arrival_time"}:
+                    raise HTTPException(status_code=400, detail=f"Reserved workflow variable: {clean_name}")
                 if clean_name:
                     script_variables[clean_name] = value
             payload["variables"] = script_variables

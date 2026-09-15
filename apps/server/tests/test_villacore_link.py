@@ -262,7 +262,7 @@ def test_checkin_workflow_calls_the_villacore_script_with_booking_context():
             result = response.json()
             assert result["workflow"] == "checkin"
             assert result["capability_key"] == "workflow.checkin"
-            assert result["status"] == "executed"
+            assert result["status"] == "accepted"
             assert result["accepted"] is True
 
             service, payload = next(

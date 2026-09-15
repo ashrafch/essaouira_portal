@@ -31,6 +31,7 @@ from app.domains.operations.service import (
     merge_notes_for_auto_task,
     parse_time_str,
     trigger_smart_reaction_on_staff_task_completion,
+    validate_staff_task_links,
 )
 from app.models.booking import Booking
 from app.models.cost_item import CostItem
@@ -87,6 +88,7 @@ def list_staff_tasks(
 
 @router.post("/staff-tasks", response_model=StaffTaskOut)
 def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
+    validate_staff_task_links(db, payload)
     # se booking_id è valorizzato, controlla che la prenotazione esista
     if payload.booking_id is not None:
         booking = db.query(Booking).filter(Booking.id == payload.booking_id).first()
@@ -147,9 +149,11 @@ def update_staff_task(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
+    # Serialize completion so concurrent retries cannot both dispatch a workflow.
+    task = db.query(StaffTask).filter(StaffTask.id == task_id).with_for_update().first()
     if not task:
         raise HTTPException(status_code=404, detail="Task staff non trovato")
+    validate_staff_task_links(db, payload, task)
     old_status = task.status
     old_notes = task.notes
     was_auto_task = is_auto_booking_transition_task(task)

@@ -201,6 +201,19 @@ class CommandsMixin:
     ) -> DeviceCommand:
         self._require_write_access()
         device = self.get_device_or_404(device_id)
+        if not device.is_active:
+            raise HTTPException(status_code=409, detail="Device is inactive")
+        if device.provider == "villacore":
+            # Enforce the same safety boundary on generic command/scene routes
+            # as on the facility/workflow endpoints.
+            capability = device.capability_key or ""
+            allowed_capability = (
+                capability in {"facility.safe_off", "facility.alarm_reset"}
+                if device.facility_key or capability.startswith("facility.")
+                else capability.startswith("workflow.") or capability == "status.housekeeping"
+            )
+            if not allowed_capability:
+                raise HTTPException(status_code=403, detail="VillaCore commands require an exposed safe capability")
         try:
             command_type = normalize_command_type(payload.command_type)
         except ValueError as exc:
@@ -310,7 +323,7 @@ class CommandsMixin:
         elif lifecycle_status == "expired":
             command.expired_at = transition_time
 
-        if lifecycle_status in {"accepted", "pending"} and command.expires_at and command.expires_at <= transition_time:
+        if lifecycle_status in {"accepted", "pending"} and command.expires_at and self._as_utc_datetime(command.expires_at) <= transition_time:
             command.status = "expired"
             command.expired_at = transition_time
 

@@ -491,6 +491,8 @@ class AutomationMixin:
             status = "partial"
         elif failures:
             status = "failed"
+        elif any(result.get("entity") == "device_command" and result.get("status") in {"pending", "accepted"} for result in results):
+            status = "accepted"
         else:
             status = "executed"
         if status not in AUTOMATION_EXECUTION_STATUSES:
@@ -546,6 +548,8 @@ class AutomationMixin:
                 requested_by=requested_by,
                 correlation_id=correlation_id,
             )
+            if command.status in {"failed", "expired"}:
+                raise HTTPException(status_code=409, detail=command.error_message or f"Command {command.status}")
             return {
                 "entity": "device_command",
                 "id": command.id,

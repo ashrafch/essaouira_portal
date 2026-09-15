@@ -5,7 +5,7 @@ from sqlalchemy import and_, inspect, text
 from app.core.auth import hash_password
 from app.core.config import settings
 from app.core.tenant import normalize_tenant_id
-from app.db import Base, engine, get_db
+from app.db import Base, engine, SessionLocal
 from app.models.pricing_defaults import PricingDefaults
 from app.models.property import Property
 from app.models.staff_defaults import StaffDefaults
@@ -200,7 +200,6 @@ def _ensure_admin_user(db) -> None:
     username = (settings.admin_username or "owner").strip().lower()
     tenant_id = normalize_tenant_id(settings.admin_tenant_id)
     role = (settings.admin_role or "owner").strip().lower()
-    password_hash = settings.admin_password_hash or hash_password(settings.admin_password)
 
     existing = (
         db.query(User)
@@ -208,19 +207,13 @@ def _ensure_admin_user(db) -> None:
         .first()
     )
     if existing:
-        changed = False
-        if not existing.is_active:
-            existing.is_active = True
-            changed = True
-        if existing.role != role:
-            existing.role = role
-            changed = True
-        if settings.admin_password_hash and existing.password_hash != settings.admin_password_hash:
-            existing.password_hash = settings.admin_password_hash
-            changed = True
-        if changed:
-            db.commit()
         return
+
+    # Bootstrap only an empty account store, not an environment backdoor that
+    # recreates a deleted or renamed administrator on the next restart.
+    if db.query(User).filter(User.tenant_id == tenant_id).first() is not None:
+        return
+    password_hash = settings.admin_password_hash or hash_password(settings.admin_password)
 
     user = User(
         tenant_id=tenant_id,
@@ -245,13 +238,12 @@ def initialize_schema_and_seed() -> None:
     else:
         logger.info("Schema auto-creation disabled; expecting migrations.")
 
-    if not settings.auto_seed_data:
-        logger.info("Auto seed disabled.")
-        return
-
-    db = next(get_db())
+    db = SessionLocal()
     try:
         _ensure_admin_user(db)
+        if not settings.auto_seed_data:
+            logger.info("Sample data seed disabled; administrator provisioning checked.")
+            return
         _ensure_default_property_for_existing_units(db)
 
         if db.query(Unit).count() == 0:

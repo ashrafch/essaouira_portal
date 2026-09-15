@@ -79,6 +79,8 @@ def authenticate_user(
 ) -> Optional[AuthenticatedPrincipal]:
     normalized_username = (username or "").strip().lower()
     normalized_tenant = normalize_tenant_id(tenant_id)
+    if settings.is_production and normalized_tenant != "default":
+        return None
     if not normalized_username:
         return None
 
@@ -90,7 +92,9 @@ def authenticate_user(
         )
         .first()
     )
-    if user and user.is_active and verify_password(password, user.password_hash):
+    if user:
+        if not user.is_active or not verify_password(password, user.password_hash):
+            return None
         return AuthenticatedPrincipal(
             username=user.username,
             role=(user.role or "viewer").strip().lower(),
@@ -99,6 +103,8 @@ def authenticate_user(
 
     fallback_tenant = normalize_tenant_id(settings.admin_tenant_id)
     if (
+        not settings.is_production
+        and
         normalized_username == (settings.admin_username or "").strip().lower()
         and normalized_tenant == fallback_tenant
         and _verify_env_admin_password(password)
@@ -131,8 +137,16 @@ def decode_access_token(token: str) -> dict:
             token,
             settings.auth_secret_key,
             algorithms=[settings.auth_algorithm],
+            options={"require": ["exp", "sub", "role", "tenant_id", "type"]},
         )
-        if payload.get("type") != "access" or not payload.get("sub"):
+        if (
+            payload.get("type") != "access"
+            or not isinstance(payload.get("sub"), str)
+            or not payload["sub"].strip()
+            or payload.get("role") not in {"owner", "manager", "operator", "viewer"}
+            or not isinstance(payload.get("tenant_id"), str)
+            or not payload["tenant_id"].strip()
+        ):
             raise AuthError("Invalid token")
         return payload
     except jwt.PyJWTError as exc:

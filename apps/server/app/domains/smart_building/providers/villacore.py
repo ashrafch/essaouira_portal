@@ -319,7 +319,7 @@ class VillaCoreProvider(HomeAssistantProvider):
         if not isinstance(payload, dict):
             return None
         schema = str(payload.get("schema") or "").strip()
-        if not schema.startswith("villacore.event."):
+        if schema != "villacore.event.v1":
             return None
         event = str(payload.get("event") or "").strip()
         if not event:

@@ -1,6 +1,6 @@
 from datetime import date, time
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class BookingBase(BaseModel):
@@ -43,10 +43,26 @@ class BookingBase(BaseModel):
 
 
 class BookingCreate(BookingBase):
-    pass
+    num_adults: int = Field(default=1, ge=1)
+    num_children: int = Field(default=0, ge=0)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in {"pending", "confirmed", "cancelled", "hold"}:
+            raise ValueError("Invalid booking status")
+        return value
+
+    @field_validator("nightly_rate", "total_price", "cleaning_fee", "city_tax", "channel_fee")
+    @classmethod
+    def validate_amount(cls, value: float | None) -> float | None:
+        import math
+        if value is not None and (not math.isfinite(value) or value < 0):
+            raise ValueError("Amount must be finite and non-negative")
+        return value
 
 
-class BookingUpdate(BookingBase):
+class BookingUpdate(BookingCreate):
     pass
 
 

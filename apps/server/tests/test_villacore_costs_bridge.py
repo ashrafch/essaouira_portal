@@ -240,20 +240,12 @@ def test_completing_a_checkin_task_dispatches_the_building_workflow():
             assert booking.status_code in {200, 201}, booking.text
             booking_id = booking.json()["id"]
 
-            task = client.post(
-                "/staff-tasks",
-                headers=headers,
-                json={
-                    "unit_id": unit_id,
-                    "booking_id": booking_id,
-                    "date": "2027-06-10",
-                    "task_type": "checkin",
-                    "status": "planned",
-                    "notes": "auto: arrivo ospite",
-                },
+            tasks = client.get("/staff-tasks", headers=headers)
+            assert tasks.status_code == 200, tasks.text
+            task_id = next(
+                task["id"] for task in tasks.json()
+                if task["booking_id"] == booking_id and task["task_type"] == "checkin"
             )
-            assert task.status_code in {200, 201}, task.text
-            task_id = task.json()["id"]
 
             before = len(fake.service_calls)
             done = client.put(

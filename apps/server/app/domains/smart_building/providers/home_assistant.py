@@ -271,10 +271,13 @@ class HomeAssistantProvider(SmartDeviceProvider):
                             provider_ref = str(context_id)
             return ProviderCommandResult(
                 accepted=True,
-                lifecycle_status="executed",
+                # A successful service call acknowledges dispatch. In
+                # particular script.turn_on does not wait for the script or
+                # report whether its interlocks allowed physical execution.
+                lifecycle_status="accepted",
                 provider_ref=provider_ref,
                 result_payload={"service": f"{service_domain}.{service_name}", "response": response},
-                executed=True,
+                executed=False,
             )
         except Exception as exc:
             return ProviderCommandResult(

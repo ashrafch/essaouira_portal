@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.main_types import StaffRole
 
@@ -26,10 +26,16 @@ class StaffTaskBase(BaseModel):
 
 
 class StaffTaskCreate(StaffTaskBase):
-    pass
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in {"planned", "in_progress", "done", "completed", "cancelled"}:
+            raise ValueError("Invalid staff task status")
+        return value
 
 
-class StaffTaskUpdate(StaffTaskBase):
+class StaffTaskUpdate(StaffTaskCreate):
     pass
 
 

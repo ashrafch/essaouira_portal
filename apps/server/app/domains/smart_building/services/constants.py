@@ -21,7 +21,7 @@ SELECT_CATEGORIES = {"option_selector", "facility_mode", "stay_status", "houseke
 NUMBER_CATEGORIES = {"numeric_setting"}
 TEXT_CATEGORIES = {"text_setting"}
 FLAG_CATEGORIES = {"toggle_flag", "guest_mode_flag", "maintenance_lock_flag"}
-AUTOMATION_EXECUTION_STATUSES = {"running", "executed", "failed", "partial"}
+AUTOMATION_EXECUTION_STATUSES = {"running", "accepted", "executed", "failed", "partial"}
 AUTOMATION_DEDUP_WINDOW = timedelta(minutes=5)
 CONNECTIVITY_STATUSES = {"online", "offline", "unknown"}
 SUPPORTED_TELEMETRY_METRICS = {

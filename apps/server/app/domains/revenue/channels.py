@@ -124,6 +124,8 @@ def apply_ical_import(db: Session, connection: ChannelConnection, ics_text: str)
     that would overlap a booking from another source are reported as conflicts
     and skipped (anti double-booking)."""
     events = parse_ical_events(ics_text)
+    from app.domains.bookings.service import lock_booking_unit
+    lock_booking_unit(db, connection.unit_id)
 
     # Drop this connection's previous imports, then look at everything else.
     db.query(Booking).filter(

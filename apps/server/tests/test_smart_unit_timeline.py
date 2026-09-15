@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
+from uuid import uuid4
 
 from app.core.auth import create_access_token
 from app.main import app
+from app.db import SessionLocal
+from app.models.unit import Unit
 
 
 def _headers(username: str = "owner", role: str = "owner", tenant_id: str = "default"):
@@ -20,7 +23,13 @@ def _get_first_unit_id(client: TestClient, headers: dict[str, str]) -> int:
 def test_smart_unit_timeline_aggregates_smart_and_ops_events():
     with TestClient(app) as client:
         headers = _headers()
-        unit_id = _get_first_unit_id(client, headers)
+        # A bounded newest-first page cannot contain this booking if unrelated
+        # tests have filled the shared seeded unit with newer stays and tasks.
+        with SessionLocal() as db:
+            unit = Unit(name=f"Timeline {uuid4().hex[:12]}", capacity=2, currency="EUR")
+            db.add(unit)
+            db.commit()
+            unit_id = unit.id
 
         booking_res = client.post(
             "/bookings",

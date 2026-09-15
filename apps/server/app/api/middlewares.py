@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from app.core.auth import decode_access_token
 from app.core.config import settings
 from app.core.logging import log_request_middleware
+from app.db import SessionLocal
+from app.models.user import User
 
 AUTH_EXCLUDED_PATHS = {
     "/health",
@@ -130,6 +132,17 @@ async def authentication(request: Request, call_next):
     request.state.user = payload.get("sub")
     request.state.role = payload.get("role", "owner")
     request.state.tenant_id = payload.get("tenant_id", "default")
+
+    if settings.is_production:
+        if request.state.tenant_id != "default":
+            return JSONResponse(status_code=403, content={"detail": "Single-owner production tenant required"})
+        # JWT roles cannot outlive an account disable, deletion or demotion.
+        with SessionLocal() as db:
+            user = db.query(User).filter(
+                User.tenant_id == "default", User.username == request.state.user,
+            ).first()
+            if user is None or not user.is_active or user.role != request.state.role:
+                return JSONResponse(status_code=401, content={"detail": "Account or role no longer active"})
 
     if not _is_authorized(request.state.role, request.method, request.url.path):
         return JSONResponse(status_code=403, content={"detail": "Forbidden for role"})

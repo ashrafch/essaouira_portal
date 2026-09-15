@@ -13,6 +13,8 @@ def _prod_settings(**overrides) -> Settings:
         app_env="production",
         auth_secret_key=STRONG_SECRET,
         admin_password=STRONG_PASSWORD,
+        auto_create_schema=False,
+        auto_seed_data=False,
     )
     base.update(overrides)
     return Settings(**base)

@@ -6,6 +6,7 @@ from sqlalchemy import (
     Time,
     ForeignKey,
     Numeric,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -14,6 +15,7 @@ from app.db import Base
 
 class StaffTask(Base):
     __tablename__ = "staff_tasks"
+    __table_args__ = (UniqueConstraint("booking_id", "auto_key", name="uq_staff_task_booking_auto_key"),)
 
     id = Column(Integer, primary_key=True, index=True)
 
@@ -36,6 +38,8 @@ class StaffTask(Base):
     )  # planned / in_progress / done / cancelled
 
     notes = Column(String, nullable=True)
+    # Server-owned provenance; notes are never authority to dispatch a workflow.
+    auto_key = Column(String(64), nullable=True)
 
     # costo interno associato alla task (es. costo pulizie singolo turno)
     cost = Column(Numeric(10, 2), nullable=True)

@@ -1,5 +1,7 @@
 from datetime import time, timedelta
 
+from fastapi import HTTPException
+
 from sqlalchemy.orm import Session
 
 from app.domains.bookings.schemas import BookingCreate, BookingUpdate
@@ -49,7 +51,7 @@ def compute_booking_financials(
             nightly_rate = None
             base_total = None
 
-    total_price = payload.total_price or base_total
+    total_price = payload.total_price if payload.total_price is not None else base_total
 
     pricing = get_or_create_pricing_defaults(db)
 
@@ -82,132 +84,113 @@ def compute_booking_financials(
     }
 
 
+def lock_booking_unit(db: Session, unit_id: int) -> Unit:
+    # All inventory writers (including channel imports) lock the canonical unit
+    # before checking overlap, serializing concurrent PostgreSQL reservations.
+    unit = db.query(Unit).filter(Unit.id == unit_id).with_for_update().first()
+    if unit is None:
+        raise HTTPException(status_code=400, detail="Unit does not exist")
+    return unit
+
+
+def save_booking(db: Session, payload: BookingCreate | BookingUpdate, booking_id: int | None = None) -> Booking:
+    from app.domains.revenue.service import get_min_stay
+
+    unit = lock_booking_unit(db, payload.unit_id)
+    booking = None
+    if booking_id is not None:
+        booking = db.query(Booking).filter(Booking.id == booking_id).with_for_update().first()
+        if booking is None:
+            raise HTTPException(status_code=404, detail="Booking not found")
+    if payload.checkout_date <= payload.checkin_date:
+        raise HTTPException(status_code=400, detail="checkout_date deve essere dopo checkin_date")
+    if payload.status != "cancelled":
+        conflicts = db.query(Booking).filter(
+            Booking.unit_id == unit.id, Booking.status != "cancelled",
+            Booking.checkin_date < payload.checkout_date,
+            Booking.checkout_date > payload.checkin_date,
+        )
+        if booking_id is not None:
+            conflicts = conflicts.filter(Booking.id != booking_id)
+        if conflicts.first() is not None:
+            raise HTTPException(status_code=400, detail="Esiste gi\u00e0 una prenotazione per questa unit\u00e0 nelle date selezionate.")
+        # Cancelling or editing a historical stay must not re-apply new pricing
+        # restrictions to an already accepted reservation.
+        changed_stay = booking is None or any(
+            getattr(booking, name) != getattr(payload, name)
+            for name in ("unit_id", "checkin_date", "checkout_date")
+        ) or booking.status == "cancelled"
+        if changed_stay:
+            minimum = get_min_stay(db, unit.id, payload.checkin_date)
+            if minimum and (payload.checkout_date - payload.checkin_date).days < minimum:
+                raise HTTPException(status_code=400, detail=f"Soggiorno minimo di {minimum} notti")
+
+    # API serializers format arrival time as HH:MM; persistence needs time.
+    values = {name: getattr(payload, name) for name in BookingCreate.model_fields}
+    values.update(compute_booking_financials(db, payload, unit))
+    if booking is None:
+        booking = Booking(**values)
+        db.add(booking)
+    else:
+        for name, value in values.items():
+            setattr(booking, name, value)
+    db.flush()
+    create_auto_staff_tasks_for_booking(db, booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
 def create_auto_staff_tasks_for_booking(db: Session, booking: Booking) -> None:
-    defaults = get_or_create_staff_defaults(db)
-
-    db.query(StaffTask).filter(
-        StaffTask.booking_id == booking.id,
-        StaffTask.notes.ilike("AUTO:%"),
-    ).delete(synchronize_session=False)
-
-    if not booking.checkin_date or not booking.checkout_date:
-        db.commit()
+    """Reconcile planned tasks without erasing assignments or completed work."""
+    existing = db.query(StaffTask).filter(
+        StaffTask.booking_id == booking.id, StaffTask.auto_key.is_not(None),
+    ).all()
+    if booking.status != "confirmed":
+        for task in existing:
+            if task.status not in {"done", "completed"}:
+                task.status = "cancelled"
+        db.flush()
         return
 
-    is_late = bool(getattr(booking, "has_late_checkout", False))
-
-    base_hours = defaults.cleaning_default_hours or 1.0
+    defaults = get_or_create_staff_defaults(db)
+    hours = defaults.cleaning_default_hours or 1.0
     currency = defaults.currency or "EUR"
+    housekeeping = find_default_assignee_for_role(db, StaffRole.housekeeping, defaults.cleaning_default_assignee)
+    reception = find_default_assignee_for_role(db, StaffRole.reception_day, housekeeping)
+    kitchen = find_default_assignee_for_role(db, StaffRole.kitchen, housekeeping)
+    late = bool(booking.has_late_checkout)
+    specs = [
+        ("checkin", booking.checkin_date, booking.estimated_arrival_time or time(15), "checkin", reception, hours),
+        ("checkout", booking.checkout_date, time(16 if late else 10), "checkout", reception, hours),
+        ("cleaning", booking.checkout_date, time(17 if late else 11), "cleaning", housekeeping, hours * (1.5 if late else 1)),
+    ]
+    if late:
+        specs.append(("extra_cleaning", booking.checkout_date, time(19), "cleaning", housekeeping, hours * 0.5))
+    day = booking.checkin_date + timedelta(days=1)
+    while day < booking.checkout_date:
+        specs.append((f"breakfast:{day.isoformat()}", day, time(8, 30), "breakfast", kitchen, hours * 0.5))
+        day += timedelta(days=1)
 
-    housekeeping_assignee = find_default_assignee_for_role(
-        db, StaffRole.housekeeping, defaults.cleaning_default_assignee
-    )
-    reception_assignee = find_default_assignee_for_role(
-        db, StaffRole.reception_day, housekeeping_assignee
-    )
-    kitchen_assignee = find_default_assignee_for_role(
-        db, StaffRole.kitchen, housekeeping_assignee
-    )
-
-    checkout_time_obj = time(10, 0)
-    cleaning_time_obj = time(11, 0)
-
-    if is_late:
-        checkout_time_obj = time(16, 0)
-        cleaning_time_obj = time(17, 0)
-
-    # 1) CHECK-IN
-    checkin_task = StaffTask(
-        date=booking.checkin_date,
-        time=time(15, 0),
-        task_type="checkin",
-        assignee_name=reception_assignee,
-        estimated_hours=base_hours,
-        status="planned",
-        notes=f"AUTO: Check-in per prenotazione #{booking.id}",
-        cost=None,
-        currency=currency,
-        booking_id=booking.id,
-        unit_id=booking.unit_id,
-    )
-    db.add(checkin_task)
-
-    # 2) CHECK-OUT
-    checkout_task = StaffTask(
-        date=booking.checkout_date,
-        time=checkout_time_obj,
-        task_type="checkout",
-        assignee_name=reception_assignee,
-        estimated_hours=base_hours,
-        status="planned",
-        notes=(
-            f"AUTO: Check-out (late) per prenotazione #{booking.id}"
-            if is_late
-            else f"AUTO: Check-out per prenotazione #{booking.id}"
-        ),
-        cost=None,
-        currency=currency,
-        booking_id=booking.id,
-        unit_id=booking.unit_id,
-    )
-    db.add(checkout_task)
-
-    # 3) PULIZIA
-    cleaning_task = StaffTask(
-        date=booking.checkout_date,
-        time=cleaning_time_obj,
-        task_type="cleaning",
-        assignee_name=housekeeping_assignee,
-        estimated_hours=base_hours if not is_late else base_hours * 1.5,
-        status="planned",
-        notes=(
-            f"AUTO: Pulizia post late check-out per prenotazione #{booking.id}"
-            if is_late
-            else f"AUTO: Pulizia per prenotazione #{booking.id}"
-        ),
-        cost=None,
-        currency=currency,
-        booking_id=booking.id,
-        unit_id=booking.unit_id,
-    )
-    db.add(cleaning_task)
-
-    # 4) Extra pulizia se late check-out
-    if is_late:
-        extra_clean_task = StaffTask(
-            date=booking.checkout_date,
-            time=time(19, 0),
-            task_type="cleaning",
-            assignee_name=housekeeping_assignee,
-            estimated_hours=base_hours * 0.5,
-            status="planned",
-            notes=f"AUTO: Extra pulizia (late check-out) per prenotazione #{booking.id}",
-            cost=None,
-            currency=currency,
-            booking_id=booking.id,
-            unit_id=booking.unit_id,
-        )
-        db.add(extra_clean_task)
-
-    # 5) COLAZIONI
-    current = booking.checkin_date + timedelta(days=1)
-    last_breakfast_day = booking.checkout_date - timedelta(days=1)
-
-    while current <= last_breakfast_day:
-        breakfast_task = StaffTask(
-            date=current,
-            time=time(8, 30),
-            task_type="breakfast",
-            assignee_name=kitchen_assignee,
-            estimated_hours=base_hours * 0.5,
-            status="planned",
-            notes=f"AUTO: Colazione per prenotazione #{booking.id}",
-            cost=None,
-            currency=currency,
-            booking_id=booking.id,
-            unit_id=booking.unit_id,
-        )
-        db.add(breakfast_task)
-        current += timedelta(days=1)
-
-    db.commit()
+    by_key = {task.auto_key: task for task in existing}
+    desired = {spec[0] for spec in specs}
+    for task in existing:
+        if task.auto_key not in desired and task.status not in {"done", "completed"}:
+            task.status = "cancelled"
+    for key, day, at, kind, assignee, estimate in specs:
+        task = by_key.get(key)
+        if task is not None:
+            # Work that has started is an operational record, not a template.
+            if task.status in {"done", "completed", "in_progress"}:
+                continue
+            task.date, task.time, task.unit_id = day, at, booking.unit_id
+            task.estimated_hours = estimate
+            task.status = "planned"
+        else:
+            db.add(StaffTask(
+                auto_key=key, booking_id=booking.id, unit_id=booking.unit_id,
+                date=day, time=at, task_type=kind, assignee_name=assignee,
+                estimated_hours=estimate, status="planned", currency=currency,
+                notes=f"AUTO: {kind} per prenotazione #{booking.id}",
+            ))
+    db.flush()

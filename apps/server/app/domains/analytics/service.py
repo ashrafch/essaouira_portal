@@ -40,7 +40,7 @@ def _compute_month_revenue_and_occupancy(
 ):
     """Revenue/occupancy aggregation shared by month-summary and month-pnl."""
     bookings = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(
             Booking.checkin_date < next_month_start,
             Booking.checkout_date > month_start,
@@ -178,7 +178,7 @@ def collect_costs_for_month(
 
     # --- Costi da prenotazioni (cleaning_fee, channel_fee, city_tax) ---
     bookings_for_costs = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(
             Booking.checkout_date >= month_start,
             Booking.checkout_date < next_month_start,
@@ -369,7 +369,7 @@ def compute_advanced_kpis(db: Session, year: int, month: int) -> AdvancedKpiSumm
     month_start, next_month_start, days_in_month = get_month_range(year, month)
 
     bookings = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(
             Booking.checkin_date < next_month_start,
             Booking.checkout_date > month_start,
@@ -419,7 +419,7 @@ def compute_advanced_kpis(db: Session, year: int, month: int) -> AdvancedKpiSumm
     next_7 = today + timedelta(days=7)
 
     upcoming_bookings = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(Booking.checkin_date >= today, Booking.checkin_date <= next_30)
         .all()
     )
@@ -471,7 +471,7 @@ def compute_alerts_today(db: Session) -> List[AlertItem]:
     alerts: list[AlertItem] = []
 
     unpaid_checkouts = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(Booking.checkout_date < today, Booking.is_paid.is_(False))
         .count()
     )

@@ -83,13 +83,13 @@ def compute_dashboard_summary(
     reference_date = today or date.today()
 
     arrivals_today = (
-        db.query(Booking).filter(Booking.checkin_date == reference_date).count()
+        db.query(Booking).filter(Booking.status != "cancelled").filter(Booking.checkin_date == reference_date).count()
     )
     departures_today = (
-        db.query(Booking).filter(Booking.checkout_date == reference_date).count()
+        db.query(Booking).filter(Booking.status != "cancelled").filter(Booking.checkout_date == reference_date).count()
     )
     in_house = (
-        db.query(Booking)
+        db.query(Booking).filter(Booking.status != "cancelled")
         .filter(
             Booking.checkin_date <= reference_date,
             Booking.checkout_date > reference_date,

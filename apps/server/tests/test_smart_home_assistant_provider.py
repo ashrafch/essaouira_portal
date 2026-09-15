@@ -91,7 +91,9 @@ def test_home_assistant_sync_and_command_mapping():
                 assert command.status_code == 200
                 command_data = command.json()
                 assert command_data["provider"] == "home_assistant"
-                assert command_data["status"] == "executed"
+                assert command_data["status"] == "accepted"
+                assert command_data["executed_at"] is None
+                assert command_data["accepted_at"] is not None
                 assert command_data["provider_ref"] == "ha-cmd-1"
 
                 other_tenant_devices = client.get("/smart/devices", headers=_headers(tenant_id="other"))

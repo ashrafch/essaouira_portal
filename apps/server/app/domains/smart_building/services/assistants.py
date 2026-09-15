@@ -55,7 +55,7 @@ class AssistantsMixin:
             raise HTTPException(status_code=400, detail="Intervallo date assistant non valido")
 
         scope_unit_ids = self._scope_unit_ids_for_operations(property_id=property_id, unit_id=unit_id)
-        query = self.db.query(Booking).join(Unit, Booking.unit_id == Unit.id)
+        query = self.db.query(Booking).filter(Booking.status != "cancelled").join(Unit, Booking.unit_id == Unit.id)
         if scope_unit_ids is not None:
             if not scope_unit_ids:
                 return [], effective_from, effective_to
@@ -672,7 +672,7 @@ class AssistantsMixin:
         )
 
     def get_checkin_assistant_booking(self, booking_id: int) -> dict[str, object]:
-        booking = self.db.query(Booking).filter(Booking.id == booking_id).first()
+        booking = self.db.query(Booking).filter(Booking.status != "cancelled").filter(Booking.id == booking_id).first()
         if booking is None:
             raise HTTPException(status_code=404, detail="Prenotazione non trovata")
         self._ensure_unit_visible(int(booking.unit_id))
@@ -706,7 +706,7 @@ class AssistantsMixin:
         )
 
     def get_checkout_assistant_booking(self, booking_id: int) -> dict[str, object]:
-        booking = self.db.query(Booking).filter(Booking.id == booking_id).first()
+        booking = self.db.query(Booking).filter(Booking.status != "cancelled").filter(Booking.id == booking_id).first()
         if booking is None:
             raise HTTPException(status_code=404, detail="Prenotazione non trovata")
         self._ensure_unit_visible(int(booking.unit_id))
