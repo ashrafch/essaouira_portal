@@ -8,13 +8,21 @@ How to run Essaouira Portal in each supported mode:
 
 All modes use the same images and the same `docker-compose.yml`; overlays and env files change the behavior.
 
+Requires Docker Compose **2.24.4+** (`!reset` / `!override` support). Verify
+`docker version` and `docker compose version` with Docker Desktop running.
+Production currently supports **one owner installation, tenant `default`**.
+Legacy PMS tables are not tenant-isolated: do not host independent customers in
+one database. Route visibility does not imply field-level financial privacy.
+See [RELEASE_VERIFICATION.md](RELEASE_VERIFICATION.md) for evidence and remaining gates.
+
 ---
 
 ## 1. Local development
 
 ```bash
-copy .env.example .env        # optional, defaults work out of the box
-docker compose up --build -d
+copy .env.example .env        # only if absent; never overwrite existing secrets
+docker compose up --build -d --wait
+docker compose ps
 ```
 
 - Frontend: http://localhost:8081
@@ -24,7 +32,8 @@ docker compose up --build -d
 
 Dev behavior: schema auto-created (`AUTO_CREATE_SCHEMA=true`), demo data seeded (`AUTO_SEED_DATA=true`), DB and API ports bound to `127.0.0.1` only.
 
-Stop with `docker compose down`; full DB reset with `docker compose down -v`.
+Stop with `docker compose down`; this preserves the database. Never use `down -v`
+on data you need: it deletes volumes. Keep the same project name/env/overlays.
 
 ### Without Docker (hot reload)
 
@@ -55,7 +64,11 @@ Notes:
 
 - Always use the web URL — the API is intentionally **not** exposed on the LAN (loopback binding). Everything flows through the nginx `/api` proxy, which is same-origin (no CORS issues).
 - The database is never reachable from the LAN.
-- For a long-running property server, use the production overlay (section 3) even on the LAN: it adds restart policies, migration-managed schema, and secret checks. TLS is optional on a trusted LAN.
+- For a long-running property server, use the production overlay (section 3),
+  including on LAN. Set `WEB_BIND_ADDRESS` to the server's management-LAN IP;
+  production defaults to loopback, unlike development. Use HTTPS with a trusted
+  certificate for real guest data and credentials. Do not use the guest Wi-Fi or
+  forward ports on the Internet router.
 
 ---
 
@@ -65,7 +78,7 @@ Notes:
 copy .env.production.example .env.production
 # fill POSTGRES_PASSWORD, AUTH_SECRET_KEY, ADMIN_PASSWORD (long random values)
 
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
 ```
 
 What the production overlay enforces:
@@ -77,6 +90,12 @@ What the production overlay enforces:
 | Demo data | seeded | never seeded |
 | DB/API host ports | loopback | **none** (web proxy is the only entry point) |
 | Restart policy | none | `unless-stopped` |
+| Web binding | all interfaces | `WEB_BIND_ADDRESS=127.0.0.1` by default |
+| Database backups | optional ops profile | automatically enabled |
+
+The first owner account is created even with demo seeding disabled. Existing
+users/passwords/disabled accounts are never overwritten from env. Keep
+`ADMIN_TENANT_ID=default`. Changing `ADMIN_PASSWORD` does not reset an existing user.
 
 Generate strong secrets:
 
@@ -100,7 +119,10 @@ git pull
 docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Migrations run automatically at backend startup (`RUN_MIGRATIONS=true`).
+Before updating, record the commit and Alembic revision, take a backup and verify
+a restore into a separate database. Migrations run at backend startup. Migration
+0016 rejects orphan `property_id` references: repair data deliberately, never
+disable the constraint. Code rollback alone may not undo a schema migration.
 
 ---
 
@@ -110,15 +132,22 @@ Migrations run automatically at backend startup (`RUN_MIGRATIONS=true`).
 docker compose --profile ops up -d
 ```
 
-- **db-backup**: `pg_dump | gzip` into the `db_backups` volume every `BACKUP_INTERVAL_HOURS` (default 24h), retention `BACKUP_RETENTION_DAYS` (default 7).
+- **db-backup**: custom PostgreSQL `portal_<UTC>_<pid>.dump` archives every
+  `BACKUP_INTERVAL_HOURS` (default 24h), local retention `BACKUP_RETENTION_DAYS`
+  (default 7). Automatically active in production, optional in dev. Writes to
+  `.partial`, validates the archive catalog, then renames atomically. A failed
+  dump fails the container and never prunes prior backups. Legacy `.sql.gz`
+  files are retained until a deliberate migration/retention decision.
 - **Prometheus**: http://localhost:9090 (scrapes backend `/metrics`).
 - **Grafana**: http://localhost:3001 (`GRAFANA_PORT`, `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`). Defaults to 3001 because VillaCore's own Grafana owns 3000 on a shared host.
 
-Restore a backup:
+Restore a backup into a **separate empty database** first. Export the completed
+dump from the backup volume using a temporary read-only mount and copy it into
+the database container with `docker cp`. The DB does not mount backups by default.
+Run inside that container (substitute actual username/database/archive):
 
 ```bash
-docker compose exec db sh -c 'gunzip -c /backups/essa_<timestamp>.sql.gz | psql -U essa -d essa'
-# (mount the db_backups volume into the db service, or docker cp the file in)
+pg_restore --exit-on-error --no-owner --no-privileges -U <user> -d <empty-database> /tmp/backup.dump
 ```
 
 ### Off-site copies
@@ -130,7 +159,13 @@ The `db_backups` volume lives on the same disk as the database — a disk failur
 REMOTE=offsite:essaouira-portal-backups ./scripts/offsite-sync.sh
 ```
 
-Schedule it hourly/daily via host cron or Windows Task Scheduler. The script exports the dumps from the Docker volume and `rclone sync`s them to your remote (cloud bucket, NAS, or another host).
+Run the POSIX script on Linux/WSL with access to the same Docker Engine. Set
+`BACKUP_VOLUME` to the actual volume name from `docker volume ls`. Schedule via
+cron or Task Scheduler with WSL and monitor exit codes. The script uses
+`rclone copy`, **never remote deletion**, and rejects missing/failed exports.
+Configure encryption (for example rclone crypt), remote retention/versioning
+and an immutable copy separately. Local dumps are not encrypted. Archive catalog
+validation is not a full restore; regularly rehearse recovery including keys.
 
 ---
 
@@ -182,6 +217,25 @@ Start with the link overlay:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.villacore.yml up -d --build
 ```
+
+For production, keep **both** overlays:
+
+```powershell
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.villacore.yml up -d --build --wait
+```
+
+An accepted `script.turn_on` request is asynchronous, not proof of physical
+completion. Confirm events/state with the correlation ID. Refusals remain errors.
+The two repositories, databases and backups stay independent.
+
+Read-only verification from the workstation (use the actual published HA port):
+
+```powershell
+.\apps\server\venv\Scripts\python.exe scripts/check-villacore-readonly.py --ha-url http://127.0.0.1:18123 --ha-secrets ../VillaCore/home-assistant/secrets.yaml
+```
+
+This authenticates and inspects the catalog without actuation or printing secrets.
+It does not prove event delivery, token rotation, or physical commissioning.
 
 Verify on the **Link VillaCore** page (owner only) or via
 `GET /smart/link/status`. Full contract: [VILLACORE_LINK.md](VILLACORE_LINK.md).

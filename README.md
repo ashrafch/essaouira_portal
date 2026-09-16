@@ -1,11 +1,11 @@
 # Essaouira Portal
 
-Hospitality operations platform (PMS/Ops + Smart Building) for a villa + six bungalow apartments in Essaouira — bookings, staff, maintenance, finance, and smart-property intelligence in one portal. Multi-tenant-ready, Home Assistant-integrable, Dockerized.
+Hospitality operations platform (PMS/Ops + Smart Building) for a villa and six bungalow apartments in Essaouira: bookings, staff, maintenance, finance and Home Assistant integration. Dockerized, with dedicated single-owner production deployment.
 
 ## Quick start
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
 - Portal: <http://localhost:8081> (LAN: `http://<host-ip>:8081`)
@@ -15,6 +15,24 @@ docker compose up --build -d
 Stop: `docker compose down` · Full DB reset: `docker compose down -v`
 
 Other modes (LAN publication, production/product deployment, ops profile with Prometheus/Grafana/backups): see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+**Release scope:** one owner installation, tenant `default`. Legacy management
+tables are not isolated for independent SaaS customers. See the current
+[verification and release gates](docs/RELEASE_VERIFICATION.md).
+
+To test the production bundle without touching villa data or devices:
+
+```powershell
+npm ci --prefix apps/web
+npm exec --prefix apps/web -- playwright install chromium
+python scripts/verify-production.py --browser --keep
+```
+
+Requires Docker Compose 2.24.4+ and Python 3.10+. The script prints a private
+test URL; login `verifier` / `Verification-only-local-password-2026`, tenant
+`default`. Without `--keep`, its disposable resources are removed automatically.
+Never aim this suite at a live database. Keep normal installation data by using
+`docker compose down` without `-v`.
 
 ## Repository layout
 

@@ -6,6 +6,10 @@ on:
     branches:
       - dev
       - feat/**
+      - main
+      - refactor/**
+      - fix/**
+      - hardening/**
 
 jobs:
   backend-tests:
@@ -20,6 +24,8 @@ jobs:
           python-version: "3.13"
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: pytest -q
+      - run: pip install pip-audit==2.10.1
+      - run: pip-audit -r requirements.txt
 
   frontend-quality:
     runs-on: ubuntu-latest
@@ -37,14 +43,26 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
 
   docker-validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose config
-      - name: Validate production overlay
-        run: |
-          POSTGRES_PASSWORD=ci AUTH_SECRET_KEY=ci-validation-secret ADMIN_PASSWORD=ci-validation \
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml config
-      - run: docker compose build --no-cache
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --prefix apps/web
+      - run: npm exec --prefix apps/web -- playwright install --with-deps chromium
+      - run: docker compose --env-file .env.example config --quiet
+      - run: python scripts/tests/test_backup_scripts.py
+      - name: Production migrations, API, backup, restore and browser journeys
+        run: python scripts/verify-production.py --browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-evidence
+          path: apps/web/test-results/

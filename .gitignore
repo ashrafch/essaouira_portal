@@ -11,10 +11,16 @@ __pycache__/
 *.pyd
 *.log
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 node_modules/
 dist/
 .DS_Store
 .pytest_cache/
+test-results/
+playwright-report/
+.backup-staging/
 
 # Legacy local notes directory
 essaouira_portal/

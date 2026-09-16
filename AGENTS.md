@@ -180,6 +180,30 @@ Use delegation when the runtime supports it and the task splits into bounded, no
 
 ## 9. Current priorities
 
+### Release evidence and safety
+
+- Resume interrupted work from `git status`, diffs, tests and saved artifacts;
+  an agent completion notification is not proof that its changes landed.
+- Production is single-owner / tenant `default` until every legacy table and
+  API query is isolated. Never describe route RBAC as field-level data privacy.
+- Never test booking creation, actuation or restore against the site's database
+  or Home Assistant without an explicit, bounded commissioning procedure.
+  Use `scripts/verify-production.py --browser` for disposable production QA.
+- A provider dispatch accepted by Home Assistant is not a completed physical
+  action. Preserve refused/unknown states, correlation IDs and interlocks.
+- Generated staff tasks need immutable provenance; notes must never grant
+  automatic workflow authority. Keep booking and task writes transactional.
+- Review the rendered Compose model, not YAML alone. Run fresh PostgreSQL
+  migrations, real backup/restore, failed-backup tests, browser bundle checks
+  and dependency audits. Frontend unit tests alone cannot catch chunk cycles.
+- Record tested viewports/themes and known gaps in `docs/RELEASE_VERIFICATION.md`.
+  Do not claim exhaustive validation from route smoke tests.
+- Keep backup off-site transfer non-destructive. Never prune remote copies as
+  a side effect of local retention; encryption and recovery keys are separate gates.
+- When commits/push are requested, use reviewable commits in each repository,
+  inspect staged changes for secrets and report commit IDs and failed checks.
+  Do not merge into main or overwrite unrelated work implicitly.
+
 Consult `docs/GAP_ANALYSIS_AND_ROADMAP.md` for the maintained list. Headlines:
 
 1. **Hardening**: off-site backups; retire dev-only schema reconcilers. (`smart_building/service.py` is now a thin facade over `services/*` mixins.)

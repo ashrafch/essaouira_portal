@@ -1,38 +1,36 @@
 #!/bin/sh
-# Off-site backup sync (host-side).
-#
-# The db-backup container writes gzip dumps into the `db_backups` Docker volume.
-# Those dumps live on the same disk as the database, so a disk failure loses both.
-# This script copies them to a remote (cloud bucket, NAS, another host) with rclone,
-# which — unlike the postgres:alpine backup container — is available on the host.
-#
-# One-time setup:
-#   1. install rclone on the host (https://rclone.org/install/)
-#   2. configure a remote:            rclone config          (e.g. name it "offsite")
-#   3. set REMOTE below or via env:   REMOTE=offsite:essaouira-portal-backups
-#
-# Run manually, or schedule it (host cron / Windows Task Scheduler), e.g. hourly:
-#   0 * * * * /path/to/scripts/offsite-sync.sh >> /var/log/essa-offsite.log 2>&1
-set -e
+# Host-side copy to a configured rclone remote; remote retention is independent.
+set -eu
+umask 077
 
-REMOTE="${REMOTE:-offsite:essaouira-portal-backups}"
+: "${REMOTE:?Set REMOTE to a configured, preferably encrypted rclone destination}"
 VOLUME="${BACKUP_VOLUME:-essaouira-portal_db_backups}"
-STAGING="${BACKUP_STAGING:-./.backup-staging}"
+PARENT="${BACKUP_STAGING:-${TMPDIR:-/tmp}}"
 
-if ! command -v rclone >/dev/null 2>&1; then
-  echo "[offsite] rclone not found on host. Install it: https://rclone.org/install/" >&2
-  exit 1
-fi
+command -v rclone >/dev/null 2>&1 || { echo '[offsite] rclone is required' >&2; exit 1; }
+# Docker otherwise creates a missing named volume and a typo looks like success.
+docker volume inspect "$VOLUME" >/dev/null
+mkdir -p "$PARENT"
+PARENT=$(cd "$PARENT" && pwd)
+STAGING=$(mktemp -d "$PARENT/portal-backup.XXXXXXXX")
+case "$STAGING" in "$PARENT"/portal-backup.*) ;; *) exit 1 ;; esac
+trap 'rm -rf -- "$STAGING"' EXIT
+trap 'exit 1' HUP INT TERM
 
-echo "[offsite] exporting backups from volume '$VOLUME'"
-mkdir -p "$STAGING"
-# Copy the volume contents out via a throwaway container that mounts it read-only.
-docker run --rm -v "${VOLUME}:/backups:ro" -v "$(pwd)/${STAGING}:/out" alpine \
-  sh -c 'cp -a /backups/*.sql.gz /out/ 2>/dev/null || true'
+docker run --rm \
+  --mount "type=volume,source=$VOLUME,target=/backups,readonly" \
+  --mount "type=bind,source=$STAGING,target=/out" alpine:3.21 \
+  sh -ec '
+    count=0
+    for file in /backups/*.dump /backups/*.sql.gz; do
+      [ -f "$file" ] || continue
+      [ -s "$file" ] || exit 1
+      cp "$file" /out/
+      count=$((count + 1))
+    done
+    [ "$count" -gt 0 ] || { echo "[offsite] no completed backups" >&2; exit 1; }
+  '
 
-echo "[offsite] syncing to '$REMOTE'"
-rclone sync "$STAGING" "$REMOTE" --progress
-
-echo "[offsite] cleaning staging"
-rm -rf "$STAGING"
-echo "[offsite] done"
+# Never use sync: an empty/partial local export must not delete disaster recovery.
+rclone copy "$STAGING" "$REMOTE"
+echo '[offsite] copy completed; remote retention unchanged'

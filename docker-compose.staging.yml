@@ -1,6 +1,6 @@
 services:
   db:
-    ports: []
+    ports: !reset []
     restart: unless-stopped
 
   backend:
