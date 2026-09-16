@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { canEditOperations } from "../config/rbac";
+import { readWorkflowContext } from "../routes/workflowContext";
+import { loadSections } from "../services/loadSections";
 import {
   getMaintenanceTickets,
   createMaintenanceTicket,
@@ -24,6 +29,12 @@ const TYPE_LABELS = {
 };
 
 function Maintenance() {
+  const context = readWorkflowContext(useLocation());
+  const canEdit = canEditOperations();
+  const [unitFilter, setUnitFilter] = useState(context.unitId);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setUnitFilter(context.unitId); }, [context.unitId]);
   const [tickets, setTickets] = useState([]);
   const [units, setUnits] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -43,27 +54,30 @@ function Maintenance() {
     status: "todo",
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const [ts, us, ss] = await Promise.all([
-        getMaintenanceTickets(),
-        getUnits(),
-        getStaffMembers({ active_only: true }),
-      ]);
+      const { data, failed } = await loadSections({
+        ticket: getMaintenanceTickets,
+        unita: getUnits,
+        personale: () => canEdit ? getStaffMembers({ active_only: true }) : [],
+      });
+      const { ticket: ts, unita: us, personale: ss } = data;
+      setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : "");
       setTickets(ts || []);
       setUnits(us || []);
       setStaff(ss || []);
     } catch (err) {
-      console.error(err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, [canEdit]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Group tickets by status
   const columns = useMemo(() => {
@@ -73,12 +87,14 @@ function Maintenance() {
       done: [],
     };
     tickets.forEach((t) => {
+      if (unitFilter && String(t.unit_id) !== unitFilter) return;
       if (cols[t.status]) cols[t.status].push(t);
     });
     return cols;
-  }, [tickets]);
+  }, [tickets, unitFilter]);
 
   function openModal(ticket = null) {
+    if (!canEdit || busy || loading) return;
     if (ticket) {
       setEditingId(ticket.id);
       setFormData({
@@ -96,7 +112,7 @@ function Maintenance() {
       setFormData({
         title: "",
         description: "",
-        unit_id: "",
+        unit_id: unitFilter,
         assigned_to_id: "",
         priority: "medium",
         ticket_type: "repair",
@@ -109,6 +125,8 @@ function Maintenance() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!canEdit || busy) return;
+    setBusy(true);
     const payload = {
       ...formData,
       unit_id: formData.unit_id ? Number(formData.unit_id) : null,
@@ -126,26 +144,36 @@ function Maintenance() {
       }
       setIsModalOpen(false);
     } catch (err) {
-      alert("Errore salvataggio: " + err.message);
+      setError("Errore salvataggio: " + err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleDelete(id) {
+    if (!canEdit || busy) return;
     if (!window.confirm("Eliminare questo ticket?")) return;
+    setBusy(true);
     try {
       await deleteMaintenanceTicket(id);
       setTickets((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
-      alert("Errore eliminazione: " + err.message);
+      setError("Errore eliminazione: " + err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function moveStatus(ticket, newStatus) {
+    if (!canEdit || busy) return;
+    setBusy(true);
     try {
       const updated = await updateMaintenanceTicket(ticket.id, { status: newStatus });
       setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } catch (err) {
-      console.error(err);
+      setError("Cambio stato non riuscito: " + err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -163,12 +191,17 @@ function Maintenance() {
         title="Manutenzioni & Migliorie"
         subtitle="Gestisci guasti, acquisti e lavori da fare nella struttura."
         actions={
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => openModal()}>
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => openModal()} disabled={!canEdit || busy || loading || Boolean(error)}>
             Nuova Segnalazione
           </Button>
         }
       />
 
+      {error && <p role="alert">{error} <button type="button" onClick={loadData} disabled={loading || busy}>Riprova</button></p>}
+      {unitFilter && <div style={{ display: "flex", gap: 12 }}>
+        <Link to={`/units/${unitFilter}/timeline`}>{unitMap[unitFilter] || `Unita #${unitFilter}`}</Link>
+        <button type="button" onClick={() => setUnitFilter("")}>Tutte le manutenzioni</button>
+      </div>}
       {loading && (
         <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 12 }}>
           Caricamento ticket manutenzione...
@@ -249,6 +282,7 @@ function Maintenance() {
                         icon={<Pencil size={16} />}
                         onClick={() => openModal(t)}
                         aria-label="Modifica ticket"
+                        disabled={!canEdit || busy || loading || Boolean(error)}
                       />
                       <Button
                         variant="danger"
@@ -256,6 +290,7 @@ function Maintenance() {
                         icon={<Trash2 size={16} />}
                         onClick={() => handleDelete(t.id)}
                         aria-label="Elimina ticket"
+                        disabled={!canEdit || busy}
                       />
                     </div>
                   </div>
@@ -275,7 +310,7 @@ function Maintenance() {
                   )}
 
                   {/* Actions to move */}
-                  <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                  <fieldset disabled={!canEdit || busy || loading} style={{ display: "flex", gap: 4, marginTop: 8, border: 0, padding: 0 }}>
                     {status !== "todo" && (
                       <Button variant="secondary" size="sm" onClick={() => moveStatus(t, "todo")}>
                         ← Da Fare
@@ -291,7 +326,7 @@ function Maintenance() {
                         Fatto →
                       </Button>
                     )}
-                  </div>
+                  </fieldset>
                 </div>
               ))}
             </div>
@@ -310,7 +345,7 @@ function Maintenance() {
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
               Annulla
             </Button>
-            <Button variant="primary" type="submit" form="maintenance-form">
+            <Button variant="primary" type="submit" form="maintenance-form" disabled={busy || !canEdit}>
               Salva
             </Button>
           </>

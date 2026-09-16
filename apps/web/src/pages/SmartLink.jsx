@@ -64,8 +64,8 @@ function SmartLink() {
     try {
       const [statusData, zoneData, unitData] = await Promise.all([
         getSmartLinkStatus(),
-        getSmartLinkZoneMap().catch(() => ({})),
-        getUnits().catch(() => []),
+        getSmartLinkZoneMap(),
+        getUnits(),
       ]);
       setStatus(statusData);
       setZoneMap(zoneData || {});
@@ -99,6 +99,7 @@ function SmartLink() {
   );
 
   async function runAction(kind) {
+    if (busy || loading || error || !status?.reachable) return;
     setBusy(kind);
     try {
       if (kind === "sync") {
@@ -121,6 +122,7 @@ function SmartLink() {
   }
 
   async function saveZoneMap() {
+    if (busy || loading || error || !Object.keys(draft).length) return;
     if (!status?.connection_id) {
       toast.error("Nessuna provider connection: creala dalla pagina Proprieta.");
       return;
@@ -160,6 +162,7 @@ function SmartLink() {
           icon={<RefreshCw size={14} />}
           onClick={load}
           loading={loading}
+          disabled={Boolean(busy)}
         >
           Ricarica
         </Button>
@@ -167,7 +170,7 @@ function SmartLink() {
           variant="primary"
           onClick={() => runAction("sync")}
           loading={busy === "sync"}
-          disabled={!status?.reachable}
+          disabled={!status?.reachable || Boolean(busy) || loading || Boolean(error)}
         >
           Sincronizza catalogo
         </Button>
@@ -175,7 +178,7 @@ function SmartLink() {
           variant="secondary"
           onClick={() => runAction("reconcile")}
           loading={busy === "reconcile"}
-          disabled={!status?.reachable}
+          disabled={!status?.reachable || Boolean(busy) || loading || Boolean(error)}
         >
           Riconcilia stati
         </Button>
@@ -325,7 +328,7 @@ function SmartLink() {
                 icon={<Save size={14} />}
                 onClick={saveZoneMap}
                 loading={busy === "zone-map"}
-                disabled={!status.connection_id}
+                disabled={!status.connection_id || Boolean(busy) || !Object.keys(draft).length}
                 title={
                   status.connection_id
                     ? "Salva le associazioni zona - unita"
@@ -360,6 +363,7 @@ function SmartLink() {
                     <code style={{ minWidth: 70 }}>{entry.zone}</code>
                     <span style={{ flex: 1, minWidth: 140 }}>{entry.display_name}</span>
                     <select
+                      disabled={Boolean(busy)}
                       value={
                         draft[entry.zone] !== undefined
                           ? draft[entry.zone]

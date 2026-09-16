@@ -52,9 +52,12 @@ def test_cancellation_releases_dates_and_preserves_completed_work(management, mo
     booking = client.post("/bookings", headers=headers, json=payload).json()
     tasks = _tasks(client, headers, booking["id"])
     checkin = next(t for t in tasks if t["task_type"] == "checkin")
+    assert checkin["is_automatic"] is True
+    assert checkin["transition_locked"] is False
     assert checkin["time"] == "16:30"
     complete = client.put(f"/staff-tasks/{checkin['id']}", headers=headers, json={**checkin, "status": "done", "assignee_name": "Assigned operator"})
     assert complete.status_code == 200
+    assert complete.json()["transition_locked"] is True
     updated = client.put(f"/bookings/{booking['id']}", headers=headers, json={**booking, "notes": "Financial edit", "is_paid": True})
     assert updated.status_code == 200
     preserved = _tasks(client, headers, booking["id"])
@@ -145,5 +148,7 @@ def test_manual_auto_note_does_not_authorize_smart_dispatch(management, monkeypa
         "date": payload["checkin_date"], "task_type": "checkin", "booking_id": booking["id"],
         "unit_id": payload["unit_id"], "notes": f"AUTO: Check-in per prenotazione #{booking['id']}",
     }).json()
+    assert task["is_automatic"] is False
+    assert task["transition_locked"] is False
     assert client.put(f"/staff-tasks/{task['id']}", headers=headers, json={**task, "status": "done"}).status_code == 200
     assert calls == []

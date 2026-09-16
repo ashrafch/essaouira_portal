@@ -21,10 +21,14 @@ import {
   getAdvancedKpis,
   getTodayAlerts,
   getDashboardSummary,
-  ownerMonthlyReportCsvUrl,
+  downloadOwnerMonthlyReportCsv,
 } from "../services/api";
 import { formatCurrency } from "../utils/format";
 import InfoHint from "../components/InfoHint";
+import { Button, useToast } from "../components/ui";
+import { Download } from "lucide-react";
+import { canAccessPath, canAccessRoute, getRole } from "../config/rbac";
+import { loadSections } from "../services/loadSections";
 
 // Theme-aware chart palette (CSS design tokens, not hardcoded hex).
 // Booking sources reuse the same tones as the Calendar legend for consistency.
@@ -41,6 +45,11 @@ const CHART_FALLBACK = [
 ];
 
 function Dashboard() {
+  const role = getRole();
+  const canReadBusiness = canAccessRoute("business", role);
+  const canReadStaff = canAccessRoute("staff", role);
+  const toast = useToast();
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
@@ -58,20 +67,24 @@ function Dashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function loadAll() {
       setLoading(true);
       setError(null);
       try {
         // Carichiamo in parallelo: Analisi Finanziaria, Task di oggi, Prenotazioni,
         // e il riepilogo operativo unificato (PMS + Smart).
-        const [pnlData, tasksData, bookingsData, advancedData, alertsData, summaryData] = await Promise.all([
-          getMonthPnL(year, month),
-          getStaffTasks({ date: todayStr }),
-          getBookings(),
-          getAdvancedKpis(year, month),
-          getTodayAlerts(),
-          getDashboardSummary().catch(() => null),
-        ]);
+        const { data, failed } = await loadSections({
+          bilancio: () => canReadBusiness ? getMonthPnL(year, month) : null,
+          task: () => canReadStaff ? getStaffTasks({ date: todayStr }) : null,
+          prenotazioni: getBookings,
+          indicatori: () => canReadBusiness ? getAdvancedKpis(year, month) : null,
+          alert: getTodayAlerts,
+          riepilogo: getDashboardSummary,
+        });
+        if (cancelled) return;
+        const { bilancio: pnlData, task: tasksData, prenotazioni: bookingsData, indicatori: advancedData, alert: alertsData, riepilogo: summaryData } = data;
+        setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : null);
 
         setPnl(pnlData);
         setTodaysTasks(tasksData || []);
@@ -81,18 +94,39 @@ function Dashboard() {
 
         // Filtra arrivi di oggi lato client
         const arrivals = (bookingsData || []).filter(
-          (b) => b.checkin_date === todayStr
+          (b) => b.checkin_date === todayStr && b.status === "confirmed"
         );
         setTodaysArrivals(arrivals);
       } catch (err) {
         console.error(err);
         setError("Errore nel caricamento della dashboard.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadAll();
-  }, [year, month, todayStr]);
+    return () => { cancelled = true; };
+  }, [year, month, todayStr, canReadBusiness, canReadStaff]);
+
+  async function exportReport() {
+    if (!canReadBusiness || exporting) return;
+    setExporting(true);
+    try {
+      const blob = await downloadOwnerMonthlyReportCsv(year, month);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `report_${year}_${String(month).padStart(2, "0")}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      toast.error(err.message || "Download non riuscito.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // --- PREPARAZIONE DATI GRAFICI ---
 
@@ -119,8 +153,9 @@ function Dashboard() {
   }, [pnl]);
 
   // --- KPI OPERATIVI ---
-  const tasksCompleted = todaysTasks.filter(t => t.status === 'done').length;
-  const tasksTotal = todaysTasks.length;
+  const activeTasks = todaysTasks.filter(t => t.status !== "cancelled");
+  const tasksCompleted = activeTasks.filter(t => ["done", "completed"].includes(t.status)).length;
+  const tasksTotal = activeTasks.length;
   const taskProgress = tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
 
   // --- STILI ---
@@ -128,28 +163,31 @@ function Dashboard() {
   
   const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" };
   
-  const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" };
+  const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 155px), 1fr))", gap: "12px" };
   
   const kpiCard = (borderLeftColor) => ({
     backgroundColor: "var(--color-surface)",
-    borderRadius: "12px",
-    padding: "20px",
+    borderRadius: "8px",
+    padding: "16px",
+    minWidth: 0,
+    minHeight: "104px",
+    overflowWrap: "anywhere",
     boxShadow: "var(--shadow-sm)",
     border: "1px solid var(--color-border)",
     borderLeft: `5px solid ${borderLeftColor}`,
     display: "flex", flexDirection: "column", justifyContent: "space-between"
   });
 
-  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px" };
+  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))", gap: "24px" };
   
   const chartCard = {
-    backgroundColor: "var(--color-surface)", borderRadius: "16px", padding: "24px",
+    backgroundColor: "var(--color-surface)", borderRadius: "8px", padding: "24px",
     boxShadow: "var(--shadow-sm)", border: "1px solid var(--color-border)",
     minHeight: "350px", display: "flex", flexDirection: "column"
   };
 
   const operationCard = {
-    backgroundColor: "var(--color-surface)", borderRadius: "16px", padding: "24px",
+    backgroundColor: "var(--color-surface)", borderRadius: "8px", padding: "24px",
     border: "1px solid var(--color-border)", flex: 1
   };
 
@@ -159,10 +197,10 @@ function Dashboard() {
   };
 
   if (loading) return <div style={{ padding: 20 }}>Caricamento Dashboard...</div>;
-  if (error) return <div style={{ padding: 20, color: "var(--color-danger)" }}>{error}</div>;
 
   return (
     <div style={pageStyle}>
+      {error && <p role="alert" style={{ color: "var(--color-danger)" }}>{error}</p>}
       
       {/* HEADER */}
       <div style={headerStyle}>
@@ -186,8 +224,10 @@ function Dashboard() {
           <select style={selectStyle} value={year} onChange={(e) => setYear(Number(e.target.value))}>
             {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <a
-            href={ownerMonthlyReportCsvUrl(year, month)}
+          {canReadBusiness && <Button
+            icon={<Download size={16} />}
+            onClick={exportReport}
+            disabled={exporting}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "8px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
@@ -196,7 +236,7 @@ function Dashboard() {
             }}
           >
             Scarica report
-          </a>
+          </Button>}
         </div>
       </div>
 
@@ -211,7 +251,7 @@ function Dashboard() {
           { label: "Alert smart aperti", value: summary?.smart?.alerts_open ?? 0, to: "/smart-alerts", tone: (summary?.smart?.alerts_open ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
           { label: "Unità da attenzionare", value: summary?.smart?.units_needing_attention ?? 0, to: "/smart-operations", tone: (summary?.smart?.units_needing_attention ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
           { label: "Dispositivi online", value: summary?.smart ? `${summary.smart.devices_online}/${summary.smart.devices_total}` : "—", to: "/smart-devices", tone: "var(--color-accent, var(--color-primary))" },
-        ].map((tile) => (
+        ].filter((tile) => canAccessPath(tile.to, role)).map((tile) => (
           <button
             key={tile.label}
             type="button"
@@ -221,7 +261,7 @@ function Dashboard() {
               textAlign: "left", cursor: "pointer", font: "inherit", width: "100%",
             }}
           >
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0 }}>
               {tile.label}
             </div>
             <div className="tabular-nums" style={{ fontSize: "26px", fontWeight: 700, color: "var(--color-text)", marginTop: "8px" }}>
@@ -231,7 +271,7 @@ function Dashboard() {
         ))}
       </div>
 
-      <div style={gridKPI}>
+      {advancedKpis && <div style={gridKPI}>
         <div style={kpiCard("var(--color-info)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>RevPAR</div>
           <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
@@ -260,6 +300,7 @@ function Dashboard() {
         </div>
       </div>
 
+      }
       {alerts.length > 0 && (
         <div style={{ ...chartCard, minHeight: "auto" }}>
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: 12, color: "var(--color-text)" }}>
@@ -277,6 +318,7 @@ function Dashboard() {
       )}
 
       {/* 1. KPI FINANZIARI */}
+      {pnl && <>
       <div style={gridKPI}>
         <div style={kpiCard("var(--color-primary)")}>
           <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Ricavi Totali</div>
@@ -373,6 +415,7 @@ function Dashboard() {
       </div>
 
       {/* 3. SEZIONE OPERATIVA OGGI */}
+      </>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
         
         {/* Arrivi di Oggi */}
@@ -407,7 +450,7 @@ function Dashboard() {
         </div>
 
         {/* Stato Staff */}
-        <div style={operationCard}>
+        {canReadStaff && <div style={operationCard}>
           <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "600" }}>Avanzamento Staff</h3>
           
           <div style={{ marginBottom: "20px" }}>
@@ -433,7 +476,7 @@ function Dashboard() {
           ) : (
             <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Nessun task programmato per oggi.</div>
           )}
-        </div>
+        </div>}
 
       </div>
     </div>

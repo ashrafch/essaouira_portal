@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { canAccessRoute, canEditOperations, getRole } from "../config/rbac";
+import { readWorkflowContext } from "../routes/workflowContext";
+import { loadSections } from "../services/loadSections";
 import {
   getBookings,
   getStaffTasks,
@@ -31,14 +34,22 @@ function whatsappLink(phone) {
 }
 
 function ArrivalsDepartures() {
+  const context = readWorkflowContext(useLocation());
+  const canEdit = canEditOperations();
+  const canOpenStaff = canAccessRoute("staff", getRole());
   const todayStr = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
   const toast = useToast();
 
   const STAFF_ROUTE = "/staff";
 
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [unitFilter, setUnitFilter] = useState("all");
+  const [selectedDate, setSelectedDate] = useState(context.date || todayStr);
+  const [unitFilter, setUnitFilter] = useState(context.unitId || "all");
+  const [tasksAvailable, setTasksAvailable] = useState(false);
+  useEffect(() => {
+    if (context.date) setSelectedDate(context.date);
+    setUnitFilter(context.unitId || "all");
+  }, [context.date, context.unitId]);
 
   const [bookings, setBookings] = useState([]);
   const [staffTasks, setStaffTasks] = useState([]);
@@ -63,27 +74,33 @@ function ArrivalsDepartures() {
   );
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const [bookingsResp, tasksResp, unitsResp] = await Promise.all([
-          getBookings(),
-          getStaffTasks({ date: selectedDate }),
-          getUnits(),
-        ]);
+        const { data, failed } = await loadSections({
+          prenotazioni: getBookings,
+          task: () => canOpenStaff ? getStaffTasks({ date: selectedDate }) : null,
+          unita: getUnits,
+        });
+        if (cancelled) return;
+        const { prenotazioni: bookingsResp, task: tasksResp, unita: unitsResp } = data;
+        setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : null);
+        setTasksAvailable(canOpenStaff && !failed.includes("task"));
         setBookings(bookingsResp || []);
         setStaffTasks(tasksResp || []);
         setUnits(unitsResp || []);
       } catch (err) {
         setError(err.message || "Errore caricando dati operativi");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     load();
-  }, [selectedDate]);
+    return () => { cancelled = true; };
+  }, [selectedDate, canOpenStaff]);
 
   const arrivals = useMemo(
     () =>
@@ -138,7 +155,7 @@ function ArrivalsDepartures() {
   }
 
   async function handleMarkPaid(b) {
-    if (b.is_paid) return;
+    if (b.is_paid || !canEdit || savingBookingId !== null) return;
     setSavingBookingId(b.id);
     try {
       const payload = {
@@ -176,6 +193,7 @@ function ArrivalsDepartures() {
   }
 
   async function handleToggleTaskStatus(task) {
+    if (!canEdit || savingTaskId !== null || task.transition_locked || task.status === "cancelled") return;
     const newStatus = task.status === "done" ? "planned" : "done";
     setSavingTaskId(task.id);
     try {
@@ -214,7 +232,8 @@ function ArrivalsDepartures() {
   }
 
   function openStaffForDate() {
-    navigate(STAFF_ROUTE, { state: { date: selectedDate } });
+    if (!canOpenStaff) return;
+    navigate(STAFF_ROUTE, { state: { date: selectedDate, unitId: unitFilter === "all" ? null : unitFilter } });
   }
 
   function _getTaskLabel(t) {
@@ -385,6 +404,7 @@ function ArrivalsDepartures() {
                 size="sm"
                 icon={<ClipboardList size={16} />}
                 onClick={openStaffForDate}
+                disabled={!canOpenStaff}
               >
                 Vai a task staff del giorno
               </Button>
@@ -404,7 +424,7 @@ function ArrivalsDepartures() {
           <div style={{ display: "flex", gap: 12, fontSize: 12, flexWrap: "wrap", alignItems: "center" }}>
             <span>Arrivi: <strong>{arrivals.length}</strong></span>
             <span>Partenze: <strong>{departures.length}</strong></span>
-            <span>Task staff: <strong>{visibleStaffTasks.length}</strong></span>
+            <span>Task staff: <strong>{tasksAvailable ? visibleStaffTasks.length : "Non disponibili"}</strong></span>
           </div>
 
           <div style={cardGrid}>
@@ -568,7 +588,7 @@ function ArrivalsDepartures() {
                                 size="sm"
                                 icon={<Wallet size={16} />}
                                 disabled={
-                                  b.is_paid || savingBookingId === b.id
+                                  !canEdit || b.is_paid || savingBookingId !== null
                                 }
                                 onClick={() => handleMarkPaid(b)}
                               >
@@ -736,7 +756,7 @@ function ArrivalsDepartures() {
                                       onClick={() =>
                                         handleToggleTaskStatus(t)
                                       }
-                                      disabled={savingTaskId === t.id}
+                                      disabled={!canEdit || savingTaskId !== null || t.transition_locked || t.status === "cancelled"}
                                     >
                                       {savingTaskId === t.id
                                         ? "..."

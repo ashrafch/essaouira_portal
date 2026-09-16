@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { canAccessRoute, getRole } from "../config/rbac";
 import { AlertTriangle, CalendarRange, Cpu, Rocket } from "lucide-react";
 import {
   CartesianGrid,
@@ -259,7 +260,7 @@ function SmartUnitDetail() {
               {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
             </button>
             <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
-            <button type="button" onClick={() => navigate("/smart-automation")}>Automazioni unità</button>
+            {canAccessRoute("smartAutomation", getRole()) && <button type="button" onClick={() => navigate("/smart-automation")}>Automazioni</button>}
           </div>
         }
       />
@@ -309,7 +310,7 @@ function SmartUnitDetail() {
         <AppCard>
           <h3 style={{ marginBottom: 10 }}>Azioni rapide</h3>
           <div style={{ display: "grid", gap: 10 }}>
-            <button type="button" onClick={() => navigate("/smart-automation")}>
+            <button type="button" disabled={!canAccessRoute("smartAutomation", getRole())} onClick={() => navigate("/smart-automation")}>
               <Rocket size={14} style={{ marginRight: 6 }} />
               Esegui scena o regola
             </button>

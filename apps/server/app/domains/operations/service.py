@@ -139,6 +139,15 @@ def is_auto_booking_transition_task(task: StaffTask) -> bool:
     return task.auto_key is not None
 
 
+def staff_task_ui_state(task: StaffTask) -> dict[str, bool]:
+    return {
+        "is_automatic": task.auto_key is not None,
+        "transition_locked": task.auto_key is not None
+        and task.task_type in {"checkin", "checkout"}
+        and task.status in TERMINAL_TASK_STATUSES,
+    }
+
+
 def merge_notes_for_auto_task(existing_notes: str | None, incoming_notes: str | None) -> str | None:
     existing = (existing_notes or "").strip()
     incoming = (incoming_notes or "").strip()

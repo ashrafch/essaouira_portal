@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { readWorkflowContext } from "../routes/workflowContext";
+import { loadSections } from "../services/loadSections";
 import {
   getStaffTasks,
   getUnits,
@@ -27,11 +30,14 @@ import TaskFormModal from "../components/staff/TaskFormModal";
 import StaffTaskTable from "../components/staff/StaffTaskTable";
 
 function Staff() {
+  const context = readWorkflowContext(useLocation());
   const toast = useToast();
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const [mode, setMode] = useState("day"); // "day" | "week"
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedDate, setSelectedDate] = useState(context.date || todayStr);
+  const [bookingFilter, setBookingFilter] = useState(context.bookingId);
+  const [baseError, setBaseError] = useState("");
 
   const [units, setUnits] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -42,8 +48,15 @@ function Staff() {
   const [error, setError] = useState(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
-  const [unitFilter, setUnitFilter] = useState("all");
-  const [taskTypeFilter, setTaskTypeFilter] = useState("all");
+  const [unitFilter, setUnitFilter] = useState(context.unitId || "all");
+  const [taskTypeFilter, setTaskTypeFilter] = useState(context.taskType || "all");
+
+  useEffect(() => {
+    if (context.date) { setSelectedDate(context.date); setMode("day"); }
+    setUnitFilter(context.unitId || "all");
+    setBookingFilter(context.bookingId);
+    setTaskTypeFilter(context.taskType || "all");
+  }, [context.date, context.unitId, context.bookingId, context.taskType]);
 
   const [savingTaskId, setSavingTaskId] = useState(null);
 
@@ -126,12 +139,14 @@ function Staff() {
     async function loadBase() {
       setDefaultsLoading(true);
       try {
-        const [uns, defs, staff, tickets] = await Promise.all([
-          getUnits(),
-          getStaffDefaults(),
-          getStaffMembers({ active_only: true }),
-          getMaintenanceTickets(),
-        ]);
+        const { data, failed } = await loadSections({
+          unita: getUnits,
+          impostazioni: getStaffDefaults,
+          personale: () => getStaffMembers({ active_only: true }),
+          manutenzioni: getMaintenanceTickets,
+        });
+        const { unita: uns, impostazioni: defs, personale: staff, manutenzioni: tickets } = data;
+        setBaseError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : "");
 
         setUnits(uns || []);
         setStaffMembers(staff || []);
@@ -162,6 +177,7 @@ function Staff() {
 
   // carica tasks
   useEffect(() => {
+    let cancelled = false;
     async function loadTasks() {
       setLoading(true);
       setError(null);
@@ -169,14 +185,18 @@ function Staff() {
         const params =
           mode === "day" ? { date: selectedDate } : { from_date, to_date };
         const tsks = await getStaffTasks(params);
+        if (cancelled) return;
         setTasks(tsks || []);
       } catch (err) {
+        if (cancelled) return;
+        setTasks([]);
         setError(err.message || "Errore caricando i task staff");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadTasks();
+    return () => { cancelled = true; };
   }, [mode, selectedDate, from_date, to_date]);
 
   const filteredTasks = useMemo(
@@ -192,9 +212,9 @@ function Staff() {
             ? true
             : (t.task_type || "") === taskTypeFilter;
 
-        return matchUnit && matchType;
+        return matchUnit && matchType && (!bookingFilter || String(t.booking_id) === bookingFilter);
       }),
-    [tasks, unitFilter, taskTypeFilter]
+    [tasks, unitFilter, taskTypeFilter, bookingFilter]
   );
 
   const kpi = useMemo(() => {
@@ -356,6 +376,7 @@ function Staff() {
   }
 
   function handleToggleStatus(task) {
+    if (task.transition_locked || task.status === "cancelled") return;
     const newStatus = task.status === "done" ? "planned" : "done";
     saveTask(task.id, { status: newStatus });
   }
@@ -571,6 +592,7 @@ function Staff() {
 
   async function handleSaveDefaults(e) {
     e.preventDefault();
+    if (!canManageDefaults || defaultsSaving || baseError) return;
     setDefaultsSaving(true);
     setDefaultsMessage("");
     try {
@@ -615,6 +637,12 @@ function Staff() {
         }
       />
 
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Link to="/staff-planner" state={{ date: selectedDate, unitId: unitFilter === "all" ? null : unitFilter, bookingId: bookingFilter }}>Planner staff</Link>
+        <Link to="/operations" state={{ date: selectedDate, unitId: unitFilter === "all" ? null : unitFilter }}>Arrivi & Partenze</Link>
+        {bookingFilter && <button type="button" onClick={() => setBookingFilter("")}>Tutte le prenotazioni (#{bookingFilter})</button>}
+      </div>
+      {baseError && <p role="alert">{baseError}</p>}
       {error && (
         <p style={{ color: "var(--color-danger)", fontSize: 12, marginBottom: 4 }}>
           {error}
@@ -655,7 +683,7 @@ function Staff() {
             defCurrency={defCurrency}
             setDefCurrency={setDefCurrency}
             defaultsSaving={defaultsSaving}
-            canManageDefaults={canManageDefaults}
+            canManageDefaults={canManageDefaults && !baseError}
             defaultsMessage={defaultsMessage}
           />
         </div>
@@ -718,6 +746,8 @@ function Staff() {
           isOpen={isTaskModalOpen}
           formMode={formMode}
           editingId={editingId}
+          isAutomatic={tasks.find(task => task.id === editingId)?.is_automatic || false}
+          transitionLocked={tasks.find(task => task.id === editingId)?.transition_locked || false}
           onSubmit={handleSubmit}
           onClose={() => {
             resetForm();

@@ -3,6 +3,8 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { CalendarRange, Cpu } from "lucide-react";
 import { PageHeader } from "../components/ui";
 import { getUnitSchedule } from "../services/api";
+import { canAccessRoute, getRole } from "../config/rbac";
+import { formatISO } from "../utils/dateUtils";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -860,7 +862,7 @@ function UnitTimeline() {
                 cursor: "pointer",
               }}
               onClick={() => {
-                navigate("/bookings");
+                navigate("/bookings", { state: { editBookingId: selectedBooking.booking_id ?? selectedBooking.id, unitId } });
                 setSelectedBooking(null);
               }}
             >
@@ -1006,11 +1008,12 @@ function UnitTimeline() {
                 cursor: "pointer",
               }}
               onClick={() => {
-                navigate("/staff");
+                if (!canAccessRoute("staff", getRole())) return;
+                navigate("/staff", { state: { date: formatISO(selectedCluster.date), unitId } });
                 setSelectedCluster(null);
               }}
             >
-              Apri in Staff
+              {canAccessRoute("staff", getRole()) ? "Apri in Staff" : "Staff: accesso riservato"}
             </button>
           </div>
         </Modal>

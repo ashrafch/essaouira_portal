@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { canEditOperations } from "../config/rbac";
 import {
   getBookings,
   getUnits,
@@ -28,6 +29,8 @@ function hasOverlap(b, start, end) {
 
 function Bookings() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const canEdit = canEditOperations();
   const toast = useToast();
 
   const [units, setUnits] = useState([]);
@@ -94,25 +97,35 @@ function Bookings() {
   // stato da Calendar (nuova o modifica)
   useEffect(() => {
     const state = location.state;
-    if (!state) return;
+    if (!state || loading || error) return;
+    if (state.unitId) setUnitFilter(String(state.unitId));
 
-    if (state.newBookingDate) {
+    if (state.newBookingDate && canEdit) {
       const d = state.newBookingDate;
+      resetForm();
       setFormMode("create");
       setEditingId(null);
       setCheckinDate(d);
-      setCheckoutDate(d);
+      const checkout = new Date(d + "T12:00:00");
+      checkout.setDate(checkout.getDate() + 1);
+      setCheckoutDate(formatISO(checkout));
+      if (state.unitId) setUnitId(String(state.unitId));
       setIsModalOpen(true);
     }
 
-    if (state.editBookingId && bookings.length > 0) {
-      const b = bookings.find((bk) => bk.id === state.editBookingId);
+    if (state.editBookingId) {
+      const b = bookings.find((bk) => String(bk.id) === String(state.editBookingId));
       if (b) {
         loadBookingIntoForm(b);
         setIsModalOpen(true);
+      } else {
+        toast.error("Prenotazione non disponibile.");
       }
     }
-  }, [location.state, bookings]);
+    navigate(location.pathname + location.search, { replace: true, state: null });
+    // Consume navigation intent once; saves must not reopen the editor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, bookings, loading, error, canEdit]);
 
   const unitMap = useMemo(
     () =>
@@ -150,7 +163,7 @@ function Bookings() {
 
     units.forEach((u) => {
       const conflictsForUnit = bookings.filter((b) =>
-        b.unit_id === u.id ? hasOverlap(b, parsedCheckin, parsedCheckout) : false
+        b.id !== editingId && b.unit_id === u.id ? hasOverlap(b, parsedCheckin, parsedCheckout) : false
       );
       if (conflictsForUnit.length === 0) {
         freeUnits.push(u);
@@ -170,7 +183,7 @@ function Bookings() {
       conflictForSelectedUnit,
       conflictBookings,
     };
-  }, [bookings, units, parsedCheckin, parsedCheckout, unitId]);
+  }, [bookings, units, parsedCheckin, parsedCheckout, unitId, editingId]);
 
   const suggestedTotal = useMemo(() => {
     const nr = nightlyRate ? Number(nightlyRate) : NaN;
@@ -236,6 +249,7 @@ function Bookings() {
   }
 
   function openCreateModal() {
+    if (!canEdit) return;
     resetForm();
     setIsModalOpen(true);
   }
@@ -295,6 +309,11 @@ function Bookings() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!canEdit || saving) return;
+    if (nights <= 0) {
+      toast.error("Il check-out deve essere successivo al check-in.");
+      return;
+    }
     if (!unitId || !guestName || !checkinDate || !checkoutDate) {
       toast.error("Unità, ospite, check-in e check-out sono obbligatori.");
       return;
@@ -348,6 +367,7 @@ function Bookings() {
   }
 
   async function handleDelete(id) {
+    if (!canEdit) return;
     if (!window.confirm("Sei sicuro di voler eliminare questa prenotazione?"))
       return;
     try {
@@ -560,7 +580,7 @@ function Bookings() {
             title={
               formMode === "create"
                 ? "Nuova prenotazione"
-                : `Modifica prenotazione #${editingId}`
+                : `${canEdit ? "Modifica" : "Dettaglio"} prenotazione #${editingId}`
             }
             size="lg"
             footer={
@@ -578,7 +598,7 @@ function Bookings() {
                   variant="primary"
                   type="submit"
                   form="booking-form"
-                  disabled={saving}
+                  disabled={saving || !canEdit}
                 >
                   {saving
                     ? "Salvataggio..."
@@ -590,6 +610,7 @@ function Bookings() {
             }
           >
             <form id="booking-form" onSubmit={handleSubmit}>
+              <fieldset disabled={!canEdit || saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
               {/* DATI BASE */}
               <div style={field}>
                 <label style={label}>Appartamento</label>
@@ -995,6 +1016,7 @@ function Bookings() {
                 />
               </div>
 
+              </fieldset>
             </form>
           </Modal>
 
@@ -1024,6 +1046,7 @@ function Bookings() {
                   size="sm"
                   icon={<Plus size={16} />}
                   onClick={openCreateModal}
+                  disabled={!canEdit}
                 >
                   Nuova prenotazione
                 </Button>
@@ -1201,6 +1224,7 @@ function Bookings() {
                                 size="sm"
                                 icon={<Trash2 size={16} />}
                                 onClick={() => handleDelete(b.id)}
+                                disabled={!canEdit}
                               >
                                 Elimina
                               </Button>

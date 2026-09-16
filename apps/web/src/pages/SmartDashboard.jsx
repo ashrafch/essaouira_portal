@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { canAccessRoute, getRole } from "../config/rbac";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -192,7 +193,7 @@ function SmartDashboard() {
               {isRefreshing ? "Aggiorno..." : "Aggiorna ora"}
             </button>
             <button type="button" onClick={() => navigate("/smart-alerts")}>Nuovo alert</button>
-            <button type="button" onClick={() => navigate("/smart-automation")}>Apri automazioni</button>
+            {canAccessRoute("smartAutomation", getRole()) && <button type="button" onClick={() => navigate("/smart-automation")}>Apri automazioni</button>}
           </div>
         }
       />

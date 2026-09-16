@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getRole } from "../../config/rbac";
+import { canUseSmartQuickAction } from "./actionPermissions";
 import {
   AppCard,
   EmptyState,
@@ -129,6 +131,8 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
   }
 
   async function handleQuickAction(action) {
+    if (runningAction || !canUseSmartQuickAction(action, getRole())) return;
+    if (action.action_type === "run_scene" && !window.confirm(`Eseguire ${action.label || "la scena selezionata"} per l'unita #${action.unit_id || "n/d"}?`)) return;
     const actionKey = `${action.action_type}-${action.scene_id || action.alert_id || action.booking_id || action.unit_id || "na"}`;
     setRunningAction(actionKey);
     setActionError("");
@@ -425,14 +429,14 @@ function SmartAssistantPage({ assistantType = "checkin" }) {
                     </div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {item.quick_actions.map((action) => {
+                      {(item.quick_actions || []).map((action) => {
                         const actionKey = `${action.action_type}-${action.scene_id || action.alert_id || action.booking_id || action.unit_id || "na"}`;
                         return (
                           <button
                             key={actionKey}
                             type="button"
                             onClick={() => handleQuickAction(action)}
-                            disabled={!action.enabled || runningAction === actionKey}
+                            disabled={!canUseSmartQuickAction(action, getRole()) || Boolean(runningAction)}
                           >
                             {runningAction === actionKey ? "Eseguo..." : action.label}
                           </button>

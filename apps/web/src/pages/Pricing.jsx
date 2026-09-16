@@ -11,6 +11,7 @@ import RevenueRulesEditor from "../components/RevenueRulesEditor";
 import MarketRatesEditor from "../components/MarketRatesEditor";
 import ChannelSyncEditor from "../components/ChannelSyncEditor";
 import PricingAlertsPanel from "../components/PricingAlertsPanel";
+import { loadSections } from "../services/loadSections";
 
 const EMPTY_PRICING = {
   default_cleaning_fee: "",
@@ -45,17 +46,19 @@ function Pricing() {
       setLoading(true);
       setError(null);
       try {
-        const [uns, pd] = await Promise.all([getUnits(), getPricingDefaults()]);
+        const { data, failed } = await loadSections({ unita: getUnits, impostazioni: getPricingDefaults });
+        const { unita: uns, impostazioni: pd } = data;
+        setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : null);
         setUnits(uns || []);
-        const pricingCfg = pd || EMPTY_PRICING;
+        const pricingCfg = pd;
         setPricing(pricingCfg);
         setPricingDraft(pricingCfg);
       } catch (err) {
         console.error("Errore caricando tariffe/pricing:", err);
         setError(err.message || "Errore caricando le tariffe.");
         setUnits([]);
-        setPricing(EMPTY_PRICING);
-        setPricingDraft(EMPTY_PRICING);
+        setPricing(null);
+        setPricingDraft(null);
       } finally {
         setLoading(false);
       }
@@ -99,6 +102,7 @@ function Pricing() {
   }
 
   function openPricingModal() {
+    if (!pricing || loading) return;
     setPricingDraft(pricing || EMPTY_PRICING);
     setPricingModalOpen(true);
   }
@@ -112,7 +116,7 @@ function Pricing() {
 
   async function handleSavePricing(e) {
     e.preventDefault();
-    if (!pricingDraft) return;
+    if (!pricing || !pricingDraft || savingPricing) return;
     setSavingPricing(true);
     try {
       const payload = {
@@ -213,7 +217,7 @@ function Pricing() {
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <h2 style={{ fontSize: 14, margin: 0 }}>Tariffe base per unità (ADR di riferimento)</h2>
-              <Button variant="primary" size="sm" onClick={openPricingModal}>
+              <Button variant="primary" size="sm" onClick={openPricingModal} disabled={!pricing || loading}>
                 Configura default pricing
               </Button>
             </div>
@@ -268,7 +272,7 @@ function Pricing() {
                 Cleaning fee: {pricing.default_cleaning_fee ?? "-"} · City tax/notte: {pricing.default_city_tax_per_night ?? "-"}
                 · Commissione: {pricing.default_channel_fee_percent ?? "-"}% · Valuta: {pricing.default_currency || "EUR"}
               </p>
-              <Button variant="primary" size="sm" onClick={openPricingModal}>
+              <Button variant="primary" size="sm" onClick={openPricingModal} disabled={!pricing || loading}>
                 Modifica impostazioni default
               </Button>
             </div>

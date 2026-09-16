@@ -32,6 +32,7 @@ from app.domains.operations.service import (
     parse_time_str,
     trigger_smart_reaction_on_staff_task_completion,
     validate_staff_task_links,
+    staff_task_ui_state,
 )
 from app.models.booking import Booking
 from app.models.cost_item import CostItem
@@ -70,6 +71,7 @@ def list_staff_tasks(
         result.append(
             {
                 "id": t.id,
+                **staff_task_ui_state(t),
                 "date": t.date,
                 "time": format_time_value(t.time),
                 "task_type": t.task_type,
@@ -128,6 +130,7 @@ def create_staff_task(payload: StaffTaskCreate, db: Session = Depends(get_db)):
 
     return {
         "id": task.id,
+        **staff_task_ui_state(task),
         "date": task.date,
         "time": format_time_value(task.time),
         "task_type": task.task_type,
@@ -149,8 +152,8 @@ def update_staff_task(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    # Serialize completion so concurrent retries cannot both dispatch a workflow.
-    task = db.query(StaffTask).filter(StaffTask.id == task_id).with_for_update().first()
+    # Validation locks booking before task, matching booking reconciliation order.
+    task = db.query(StaffTask).filter(StaffTask.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task staff non trovato")
     validate_staff_task_links(db, payload, task)
@@ -203,6 +206,7 @@ def update_staff_task(
 
     return {
         "id": task.id,
+        **staff_task_ui_state(task),
         "date": task.date,
         "time": format_time_value(task.time),
         "task_type": task.task_type,

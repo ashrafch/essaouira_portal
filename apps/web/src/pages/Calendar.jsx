@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { canEditOperations } from "../config/rbac";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   getBookings,
@@ -234,7 +235,7 @@ function Calendar() {
 
   // ---- DRAG & DROP ----
   function handleDragStart(e, booking) {
-    if (fromCache) return;
+    if (fromCache || !canEditOperations()) return;
     setDraggingBooking(booking);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(
@@ -253,7 +254,7 @@ function Calendar() {
 
   async function handleDrop(e, dayDate) {
     e.preventDefault();
-    if (!draggingBooking || fromCache) return;
+    if (!draggingBooking || fromCache || !canEditOperations()) return;
 
     try {
       const dataJson = e.dataTransfer.getData("application/json");
@@ -307,7 +308,8 @@ function Calendar() {
   // --- CLICK + : NUOVA PRENOTAZIONE PER QUEL GIORNO ---
   function createBookingForDay(dayDate) {
     const iso = formatISO(dayDate);
-    navigate("/bookings", { state: { newBookingDate: iso } });
+    if (!canEditOperations()) return;
+    navigate("/bookings", { state: { newBookingDate: iso, unitId: selectedUnitId } });
   }
 
   // STILI

@@ -43,6 +43,8 @@ class StaffTaskOut(StaffTaskBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    is_automatic: bool = False
+    transition_locked: bool = False
 
 
 # ---------- COST ITEMS ----------

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 import { getBookings, getUnits } from "../services/api";
 
 // --- STILI SCHERMO ---
@@ -19,6 +20,9 @@ const controlsStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  flexWrap: "wrap",
+  gap: 12,
+  boxSizing: "border-box",
   backgroundColor: "var(--color-surface)",
   padding: "10px 20px",
   borderRadius: "8px",
@@ -53,6 +57,7 @@ const btn = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
+  flexShrink: 0,
 };
 
 const btnPrimary = {
@@ -64,6 +69,12 @@ const btnPrimary = {
 
 // --- CSS DI STAMPA POTENZIATO ---
 const printCss = `
+.printable-area-wrapper {
+  width: 100%;
+  max-width: 210mm;
+  overflow-x: auto;
+}
+.a4-page { overflow-wrap: anywhere; }
 @media print {
   @page {
     size: A4 portrait;
@@ -123,6 +134,8 @@ function BookingDocument() {
   const [unit, setUnit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [docType, setDocType] = useState("registration");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   
   const documentRef = useRef(null);
 
@@ -147,7 +160,9 @@ function BookingDocument() {
 
   const handleDownloadPdf = async () => {
     const element = documentRef.current;
-    if (!element) return;
+    if (!element || exporting) return;
+    setExporting(true);
+    setExportError("");
     try {
       // Librerie pesanti caricate solo al momento del download.
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
@@ -169,7 +184,9 @@ function BookingDocument() {
       const fileName = `${docType}_${booking.guest_name.replace(/\s+/g, "_")}.pdf`;
       pdf.save(fileName);
     } catch {
-      alert("Errore durante la creazione del PDF.");
+      setExportError("Errore durante la creazione del PDF. Riprova o usa Stampa.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -187,15 +204,16 @@ function BookingDocument() {
 
       {/* BARRA DI CONTROLLO - Classe no-print fondamentale */}
       <div className="no-print" style={controlsStyle}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", minWidth: 0, gap: 16 }}>
           <button style={btn} onClick={() => navigate("/bookings")}>
-            <span>⬅</span> Torna a Prenotazioni
+            <ArrowLeft size={16} /> Torna a Prenotazioni
           </button>
           
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Documento:</span>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", minWidth: 0, gap: 8 }}>
+            <label htmlFor="document-type" style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>Documento:</label>
             <select
-              style={{ padding: "8px", borderRadius: "6px", border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
+              id="document-type"
+              style={{ maxWidth: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--color-border-strong)", cursor: "pointer" }}
               value={docType} 
               onChange={(e) => setDocType(e.target.value)}
             >
@@ -207,13 +225,15 @@ function BookingDocument() {
 
         <div style={{ display: "flex", gap: 8 }}>
           <button style={btn} onClick={() => window.print()}>
-            🖨️ Stampa
+            <Printer size={16} /> Stampa
           </button>
-          <button style={btnPrimary} onClick={handleDownloadPdf}>
-            ⬇️ Scarica PDF
+          <button style={btnPrimary} disabled={exporting} aria-busy={exporting} onClick={handleDownloadPdf}>
+            <Download size={16} /> {exporting ? "Esportazione..." : "Scarica PDF"}
           </button>
         </div>
       </div>
+
+      {exportError && <p className="no-print" role="alert">{exportError}</p>}
 
       {/* WRAPPER DI STAMPA */}
       <div className="printable-area-wrapper">

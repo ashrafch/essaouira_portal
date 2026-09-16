@@ -10,6 +10,8 @@ function TaskFormModal({
   isOpen,
   formMode,
   editingId,
+  isAutomatic = false,
+  transitionLocked = false,
   onSubmit,
   onClose,
   date,
@@ -77,6 +79,7 @@ function TaskFormModal({
             <select
               style={select}
               value={taskType}
+              disabled={isAutomatic}
               onChange={(e) => setTaskType(e.target.value)}
             >
               <option value="cleaning">Pulizie</option>
@@ -103,6 +106,7 @@ function TaskFormModal({
             <select
               style={select}
               value={unitId}
+              disabled={isAutomatic}
               onChange={(e) => setUnitId(e.target.value)}
             >
               <option value="">Nessuno</option>
@@ -132,11 +136,13 @@ function TaskFormModal({
             <select
               style={select}
               value={status}
+              disabled={transitionLocked}
               onChange={(e) => setStatus(e.target.value)}
             >
               <option value="planned">Planned</option>
               <option value="in_progress">In corso</option>
               <option value="done">Completato</option>
+              <option value="completed">Completato (archivio)</option>
               <option value="cancelled">Annullato</option>
             </select>
           </div>

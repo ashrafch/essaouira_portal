@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { canAccessRoute, canEditOperations, getRole } from "../config/rbac";
 import {
   AppCard,
   EmptyState,
@@ -117,6 +118,7 @@ function SmartOperations() {
   }
 
   async function handleAcknowledgeAlert(alertId) {
+    if (!canEditOperations() || busyAlertId !== null) return;
     setBusyAlertId(alertId);
     setActionError("");
     try {
@@ -142,25 +144,25 @@ function SmartOperations() {
   }
 
   function issueActionButton(issue) {
-    if (issue.suggested_action === "acknowledge_alert" && issue.alert_id) {
+    if (issue.suggested_action === "acknowledge_alert" && issue.alert_id && canEditOperations()) {
       return (
         <button
           type="button"
           onClick={() => handleAcknowledgeAlert(issue.alert_id)}
-          disabled={busyAlertId === issue.alert_id}
+          disabled={busyAlertId !== null}
         >
           {busyAlertId === issue.alert_id ? "..." : "Prendi in carico"}
         </button>
       );
     }
     if (issue.suggested_action === "open_maintenance") {
-      return <button type="button" onClick={() => navigate("/maintenance")}>Apri manutenzioni</button>;
+      return <button type="button" onClick={() => navigate("/maintenance", { state: { unitId: issue.unit_id } })}>Apri manutenzioni</button>;
     }
-    if (issue.suggested_action === "open_automation") {
+    if (issue.suggested_action === "open_automation" && canAccessRoute("smartAutomation", getRole())) {
       return <button type="button" onClick={() => navigate("/smart-automation")}>Apri automazioni</button>;
     }
-    if (issue.suggested_action === "open_staff_planner") {
-      return <button type="button" onClick={() => navigate("/staff-planner")}>Apri planner staff</button>;
+    if (issue.suggested_action === "open_staff_planner" && canAccessRoute("staffPlanner", getRole())) {
+      return <button type="button" onClick={() => navigate("/staff-planner", { state: { unitId: issue.unit_id, date: issue.date } })}>Apri planner staff</button>;
     }
     if (issue.device_id) {
       return <button type="button" onClick={() => navigate(`/smart-devices/${issue.device_id}`)}>Apri device</button>;

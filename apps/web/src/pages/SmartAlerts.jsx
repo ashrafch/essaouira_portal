@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { canEditOperations } from "../config/rbac";
 import {
   acknowledgeSmartAlert,
   createSmartAlert,
@@ -27,6 +28,10 @@ const EMPTY_FORM = {
 };
 
 function SmartAlerts() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedAlertId = searchParams.get("alert_id");
+  const canEdit = canEditOperations();
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState([]);
   const [units, setUnits] = useState([]);
@@ -59,18 +64,22 @@ function SmartAlerts() {
   }, [loadAlerts]);
 
   const grouped = useMemo(() => {
-    const open = alerts.filter((a) => a.status === "open");
-    const resolved = alerts.filter((a) => a.status !== "open");
+    const visible = selectedAlertId ? alerts.filter((alert) => String(alert.id) === selectedAlertId) : alerts;
+    const open = visible.filter((a) => a.status === "open");
+    const resolved = visible.filter((a) => a.status !== "open");
     return { open, resolved };
-  }, [alerts]);
+  }, [alerts, selectedAlertId]);
 
   function openCreateModal() {
+    if (!canEdit) return;
     setForm(EMPTY_FORM);
     setIsModalOpen(true);
   }
 
   async function handleCreate(e) {
     e.preventDefault();
+    if (!canEdit || busy) return;
+    setBusy(true);
     setError("");
     try {
       await createSmartAlert({
@@ -86,10 +95,14 @@ function SmartAlerts() {
       setForm(EMPTY_FORM);
     } catch (err) {
       setFeedback({ type: "error", message: err.message || "Errore creazione alert" });
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleAck(id) {
+    if (!canEdit || busy) return;
+    setBusy(true);
     setError("");
     try {
       await acknowledgeSmartAlert(id);
@@ -97,6 +110,8 @@ function SmartAlerts() {
       setFeedback({ type: "success", message: "Alert preso in carico." });
     } catch (err) {
       setFeedback({ type: "error", message: err.message || "Errore presa in carico" });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -107,7 +122,7 @@ function SmartAlerts() {
         subtitle="Alert operativi da dispositivi, regole e automazioni smart"
         right={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button type="button" onClick={openCreateModal}>Nuovo alert</button>
+            {canEdit && <button type="button" onClick={openCreateModal} disabled={busy}>Nuovo alert</button>}
             <button type="button" onClick={() => navigate("/smart-dashboard")}>Apri dashboard</button>
           </div>
         }
@@ -120,6 +135,7 @@ function SmartAlerts() {
       />
 
       <FilterBar>
+        {selectedAlertId && <button type="button" onClick={() => setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete("alert_id"); return next; })}>Tutti gli alert (#{selectedAlertId})</button>}
         <label style={{ minWidth: 180 }}>
           <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Stato</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -147,7 +163,7 @@ function SmartAlerts() {
                   subtitle={`${a.alert_type} · unità ${a.unit_id || "n/d"}`}
                   severity={a.severity}
                   timestamp={a.last_seen_at || a.first_seen_at}
-                  right={<button type="button" onClick={() => handleAck(a.id)}>Prendi in carico</button>}
+                  right={canEdit && <button type="button" disabled={busy} onClick={() => handleAck(a.id)}>Prendi in carico</button>}
                 />
               ))}
             </div>

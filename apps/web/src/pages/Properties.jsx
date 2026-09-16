@@ -1,5 +1,8 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCallback } from "react";
+import { canAccessRoute, getRole } from "../config/rbac";
+import { loadSections } from "../services/loadSections";
 import {
   createProperty,
   createSmartProviderConnection,
@@ -16,6 +19,8 @@ import {
 import ActivityCard from "../components/dashboard/ActivityCard";
 
 function Properties() {
+  const canConfigure = canAccessRoute("setupWizard", getRole());
+  const canCreateProperty = canAccessRoute("pricing", getRole());
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [connections, setConnections] = useState([]);
@@ -32,11 +37,13 @@ function Properties() {
     base_url: "",
   });
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [p, c] = await Promise.all([getProperties(), getSmartProviderConnections()]);
+      const { data, failed } = await loadSections({ proprieta: getProperties, connessioni: () => canConfigure ? getSmartProviderConnections() : [] });
+      const { proprieta: p, connessioni: c } = data;
+      setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : "");
       setProperties(p || []);
       setConnections(c || []);
     } catch (err) {
@@ -44,14 +51,15 @@ function Properties() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [canConfigure]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   async function onCreateProperty(e) {
     e.preventDefault();
+    if (!canCreateProperty) return;
     try {
       await createProperty({
         name: propertyForm.name,
@@ -67,6 +75,7 @@ function Properties() {
 
   async function onCreateConnection(e) {
     e.preventDefault();
+    if (!canConfigure) return;
     try {
       await createSmartProviderConnection({
         property_id: Number(connectionForm.property_id),
@@ -88,7 +97,7 @@ function Properties() {
       <SectionHeader
         title="Property e Connessioni Provider"
         subtitle="Gestione portfolio property multi-tenant e connessioni provider persistenti"
-        right={<button type="button" onClick={() => navigate("/setup")}>Apri Setup Wizard</button>}
+        right={canConfigure && <button type="button" onClick={() => navigate("/setup")}>Apri Setup Wizard</button>}
       />
       {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
 
@@ -96,6 +105,7 @@ function Properties() {
         <AppCard>
           <h3 style={{ marginTop: 0, marginBottom: 10 }}>Nuova property</h3>
           <form onSubmit={onCreateProperty} style={{ display: "grid", gap: 8 }}>
+            <fieldset disabled={!canCreateProperty} style={{ display: "grid", gap: 8, border: 0, padding: 0 }}>
             <input
               placeholder="Nome property"
               value={propertyForm.name}
@@ -114,6 +124,7 @@ function Properties() {
               required
             />
             <button type="submit">Crea property</button>
+            </fieldset>
           </form>
         </AppCard>
 

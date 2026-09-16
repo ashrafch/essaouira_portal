@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { canAccessRoute, getRole } from "../config/rbac";
 import { getDashboardSummary } from "../services/api";
+import { isNavigationActive } from "../routes/navigation";
 import "./chrome.css";
 
 function makeLinkClass(level) {
@@ -55,11 +56,11 @@ function Sidebar({ className = "", onNavigate = null }) {
   const location = useLocation();
   const role = getRole();
   const [openSections, setOpenSections] = useState({
-    bookings: false,
+    bookings: true,
     property: false,
-    staff: false,
-    facility: true, // Apro la nuova sezione per evidenziarla
-    smart: true,
+    staff: true,
+    facility: true,
+    smart: false,
   });
 
   const [todayStats, setTodayStats] = useState({
@@ -213,7 +214,7 @@ function Sidebar({ className = "", onNavigate = null }) {
     setOpenSections((prev) => {
       const next = { ...prev };
       for (const section of routeFilteredSections) {
-        if (section.items.some((item) => path.startsWith(item.to))) {
+        if (section.items.some((item) => isNavigationActive(path, item.to))) {
           next[section.id] = true;
         }
       }
@@ -300,7 +301,7 @@ function Sidebar({ className = "", onNavigate = null }) {
           const isOpen = Boolean(openSections[section.id]);
           const path = location.pathname;
           const hasActiveChild = section.items.some((item) =>
-            path.startsWith(item.to)
+            isNavigationActive(path, item.to)
           );
           const SectionIcon = section.icon;
 

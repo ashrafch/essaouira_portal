@@ -272,15 +272,23 @@ export function getTodayAlerts() {
 }
 
 export async function downloadMonthCostLinesCsv(year, month) {
+  return apiDownload("/analytics/month-cost-lines.csv", { year, month });
+}
+
+async function apiDownload(path, params) {
+  const requestToken = getAccessToken();
   const res = await fetch(
-    `${BASE_URL}/analytics/month-cost-lines.csv${buildQuery({ year, month })}`,
+    `${BASE_URL}${path}${buildQuery(params)}`,
     { headers: getAuthHeaders() }
   );
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Errore export CSV ${res.status}: ${text}`);
+    await handleResponse(res, requestToken);
   }
   return res.blob();
+}
+
+export function downloadOwnerMonthlyReportCsv(year, month) {
+  return apiDownload("/analytics/report/monthly.csv", { year, month });
 }
 
 /* --------- STAFF TASKS --------- */

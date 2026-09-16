@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { readWorkflowContext } from "../routes/workflowContext";
 import { getStaffTasks, getUnits, updateStaffTask } from "../services/api";
 import { PageHeader, Button, Modal } from "../components/ui";
 
@@ -165,10 +167,19 @@ const categories = [
 ];
 
 function StaffPlanner() {
+  const context = readWorkflowContext(useLocation());
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().slice(0, 10);
+    return context.date || today.toISOString().slice(0, 10);
   });
+  const [unitFilter, setUnitFilter] = useState(context.unitId);
+  const [bookingFilter, setBookingFilter] = useState(context.bookingId);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    if (context.date) setSelectedDate(context.date);
+    setUnitFilter(context.unitId);
+    setBookingFilter(context.bookingId);
+  }, [context.date, context.unitId, context.bookingId]);
 
   const [tasks, setTasks] = useState([]);
   const [unitsById, setUnitsById] = useState({});
@@ -204,18 +215,23 @@ function StaffPlanner() {
 
   // carica task del giorno
   useEffect(() => {
+    let cancelled = false;
     async function loadTasks() {
       setLoading(true);
+      setLoadError("");
+      setTasks([]);
       try {
         const data = await getStaffTasks({ date: selectedDate });
+        if (cancelled) return;
         setTasks(data);
       } catch (err) {
-        console.error("Errore caricamento staff tasks", err);
+        if (!cancelled) setLoadError(err.message || "Task non disponibili.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     loadTasks();
+    return () => { cancelled = true; };
   }, [selectedDate]);
 
   function formatUnit(task) {
@@ -226,21 +242,22 @@ function StaffPlanner() {
   }
 
   function getColumnTasks(key) {
+    const visibleTasks = tasks.filter((task) => (!unitFilter || String(task.unit_id) === unitFilter) && (!bookingFilter || String(task.booking_id) === bookingFilter));
     switch (key) {
       case "cleaning":
-        return tasks.filter((t) => t.task_type === "cleaning");
+        return visibleTasks.filter((t) => t.task_type === "cleaning");
       case "checkin":
-        return tasks.filter(
+        return visibleTasks.filter(
           (t) =>
             t.task_type === "checkin" ||
             t.task_type === "checkout" ||
             t.task_type === "check-in/out"
         );
       case "breakfast":
-        return tasks.filter((t) => t.task_type === "breakfast");
+        return visibleTasks.filter((t) => t.task_type === "breakfast");
       case "other":
       default:
-        return tasks.filter(
+        return visibleTasks.filter(
           (t) =>
             !["cleaning", "checkin", "checkout", "check-in/out", "breakfast"].includes(
               t.task_type
@@ -323,6 +340,12 @@ function StaffPlanner() {
         }
       />
 
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Link to="/staff" state={{ date: selectedDate, unitId: unitFilter, bookingId: bookingFilter }}>Task staff & pulizie</Link>
+        <Link to="/operations" state={{ date: selectedDate, unitId: unitFilter }}>Arrivi & Partenze</Link>
+        {(unitFilter || bookingFilter) && <button type="button" onClick={() => { setUnitFilter(""); setBookingFilter(""); }}>Tutti i task del giorno</button>}
+      </div>
+      {loadError && <p role="alert">{loadError}</p>}
       <div style={boardWrapper}>
         <div style={boardInner}>
           {categories.map((col) => {
@@ -349,6 +372,11 @@ function StaffPlanner() {
                     colTasks.map((t) => (
                       <div
                         key={t.id}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openEdit(t); }
+                        }}
                         style={taskCard}
                         onClick={() => openEdit(t)}
                       >
@@ -438,13 +466,16 @@ function StaffPlanner() {
               <select
                 style={modalInput}
                 value={editForm.status}
+                disabled={editingTask.transition_locked}
                 onChange={(e) =>
                   setEditForm((f) => ({ ...f, status: e.target.value }))
                 }
               >
-                <option value="planned">Planned</option>
-                <option value="in_progress">In progress</option>
-                <option value="done">Done</option>
+                <option value="planned">Pianificato</option>
+                <option value="in_progress">In corso</option>
+                <option value="done">Completato</option>
+                <option value="completed">Completato (archivio)</option>
+                <option value="cancelled">Annullato</option>
               </select>
             </div>
 
