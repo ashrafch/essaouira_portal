@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Leaf,
   Lock,
@@ -70,6 +70,7 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
   const [pending, setPending] = useState("");
   const [confirming, setConfirming] = useState(null);
   const [lastResult, setLastResult] = useState(null);
+  const dispatching = useRef(false);
 
   const load = useCallback(async () => {
     if (!unitId) return;
@@ -89,6 +90,8 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
   }, [load]);
 
   async function dispatch(workflow, variables = null) {
+    if (!canOperate || dispatching.current) return;
+    dispatching.current = true;
     setConfirming(null);
     setPending(variables?.status ? `${workflow}:${variables.status}` : workflow);
     try {
@@ -98,7 +101,11 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
       });
       setLastResult(result);
       if (result.accepted) {
-        toast.success(`${result.label} eseguito su VillaCore`);
+        if (result.status === "executed") {
+          toast.success(`${result.label}: esecuzione confermata dal provider`);
+        } else {
+          toast.info(`${result.label}: richiesta accettata, esecuzione da confermare`);
+        }
       } else {
         toast.error(result.error_message || `${result.label} rifiutato da VillaCore`);
       }
@@ -107,6 +114,7 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
     } catch (err) {
       toast.error(err.message || "Workflow non eseguito");
     } finally {
+      dispatching.current = false;
       setPending("");
     }
   }
@@ -150,7 +158,7 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
                 }
                 size="sm"
                 icon={<Icon size={14} />}
-                disabled={!workflow.available || !canOperate}
+                disabled={!workflow.available || !canOperate || Boolean(pending)}
                 loading={pending === workflow.workflow}
                 onClick={() =>
                   workflow.needs_confirmation
@@ -190,7 +198,7 @@ function UnitWorkflowPanel({ unitId, bookingId = null, compact = false, onDispat
               key={option}
               variant="secondary"
               size="sm"
-              disabled={!canOperate}
+              disabled={!canOperate || Boolean(pending)}
               loading={pending === `${housekeeping.workflow}:${option}`}
               onClick={() => dispatch(housekeeping.workflow, { status: option })}
               title={!canOperate ? "Permesso insufficiente" : undefined}

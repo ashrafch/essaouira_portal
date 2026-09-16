@@ -110,6 +110,26 @@ describe("UnitWorkflowPanel", () => {
     );
   });
 
+  it("does not present asynchronous acceptance as completed execution", async () => {
+    runSmartUnitWorkflow.mockResolvedValue({ label: "Check-in", accepted: true, status: "accepted" });
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: /Check-in/ }));
+    expect(await screen.findByText(/richiesta accettata, esecuzione da confermare/)).toBeInTheDocument();
+    expect(screen.queryByText(/esecuzione confermata dal provider/)).not.toBeInTheDocument();
+  });
+
+  it("prevents competing workflows while a dispatch is pending", async () => {
+    let finish;
+    runSmartUnitWorkflow.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    renderPanel();
+    fireEvent.click(await screen.findByRole("button", { name: /Check-in/ }));
+    expect(screen.getByRole("button", { name: /Check-out/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Check-out/ }));
+    expect(runSmartUnitWorkflow).toHaveBeenCalledTimes(1);
+    finish({ label: "Check-in", accepted: true, status: "accepted" });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Check-out/ })).toBeEnabled());
+  });
+
   it("shows the building's refusal instead of claiming success", async () => {
     runSmartUnitWorkflow.mockResolvedValue({
       workflow: "checkin",
