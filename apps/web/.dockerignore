@@ -3,3 +3,6 @@ dist/
 .git/
 .env
 *.log
+test-results/
+playwright-report/
+coverage/

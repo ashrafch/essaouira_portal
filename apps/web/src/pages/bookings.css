@@ -1,0 +1,4 @@
+.booking-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-block: var(--space-3); border-top: 1px solid var(--color-border); margin-top: var(--space-3); }
+.booking-filters input, .booking-filters select { min-height: 40px; min-width: 0; max-width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
+.booking-filters input[type="search"] { flex: 1 1 240px; }
+@media (max-width: 480px) { .booking-filters select { flex: 1 1 100%; } }

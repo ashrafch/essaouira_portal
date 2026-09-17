@@ -48,18 +48,9 @@ function Layout({ children }) {
       </header>
 
       <main className="portal-main" id="main-content" tabIndex={-1}>
-        <AnimatePresence mode="wait">
-          <MotionDiv
-            key={location.pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.16 }}
-            style={{ height: "100%" }}
-          >
-            {content}
-          </MotionDiv>
-        </AnimatePresence>
+        <div key={location.pathname} style={{ height: "100%" }}>
+          {content}
+        </div>
       </main>
 
       <BottomNav onOpenMenu={() => setMobileSidebarOpen(true)} />

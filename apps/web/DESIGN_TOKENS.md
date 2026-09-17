@@ -16,12 +16,12 @@ and in inline JSX styles (`style={{ color: "var(--color-text)" }}`).
 
 | Token | Light | Dark | Use for |
 |---|---|---|---|
-| `--color-bg` | `#f4f7fb` | `#0b1220` | Page/app background |
-| `--color-surface` | `#ffffff` | `#101a2c` | Cards, panels, modals, inputs |
-| `--color-surface-raised` | `#ffffff` | `#16223a` | Popovers, hovering layers above a surface |
-| `--color-surface-soft` | `#f8fafc` | `#0d1626` | Subtle wells, table headers, toolbars, hover rows |
-| `--color-border` | `#e2e8f0` | `#24334d` | Default borders, dividers |
-| `--color-border-strong` | `#cbd5e1` | `#35486b` | Input borders, emphasized dividers |
+| `--color-bg` | `#f4f7fb` | `#141719` | Page/app background |
+| `--color-surface` | `#ffffff` | `#1c2023` | Cards, panels, modals, inputs |
+| `--color-surface-raised` | `#ffffff` | `#272d31` | Popovers, hovering layers above a surface |
+| `--color-surface-soft` | `#f8fafc` | `#181c1f` | Subtle wells, table headers, toolbars, hover rows |
+| `--color-border` | `#e2e8f0` | `#333b40` | Default borders, dividers |
+| `--color-border-strong` | `#cbd5e1` | `#4b575e` | Input borders, emphasized dividers |
 
 ### Text
 

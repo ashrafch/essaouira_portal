@@ -1,486 +1,131 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import {
-  getMonthPnL,
-  getStaffTasks,
-  getBookings,
-  getAdvancedKpis,
-  getTodayAlerts,
-  getDashboardSummary,
-  downloadOwnerMonthlyReportCsv,
-} from "../services/api";
-import { formatCurrency } from "../utils/format";
-import InfoHint from "../components/InfoHint";
-import { Button, useToast } from "../components/ui";
-import { Download } from "lucide-react";
-import { canAccessPath, canAccessRoute, getRole } from "../config/rbac";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowDownLeft, ArrowUpRight, CalendarDays, CheckCheck, ChevronRight, ClipboardList, Plus, RefreshCw, Wrench, Radio, TriangleAlert, Users } from "lucide-react";
+import { getStaffTasks, getBookings, getUnits, getTodayAlerts, getDashboardSummary } from "../services/api";
+import { Button, SegmentedToggle } from "../components/ui";
+import MonthOverview from "../components/dashboard/MonthOverview";
+import { canAccessPath, canAccessRoute, canEditOperations, getRole } from "../config/rbac";
 import { loadSections } from "../services/loadSections";
+import { formatISO } from "../utils/dateUtils";
+import { filterBookings } from "../utils/bookingViews";
+import "./workbench.css";
 
-// Theme-aware chart palette (CSS design tokens, not hardcoded hex).
-// Booking sources reuse the same tones as the Calendar legend for consistency.
-const SOURCE_COLORS = {
-  direct: "var(--color-success)",
-  airbnb: "var(--color-warning)",
-  booking: "var(--color-info)",
-};
-const CHART_FALLBACK = [
-  "var(--color-primary)",
-  "var(--color-accent)",
-  "var(--color-info)",
-  "var(--color-warning)",
-];
+const TASK_LABELS = { checkin: "Check-in", checkout: "Check-out", cleaning: "Pulizia", maintenance: "Manutenzione", inspection: "Ispezione" };
 
 function Dashboard() {
   const role = getRole();
   const canReadBusiness = canAccessRoute("business", role);
   const canReadStaff = canAccessRoute("staff", role);
-  const toast = useToast();
-  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
-
-  const [pnl, setPnl] = useState(null);
-  const [todaysTasks, setTodaysTasks] = useState([]);
-  const [todaysArrivals, setTodaysArrivals] = useState([]);
-  const [advancedKpis, setAdvancedKpis] = useState(null);
-  const [alerts, setAlerts] = useState([]);
-  const [summary, setSummary] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const view = canReadBusiness && params.get("view") === "performance" ? "performance" : "today";
+  const [period, setPeriod] = useState(() => formatISO(new Date()).slice(0, 7));
+  const [refresh, setRefresh] = useState(0);
+  const [result, setResult] = useState({ data: {}, failed: [] });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [updated, setUpdated] = useState(null);
+  const [agendaView, setAgendaView] = useState("arrivals");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    async function loadAll() {
+    async function load() {
       setLoading(true);
-      setError(null);
-      try {
-        // Carichiamo in parallelo: Analisi Finanziaria, Task di oggi, Prenotazioni,
-        // e il riepilogo operativo unificato (PMS + Smart).
-        const { data, failed } = await loadSections({
-          bilancio: () => canReadBusiness ? getMonthPnL(year, month) : null,
-          task: () => canReadStaff ? getStaffTasks({ date: todayStr }) : null,
-          prenotazioni: getBookings,
-          indicatori: () => canReadBusiness ? getAdvancedKpis(year, month) : null,
-          alert: getTodayAlerts,
-          riepilogo: getDashboardSummary,
-        });
-        if (cancelled) return;
-        const { bilancio: pnlData, task: tasksData, prenotazioni: bookingsData, indicatori: advancedData, alert: alertsData, riepilogo: summaryData } = data;
-        setError(failed.length ? `Dati non disponibili: ${failed.join(", ")}.` : null);
-
-        setPnl(pnlData);
-        setTodaysTasks(tasksData || []);
-        setAdvancedKpis(advancedData);
-        setAlerts(alertsData || []);
-        setSummary(summaryData);
-
-        // Filtra arrivi di oggi lato client
-        const arrivals = (bookingsData || []).filter(
-          (b) => b.checkin_date === todayStr && b.status === "confirmed"
-        );
-        setTodaysArrivals(arrivals);
-      } catch (err) {
-        console.error(err);
-        setError("Errore nel caricamento della dashboard.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      // Use the server's operational date for both task queries and booking links.
+      const snapshot = await loadSections({ riepilogo: getDashboardSummary });
+      const date = snapshot.data.riepilogo?.date || formatISO(new Date());
+      const sections = await loadSections({
+        prenotazioni: getBookings, unita: getUnits, alert: getTodayAlerts,
+        attivita: () => canReadStaff ? getStaffTasks({ date }) : null,
+      });
+      if (cancelled) return;
+      setResult({ data: { ...snapshot.data, ...sections.data, date }, failed: [...snapshot.failed, ...sections.failed] });
+      setLoading(false);
+      setUpdated(new Date());
     }
-    loadAll();
+    load();
     return () => { cancelled = true; };
-  }, [year, month, todayStr, canReadBusiness, canReadStaff]);
+  }, [refresh, canReadStaff]);
 
-  async function exportReport() {
-    if (!canReadBusiness || exporting) return;
-    setExporting(true);
-    try {
-      const blob = await downloadOwnerMonthlyReportCsv(year, month);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `report_${year}_${String(month).padStart(2, "0")}.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      toast.error(err.message || "Download non riuscito.");
-    } finally {
-      setExporting(false);
-    }
-  }
+  const { riepilogo: summary, prenotazioni: bookings, unita: units, attivita: tasks, alert: alerts, date } = result.data;
+  const today = date || formatISO(new Date());
+  const unitMap = Object.fromEntries((units || []).map(unit => [unit.id, unit]));
+  const agenda = filterBookings(bookings || [], { today, view: agendaView, query }, unitMap);
+  const activeTasks = (tasks || []).filter(task => task.status !== "cancelled");
+  const pendingTasks = activeTasks.filter(task => !["done", "completed"].includes(task.status));
+  const completed = activeTasks.length - pendingTasks.length;
+  const bookLink = selected => `/bookings?view=${selected}&date=${today}`;
+  const stats = [
+    { label: "Arrivi", value: bookings ? filterBookings(bookings, { today, view: "arrivals" }).length : null, to: bookLink("arrivals"), icon: <ArrowDownLeft size={18} />, tone: "info" },
+    { label: "Partenze", value: bookings ? filterBookings(bookings, { today, view: "departures" }).length : null, to: bookLink("departures"), icon: <ArrowUpRight size={18} />, tone: "accent" },
+    { label: "In casa", value: bookings ? filterBookings(bookings, { today, view: "in-house" }).length : null, to: bookLink("in-house"), icon: <Users size={18} />, tone: "primary" },
+    { label: "Attivita aperte oggi", value: tasks ? pendingTasks.length : null, to: `/staff-planner?date=${today}`, icon: <ClipboardList size={18} />, tone: "warning" },
+  ].filter(item => canAccessPath(item.to, role));
+  const health = [
+    { label: "Manutenzioni aperte", value: summary?.maintenance_open, to: "/maintenance", icon: <Wrench size={18} /> },
+    { label: "Alert smart", value: summary?.smart?.alerts_open, to: "/smart-alerts", icon: <TriangleAlert size={18} /> },
+    { label: "Unita da verificare", value: summary?.smart?.units_needing_attention, to: "/smart-operations", icon: <ClipboardList size={18} /> },
+    { label: "Dispositivi online", value: summary?.smart ? `${summary.smart.devices_online}/${summary.smart.devices_total}` : null, to: "/smart-devices", icon: <Radio size={18} /> },
+  ].filter(item => canAccessPath(item.to, role));
 
-  // --- PREPARAZIONE DATI GRAFICI ---
-
-  // 1. Fonti di Prenotazione (Pie Chart)
-  const sourceData = useMemo(() => {
-    if (!pnl?.revenue_by_source) return [];
-    return Object.entries(pnl.revenue_by_source).map(([key, value]) => ({
-      name: key === "direct" ? "Diretta" : key.charAt(0).toUpperCase() + key.slice(1),
-      source: key,
-      value: value,
-    })).filter(item => item.value > 0);
-  }, [pnl]);
-
-  // 2. Costi per Categoria (Bar Chart)
-  const costData = useMemo(() => {
-    if (!pnl?.costs_by_category) return [];
-    // Prendi le top 5 categorie di costo
-    return pnl.costs_by_category
-      .slice(0, 5)
-      .map((c) => ({
-        name: c.category.length > 15 ? c.category.slice(0, 12) + "..." : c.category,
-        Importo: c.total,
-      }));
-  }, [pnl]);
-
-  // --- KPI OPERATIVI ---
-  const activeTasks = todaysTasks.filter(t => t.status !== "cancelled");
-  const tasksCompleted = activeTasks.filter(t => ["done", "completed"].includes(t.status)).length;
-  const tasksTotal = activeTasks.length;
-  const taskProgress = tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
-
-  // --- STILI ---
-  const pageStyle = { display: "flex", flexDirection: "column", gap: "24px" };
-  
-  const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" };
-  
-  const gridKPI = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 155px), 1fr))", gap: "12px" };
-  
-  const kpiCard = (borderLeftColor) => ({
-    backgroundColor: "var(--color-surface)",
-    borderRadius: "8px",
-    padding: "16px",
-    minWidth: 0,
-    minHeight: "104px",
-    overflowWrap: "anywhere",
-    boxShadow: "var(--shadow-sm)",
-    border: "1px solid var(--color-border)",
-    borderLeft: `5px solid ${borderLeftColor}`,
-    display: "flex", flexDirection: "column", justifyContent: "space-between"
-  });
-
-  const gridCharts = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))", gap: "24px" };
-  
-  const chartCard = {
-    backgroundColor: "var(--color-surface)", borderRadius: "8px", padding: "24px",
-    boxShadow: "var(--shadow-sm)", border: "1px solid var(--color-border)",
-    minHeight: "350px", display: "flex", flexDirection: "column"
-  };
-
-  const operationCard = {
-    backgroundColor: "var(--color-surface)", borderRadius: "8px", padding: "24px",
-    border: "1px solid var(--color-border)", flex: 1
-  };
-
-  const selectStyle = {
-    padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--color-border-strong)",
-    fontSize: "14px", cursor: "pointer", backgroundColor: "var(--color-surface)"
-  };
-
-  if (loading) return <div style={{ padding: 20 }}>Caricamento Dashboard...</div>;
-
-  return (
-    <div style={pageStyle}>
-      {error && <p role="alert" style={{ color: "var(--color-danger)" }}>{error}</p>}
-      
-      {/* HEADER */}
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "24px", fontWeight: "700", color: "var(--color-text)" }}>
-            Dashboard
-          </h1>
-          <p style={{ margin: "4px 0 0", color: "var(--color-text-muted)", fontSize: "14px" }}>
-            Panoramica di {new Date(year, month - 1).toLocaleDateString("it-IT", { month: 'long', year: 'numeric' })}
-          </p>
-        </div>
-        
-        <div style={{ display: "flex", gap: "12px" }}>
-          <select style={selectStyle} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {new Date(2000, i, 1).toLocaleDateString("it-IT", { month: "long" })}
-              </option>
-            ))}
-          </select>
-          <select style={selectStyle} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          {canReadBusiness && <Button
-            icon={<Download size={16} />}
-            onClick={exportReport}
-            disabled={exporting}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "8px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-              textDecoration: "none", cursor: "pointer",
-              background: "var(--color-primary)", color: "var(--color-on-primary)",
-            }}
-          >
-            Scarica report
-          </Button>}
-        </div>
+  return <div className="workbench">
+    <header className="workbench__header">
+      <div><p className="workbench__date">{new Date(`${today}T12:00:00`).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p><h1>Centro operativo</h1></div>
+      <div className="workbench__actions">
+        <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Aggiorna dashboard" title="Aggiorna" loading={loading} onClick={() => setRefresh(value => value + 1)} />
+        {canEditOperations(role) && <Button icon={<Plus size={16} />} onClick={() => navigate(`/bookings?new_booking=1&date=${today}`)}>Nuova prenotazione</Button>}
       </div>
-
-      {/* FASCIA OPERATIVA OGGI — ponte tra PMS/Ops e Smart, tessere cliccabili */}
-      <div style={gridKPI}>
-        {[
-          { label: "Arrivi oggi", value: summary?.arrivals_today ?? todaysArrivals.length, to: "/operations", tone: "var(--color-info)" },
-          { label: "Partenze oggi", value: summary?.departures_today ?? 0, to: "/operations", tone: "var(--color-info)" },
-          { label: "In casa", value: summary?.in_house ?? 0, to: "/bookings", tone: "var(--color-primary)" },
-          { label: "Task staff oggi", value: summary?.staff_tasks_today ?? tasksTotal, to: "/staff-planner", tone: "var(--color-primary)" },
-          { label: "Manutenzioni aperte", value: summary?.maintenance_open ?? 0, to: "/maintenance", tone: (summary?.maintenance_open ?? 0) > 0 ? "var(--color-danger)" : "var(--color-border-strong)" },
-          { label: "Alert smart aperti", value: summary?.smart?.alerts_open ?? 0, to: "/smart-alerts", tone: (summary?.smart?.alerts_open ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
-          { label: "Unità da attenzionare", value: summary?.smart?.units_needing_attention ?? 0, to: "/smart-operations", tone: (summary?.smart?.units_needing_attention ?? 0) > 0 ? "var(--color-warning)" : "var(--color-border-strong)" },
-          { label: "Dispositivi online", value: summary?.smart ? `${summary.smart.devices_online}/${summary.smart.devices_total}` : "—", to: "/smart-devices", tone: "var(--color-accent, var(--color-primary))" },
-        ].filter((tile) => canAccessPath(tile.to, role)).map((tile) => (
-          <button
-            key={tile.label}
-            type="button"
-            onClick={() => navigate(tile.to)}
-            style={{
-              ...kpiCard(tile.tone),
-              textAlign: "left", cursor: "pointer", font: "inherit", width: "100%",
-            }}
-          >
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0 }}>
-              {tile.label}
-            </div>
-            <div className="tabular-nums" style={{ fontSize: "26px", fontWeight: 700, color: "var(--color-text)", marginTop: "8px" }}>
-              {tile.value}
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {advancedKpis && <div style={gridKPI}>
-        <div style={kpiCard("var(--color-info)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>RevPAR</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            {formatCurrency(advancedKpis?.revpar)}
-          </div>
-        </div>
-        <div style={kpiCard("var(--color-info)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Share Direct</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            {advancedKpis?.direct_share_percent ?? 0}%
-          </div>
-        </div>
-        <div style={kpiCard("var(--color-info)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Pipeline 30g</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            {formatCurrency(advancedKpis?.pipeline_revenue_next_30_days)}
-          </div>
-        </div>
-        <div style={kpiCard("var(--color-warning)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Alert operativi</div>
-          <div style={{ marginTop: "8px", fontSize: 13, color: "var(--color-text)" }}>
-            {alerts.length === 0
-              ? "Nessun alert attivo"
-              : `${alerts.length} alert da verificare`}
-          </div>
-        </div>
-      </div>
-
-      }
-      {alerts.length > 0 && (
-        <div style={{ ...chartCard, minHeight: "auto" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: 12, color: "var(--color-text)" }}>
-            Alert Oggi
-          </h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {alerts.map((alert) => (
-              <div key={alert.code} style={{ border: "1px solid var(--color-border)", borderRadius: 10, padding: 10, background: "var(--color-surface)" }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{alert.title} ({alert.count})</div>
-                <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{alert.details}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 1. KPI FINANZIARI */}
-      {pnl && <>
-      <div style={gridKPI}>
-        <div style={kpiCard("var(--color-primary)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Ricavi Totali</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            {formatCurrency(pnl?.revenue_total)}
-          </div>
-        </div>
-        <div style={kpiCard("var(--color-danger)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Costi Totali</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)", marginTop: "8px" }}>
-            {formatCurrency(pnl?.costs_total)}
-          </div>
-        </div>
-        <div style={kpiCard(pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Profitto Netto</div>
-          <div style={{ fontSize: "28px", fontWeight: "700", color: pnl?.profit >= 0 ? "var(--color-success)" : "var(--color-danger)", marginTop: "8px" }}>
-            {formatCurrency(pnl?.profit)}
-          </div>
-        </div>
-        <div style={kpiCard("var(--color-warning)")}>
-          <div style={{ fontSize: "12px", fontWeight: "600", color: "var(--color-text-muted)", textTransform: "uppercase" }}>Occupazione & ADR</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
-             <span style={{ fontSize: "28px", fontWeight: "700", color: "var(--color-text)" }}>{pnl?.occupancy_rate.toFixed(0)}%</span>
-             <span style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
-               ({formatCurrency(pnl?.adr)}/notte)
-             </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. GRAFICI */}
-      <div style={gridCharts}>
-        {/* Grafico a Torta: Fonti */}
-        <div style={chartCard}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "20px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "600", margin: 0, color: "var(--color-text)" }}>
-              Provenienza Ricavi
-            </h3>
-            <InfoHint title="Provenienza ricavi" label="Come leggere il grafico">
-              I ricavi del mese sono suddivisi per canale di prenotazione. I colori
-              seguono la legenda del calendario: verde = diretta, arancione = Airbnb,
-              blu = Booking.com.
-            </InfoHint>
-          </div>
-          <div style={{ flex: 1, minHeight: "250px" }}>
-            {sourceData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={sourceData}
-                    cx="50%" cy="50%"
-                    innerRadius={60} outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {sourceData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={SOURCE_COLORS[entry.source] || CHART_FALLBACK[index % CHART_FALLBACK.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Legend verticalAlign="bottom" height={36}/>
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--color-text-subtle)" }}>Nessun dato</div>
-            )}
-          </div>
-        </div>
-
-        {/* Grafico a Barre: Costi */}
-        <div style={chartCard}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "20px", color: "var(--color-text)" }}>
-            Top 5 Categorie di Spesa
-          </h3>
-          <div style={{ flex: 1, minHeight: "250px" }}>
-            {costData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={costData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={100} tick={{fontSize: 12}} />
-                  <Tooltip cursor={{fill: 'transparent'}} formatter={(value) => formatCurrency(value)} />
-                  <Bar dataKey="Importo" fill="var(--color-danger)" radius={[0, 4, 4, 0]} barSize={20} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--color-text-subtle)" }}>Nessun costo</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. SEZIONE OPERATIVA OGGI */}
-      </>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px" }}>
-        
-        {/* Arrivi di Oggi */}
-        <div style={operationCard}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>Arrivi di Oggi</h3>
-            <span style={{ backgroundColor: "var(--color-info-soft)", color: "var(--color-info-strong)", padding: "2px 8px", borderRadius: "99px", fontSize: "12px", fontWeight: "600" }}>
-              {todayStr}
-            </span>
-          </div>
-          
-          {todaysArrivals.length === 0 ? (
-            <p style={{ color: "var(--color-text-subtle)", fontSize: "14px", fontStyle: "italic" }}>Nessun check-in previsto per oggi.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {todaysArrivals.map(booking => (
-                <div key={booking.id} style={{ display: "flex", alignItems: "center", gap: "12px", paddingBottom: "12px", borderBottom: "1px solid var(--color-border)" }}>
-                  <div style={{ width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "var(--color-success-soft)", color: "var(--color-success-strong)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "14px" }}>
-                    IN
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: "600", fontSize: "14px", color: "var(--color-text)" }}>{booking.guest_name}</div>
-                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Unit #{booking.unit_id} · {booking.num_adults} pax</div>
-                  </div>
-                  <div style={{ marginLeft: "auto", fontSize: "12px", fontWeight: "600", color: "var(--color-primary)" }}>
-                    {booking.estimated_arrival_time ? booking.estimated_arrival_time.slice(0,5) : "Orario n/d"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Stato Staff */}
-        {canReadStaff && <div style={operationCard}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "600" }}>Avanzamento Staff</h3>
-          
-          <div style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px", color: "var(--color-text-muted)" }}>
-              <span>Task completati</span>
-              <strong>{tasksCompleted} / {tasksTotal}</strong>
-            </div>
-            <div style={{ width: "100%", height: "10px", backgroundColor: "var(--color-surface-soft)", borderRadius: "99px", overflow: "hidden" }}>
-              <div style={{ width: `${taskProgress}%`, height: "100%", backgroundColor: taskProgress === 100 ? "var(--color-success)" : "var(--color-primary)", transition: "width 0.5s ease" }}></div>
-            </div>
-          </div>
-
-          {tasksTotal > 0 && tasksCompleted < tasksTotal ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", color: "var(--color-warning-strong)", backgroundColor: "var(--color-warning-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-warning)" }}>
-              <AlertTriangle size={16} aria-hidden="true" />
-              <span>Ci sono ancora <strong>{tasksTotal - tasksCompleted}</strong> attività da completare oggi.</span>
-            </div>
-          ) : tasksTotal > 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", color: "var(--color-success-strong)", backgroundColor: "var(--color-success-soft)", padding: "10px", borderRadius: "8px", border: "1px solid var(--color-success)" }}>
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span>Ottimo lavoro! Tutte le attività di oggi sono completate.</span>
-            </div>
-          ) : (
-            <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>Nessun task programmato per oggi.</div>
-          )}
-        </div>}
-
-      </div>
+    </header>
+    <div className="workbench__viewbar">
+      {canReadBusiness ? <SegmentedToggle ariaLabel="Vista dashboard" value={view} onChange={value => setParams(value === "today" ? {} : { view: value })}
+        options={[{ value: "today", label: "Oggi" }, { value: "performance", label: "Andamento" }]} /> : <h2>Oggi</h2>}
+      <span className="workbench__freshness" role="status">{loading ? "Aggiornamento..." : `${result.failed.length ? "Dati parziali" : "Aggiornato"} alle ${updated?.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}</span>
     </div>
-  );
+    {view === "performance" ? <MonthOverview period={period} onPeriodChange={setPeriod} refresh={refresh} /> : <div className="workbench__view" aria-busy={loading}>
+      {result.failed.length > 0 && <p role="alert" className="workbench__error">Dati non disponibili: {result.failed.join(", ")}. Riprova con Aggiorna.</p>}
+      <div className="workbench__metrics">
+        {stats.map(item => <Link key={item.label} to={item.to} className={`workbench__metric workbench__metric--${item.tone}`}>
+          <span className="workbench__metric-label">{item.icon}{item.label}<ChevronRight size={14} /></span>
+          <strong>{item.value ?? (loading ? "..." : "N/D")}</strong>
+        </Link>)}
+      </div>
+      <div className="workbench__columns">
+        <section className="workbench__section" aria-label="Agenda ospiti">
+          <div className="workbench__section-heading"><h2><CalendarDays size={18} /> Agenda ospiti</h2><Link to={`/operations?date=${today}`}>Operazioni <ChevronRight size={14} /></Link></div>
+          <div className="workbench__agenda-toolbar">
+            <SegmentedToggle ariaLabel="Movimenti ospiti" value={agendaView} onChange={setAgendaView} options={[{ value: "arrivals", label: "Arrivi" }, { value: "departures", label: "Partenze" }]} />
+            <input type="search" aria-label="Cerca in agenda" placeholder="Cerca ospite o unita" value={query} onChange={event => setQuery(event.target.value)} />
+          </div>
+          {!bookings ? <p className="workbench__empty">{loading ? "Caricamento agenda..." : "Agenda non disponibile."}</p> : agenda.length === 0 ? <p className="workbench__empty">{query ? "Nessun ospite corrisponde alla ricerca." : agendaView === "arrivals" ? "Nessun arrivo previsto oggi." : "Nessuna partenza prevista oggi."}</p> : <ul className="workbench__list">
+            {agenda.map(booking => <li key={booking.id}><Link className="workbench__row" to={`/bookings?booking_id=${booking.id}`}>
+              <span className={`workbench__movement workbench__movement--${agendaView}`} aria-hidden="true">{agendaView === "arrivals" ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}</span>
+              <span className="workbench__row-main"><strong>{booking.guest_name}</strong><small>{unitMap[booking.unit_id]?.name || `Unita #${booking.unit_id}`} · {(booking.num_adults || 0) + (booking.num_children || 0)} ospiti</small></span>
+              <span className="workbench__row-meta">{agendaView === "arrivals" ? booking.estimated_arrival_time?.slice(0, 5) || "Orario da definire" : booking.has_late_checkout ? "Late check-out" : "Check-out"}</span><ChevronRight size={16} />
+            </Link></li>)}
+          </ul>}
+        </section>
+        {canReadStaff && <section className="workbench__section" aria-label="Attivita di oggi">
+          <div className="workbench__section-heading"><h2><CheckCheck size={18} /> Attivita di oggi</h2><Link to={`/staff-planner?date=${today}`}>Planner <ChevronRight size={14} /></Link></div>
+          {!tasks ? <p className="workbench__empty">{loading ? "Caricamento attivita..." : "Attivita non disponibili."}</p> : <>
+            <div className="workbench__progress-label"><span>Completate</span><strong>{completed} / {activeTasks.length}</strong></div>
+            <progress aria-label="Attivita completate" value={completed} max={activeTasks.length || 1} />
+            {pendingTasks.length === 0 ? <p className="workbench__empty">{activeTasks.length ? "Tutte le attivita di oggi sono completate." : "Nessuna attivita programmata oggi."}</p> : <ul className="workbench__list">
+              {pendingTasks.slice(0, 5).map(task => <li key={task.id}><Link className="workbench__row" to={`/staff-planner?${new URLSearchParams({ date: today, ...(task.unit_id ? { unit_id: task.unit_id } : {}), ...(task.booking_id ? { booking_id: task.booking_id } : {}) })}`}>
+                <span className="workbench__row-main"><strong>{task.title || TASK_LABELS[task.task_type] || task.task_type}</strong><small>{unitMap[task.unit_id]?.name || "Struttura"}</small></span>
+                <span className="workbench__row-meta">{task.status === "in_progress" ? "In corso" : "Da fare"}</span><ChevronRight size={16} />
+              </Link></li>)}
+            </ul>}
+            {pendingTasks.length > 5 && <Link className="workbench__more" to={`/staff-planner?date=${today}`}>Altre {pendingTasks.length - 5} attivita <ChevronRight size={14} /></Link>}
+          </>}
+        </section>}
+      </div>
+      <section className="workbench__section" aria-label="Stato struttura">
+        <h2>Stato struttura</h2>
+        <div className="workbench__health">{health.map(item => <Link key={item.label} to={item.to}>{item.icon}<span>{item.label}</span><strong>{item.value ?? (loading ? "..." : "N/D")}</strong><ChevronRight size={14} /></Link>)}</div>
+        {!alerts && !loading ? <p className="workbench__empty">Alert operativi non disponibili.</p> : alerts?.length > 0 && <ul className="workbench__alerts">{alerts.map(alert => <li key={alert.code}><TriangleAlert size={16} /><div><strong>{alert.title} ({alert.count})</strong><p>{alert.details}</p></div></li>)}</ul>}
+      </section>
+    </div>}
+  </div>;
 }
 
 export default Dashboard;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bell, Menu, Moon, Sun, Wifi, WifiOff } from "lucide-react";
+import { Bell, LogOut, Menu, Moon, Sun, Wifi, WifiOff } from "lucide-react";
 import { resolveHelp } from "../config/helpTopics";
 import { clearAuthSession, getCurrentRole, getCurrentTenant, getCurrentUsername } from "../services/auth";
 import { getDashboardSummary } from "../services/api";
@@ -15,7 +15,7 @@ function Topbar({ onToggleSidebar = null }) {
   const { pathname } = useLocation();
   const pageTopic = resolveHelp(pathname);
   const [online, setOnline] = useState(navigator.onLine);
-  const [alertsOpen, setAlertsOpen] = useState(0);
+  const [alertsOpen, setAlertsOpen] = useState(null);
   const { theme, toggleTheme } = useTheme();
   const username = getCurrentUsername() || "Owner";
   const role = getCurrentRole() || "owner";
@@ -45,12 +45,12 @@ function Topbar({ onToggleSidebar = null }) {
         }
       })
       .catch(() => {
-        /* non-blocking: the bell simply shows no count */
+        if (!cancelled) setAlertsOpen(null);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <div className="topbar">
@@ -67,7 +67,6 @@ function Topbar({ onToggleSidebar = null }) {
         ) : null}
         <div>
           <div className="topbar__title">{pageTopic.title}</div>
-          <div className="topbar__subtitle">{pageTopic.intro}</div>
         </div>
       </div>
 
@@ -78,7 +77,7 @@ function Topbar({ onToggleSidebar = null }) {
           role="status"
         >
           {online ? <Wifi size={12} aria-hidden="true" /> : <WifiOff size={12} aria-hidden="true" />}
-          {online ? "Online" : "Offline"}
+          {online ? "Rete connessa" : "Offline"}
         </span>
         <div className="topbar__meta">
           <StatusBadge status={role} />
@@ -93,7 +92,7 @@ function Topbar({ onToggleSidebar = null }) {
             className="chrome-icon-btn topbar__bell"
             onClick={() => navigate("/smart-alerts")}
             aria-label={
-              alertsOpen > 0
+              alertsOpen === null ? "Alert smart: stato non disponibile" : alertsOpen > 0
                 ? `${alertsOpen} alert smart aperti`
                 : "Nessun alert smart aperto"
             }
@@ -117,13 +116,15 @@ function Topbar({ onToggleSidebar = null }) {
           </button>
           <button
             type="button"
-            className="topbar__logout"
+            className="chrome-icon-btn topbar__logout"
+            aria-label="Esci dall'account"
+            title="Esci dall'account"
             onClick={() => {
               clearAuthSession();
               window.location.href = "/login";
             }}
           >
-            Logout
+            <LogOut size={16} aria-hidden="true" />
           </button>
         </div>
       </div>

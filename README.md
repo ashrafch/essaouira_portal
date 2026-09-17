@@ -86,6 +86,7 @@ Interactive docs at `/docs` (Swagger) when the backend runs. Main groups: `/auth
 
 - [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md) — index by audience
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — dev / LAN / production deployment
+- [docs/UX_FUNCTIONAL_REVIEW.md](docs/UX_FUNCTIONAL_REVIEW.md) — operational home, booking flows, UI checks and remaining UX work
 - [docs/VILLACORE_LINK.md](docs/VILLACORE_LINK.md) — simulated `villacore.link.v1` contract, setup, mapping, token rotation and restore reconciliation
 - [docs/VILLACORE_PROMPTS.md](docs/VILLACORE_PROMPTS.md) — ready-to-paste prompts for the VillaCore repository
 

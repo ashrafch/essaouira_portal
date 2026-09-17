@@ -58,7 +58,7 @@ test('production login, all route bundles, themes and booking document', async (
       const text = await page.locator('#root').innerText();
       expect(text.length, `${path} blank`).toBeGreaterThan(30);
       expect(text, path).not.toMatch(/Qualcosa.*andato storto|Cannot read properties|Pagina non trovata/i);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
       expect(overflow, `${path} horizontal page overflow`).toBeFalsy();
       expect(failures, `${theme} ${path}`).toEqual([]);
       if (['/', '/bookings', '/operations', '/smart-link'].includes(path)) {

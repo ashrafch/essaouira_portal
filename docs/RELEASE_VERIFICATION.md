@@ -9,6 +9,11 @@ Ripresa e verifica conclusiva: 2026-09-16. I comandi automatici restano distinti
 dagli ACK: il pannello mostra "esecuzione da confermare" per richieste accettate
 e impedisce dispatch concorrenti nello stesso pannello.
 
+Revisione successiva della UX: [UX_FUNCTIONAL_REVIEW.md](UX_FUNCTIONAL_REVIEW.md).
+Home operativa separata dal rendiconto, filtri prenotazioni e collegamenti
+persistenti; suite frontend ampliata a 74 test. Questa fase non modifica
+backend, schema dati o automazioni VillaCore e non estende le garanzie hardware.
+
 ## Flussi e responsabilita
 
 | Flusso | Correzione / copertura | Limite |

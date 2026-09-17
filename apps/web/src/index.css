@@ -105,15 +105,15 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* Surfaces — slate based */
-  --color-bg: #0b1220;
-  --color-surface: #101a2c;
-  --color-surface-raised: #16223a;
-  --color-surface-soft: #0d1626;
+  /* Neutral surfaces keep operational status colors distinct. */
+  --color-bg: #141719;
+  --color-surface: #1c2023;
+  --color-surface-raised: #272d31;
+  --color-surface-soft: #181c1f;
 
   /* Borders */
-  --color-border: #24334d;
-  --color-border-strong: #35486b;
+  --color-border: #333b40;
+  --color-border-strong: #4b575e;
 
   /* Text */
   --color-text: #e6edf7;
@@ -179,10 +179,7 @@ body,
 
 body {
   font-family: var(--font-sans);
-  background:
-    radial-gradient(circle at 95% 6%, var(--backdrop-glow-1), transparent 30%),
-    radial-gradient(circle at 4% 2%, var(--backdrop-glow-2), transparent 26%),
-    var(--color-bg);
+  background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -202,7 +199,7 @@ h3,
 h4 {
   font-weight: 700;
   color: var(--color-text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.25;
   text-wrap: balance;
 }
@@ -540,7 +537,7 @@ svg {
 
 @media (max-width: 1024px) {
   .portal-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: 74px minmax(0, 1fr);
   }
   .portal-sidebar.desktop-only {

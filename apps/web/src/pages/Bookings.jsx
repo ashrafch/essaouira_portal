@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { canEditOperations } from "../config/rbac";
 import {
   getBookings,
@@ -12,6 +12,9 @@ import { PageHeader, Button, Modal, useToast } from "../components/ui";
 import { Plus, Pencil, Printer, Trash2 } from "lucide-react";
 import { formatISO, nightsBetween } from "../utils/dateUtils";
 import { formatCurrency } from "../utils/format";
+import { bookingConflicts, filterBookings, BOOKING_STATUS_LABELS } from "../utils/bookingViews";
+import { readWorkflowContext } from "../routes/workflowContext";
+import "./bookings.css";
 
 function parseDate(value) {
   if (!value) return null;
@@ -20,16 +23,14 @@ function parseDate(value) {
   return d;
 }
 
-function hasOverlap(b, start, end) {
-  const bIn = parseDate(b.checkin_date);
-  const bOut = parseDate(b.checkout_date);
-  if (!bIn || !bOut) return false;
-  return bIn < end && bOut > start;
-}
-
 function Bookings() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const viewFilter = ["arrivals", "departures", "in-house", "cancelled"].includes(params.get("view")) ? params.get("view") : "all";
+  const filterDate = readWorkflowContext(location).date || formatISO(new Date());
+  const [search, setSearch] = useState("");
+  const handledIntent = useRef(null);
   const canEdit = canEditOperations();
   const toast = useToast();
 
@@ -96,8 +97,17 @@ function Bookings() {
 
   // stato da Calendar (nuova o modifica)
   useEffect(() => {
-    const state = location.state;
-    if (!state || loading || error) return;
+    const context = readWorkflowContext(location);
+    const queryIntent = context.bookingId ? { editBookingId: context.bookingId }
+      : params.get("new_booking") === "1" && context.date ? { newBookingDate: context.date, unitId: context.unitId } : null;
+    const state = location.state || queryIntent;
+    if (!state) { handledIntent.current = null; return; }
+    if (loading || error) return;
+    const intentKey = state.editBookingId ? `edit:${state.editBookingId}` : `new:${state.newBookingDate || ""}:${state.unitId || ""}`;
+    // Saving updates the collection before a router transition can remove the
+    // query. Do not reopen or overwrite the form for an already handled intent.
+    if (handledIntent.current === intentKey) return;
+    handledIntent.current = intentKey;
     if (state.unitId) setUnitFilter(String(state.unitId));
 
     if (state.newBookingDate && canEdit) {
@@ -122,10 +132,28 @@ function Bookings() {
         toast.error("Prenotazione non disponibile.");
       }
     }
-    navigate(location.pathname + location.search, { replace: true, state: null });
-    // Consume navigation intent once; saves must not reopen the editor.
+    if (location.state) {
+      // Persist the intent before consuming transient router state. Route exit
+      // animations may mount the destination again during navigation.
+      const next = new URLSearchParams(location.search);
+      if (state.editBookingId) next.set("booking_id", state.editBookingId);
+      if (state.newBookingDate) { next.set("new_booking", "1"); next.set("date", state.newBookingDate); }
+      if (state.unitId) next.set("unit_id", state.unitId);
+      navigate(`${location.pathname}?${next}`, { replace: true, state: null });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, bookings, loading, error, canEdit]);
+  }, [location.state, location.search, bookings, loading, error, canEdit]);
+
+  function closeBookingModal() {
+    resetForm();
+    setIsModalOpen(false);
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.delete("booking_id");
+      next.delete("new_booking");
+      return next;
+    }, { replace: true });
+  }
 
   const unitMap = useMemo(
     () =>
@@ -163,7 +191,7 @@ function Bookings() {
 
     units.forEach((u) => {
       const conflictsForUnit = bookings.filter((b) =>
-        b.id !== editingId && b.unit_id === u.id ? hasOverlap(b, parsedCheckin, parsedCheckout) : false
+        b.unit_id === u.id && bookingConflicts(b, checkinDate, checkoutDate, editingId)
       );
       if (conflictsForUnit.length === 0) {
         freeUnits.push(u);
@@ -183,7 +211,7 @@ function Bookings() {
       conflictForSelectedUnit,
       conflictBookings,
     };
-  }, [bookings, units, parsedCheckin, parsedCheckout, unitId, editingId]);
+  }, [bookings, units, parsedCheckin, parsedCheckout, checkinDate, checkoutDate, unitId, editingId]);
 
   const suggestedTotal = useMemo(() => {
     const nr = nightlyRate ? Number(nightlyRate) : NaN;
@@ -197,22 +225,8 @@ function Bookings() {
   }, [nightlyRate, nights, cleaningFee, cityTax, channelFee]);
 
   const filteredBookings = useMemo(() => {
-    return bookings
-      .filter((b) => {
-        if (unitFilter !== "all" && String(b.unit_id) !== unitFilter) {
-          return false;
-        }
-        if (paymentFilter === "paid" && !b.is_paid) return false;
-        if (paymentFilter === "unpaid" && b.is_paid) return false;
-        return true;
-      })
-      .slice()
-      .sort((a, b) => {
-        const aDate = new Date(a.checkin_date || a.checkout_date).getTime();
-        const bDate = new Date(b.checkin_date || b.checkout_date).getTime();
-        return aDate - bDate;
-      });
-  }, [bookings, unitFilter, paymentFilter]);
+    return filterBookings(bookings, { unit: unitFilter, payment: paymentFilter, view: viewFilter, query: search, today: filterDate }, unitMap);
+  }, [bookings, unitFilter, paymentFilter, viewFilter, search, filterDate, unitMap]);
 
   const shownCount = filteredBookings.length;
   const totalCount = bookings.length;
@@ -357,8 +371,7 @@ function Bookings() {
         setBookings((prev) => [...prev, saved]);
         toast.success("Prenotazione creata.");
       }
-      resetForm();
-      setIsModalOpen(false);
+      closeBookingModal();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -573,10 +586,7 @@ function Bookings() {
         <>
           <Modal
             open={isModalOpen}
-            onClose={() => {
-              resetForm();
-              setIsModalOpen(false);
-            }}
+            onClose={closeBookingModal}
             title={
               formMode === "create"
                 ? "Nuova prenotazione"
@@ -587,10 +597,7 @@ function Bookings() {
               <>
                 <Button
                   variant="secondary"
-                  onClick={() => {
-                    resetForm();
-                    setIsModalOpen(false);
-                  }}
+                  onClick={closeBookingModal}
                 >
                   Annulla
                 </Button>
@@ -613,9 +620,10 @@ function Bookings() {
               <fieldset disabled={!canEdit || saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
               {/* DATI BASE */}
               <div style={field}>
-                <label style={label}>Appartamento</label>
+                <label style={label} htmlFor="booking-unitId">Appartamento</label>
                 <select
                   style={select}
+                  id="booking-unitId"
                   value={unitId}
                   onChange={(e) => setUnitId(e.target.value)}
                 >
@@ -720,9 +728,10 @@ function Bookings() {
               </div>
 
               <div style={field}>
-                <label style={label}>Nome e Cognome</label>
+                <label style={label} htmlFor="booking-guestName">Nome e Cognome</label>
                 <input
                   style={input}
+                  id="booking-guestName"
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                   placeholder="Es. Mario Rossi"
@@ -731,20 +740,22 @@ function Bookings() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div style={field}>
-                  <label style={label}>Email</label>
+                  <label style={label} htmlFor="booking-guestEmail">Email</label>
                   <input
                     style={input}
                     type="email"
+                    id="booking-guestEmail"
                     value={guestEmail}
                     onChange={(e) => setGuestEmail(e.target.value)}
                     placeholder="email@example.com"
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Telefono / WhatsApp</label>
+                  <label style={label} htmlFor="booking-guestPhone">Telefono / WhatsApp</label>
                   <input
                     style={input}
                     type="tel"
+                    id="booking-guestPhone"
                     value={guestPhone}
                     onChange={(e) => setGuestPhone(e.target.value)}
                     placeholder="+39 333..."
@@ -754,30 +765,33 @@ function Bookings() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 <div style={field}>
-                  <label style={label}>Adulti</label>
+                  <label style={label} htmlFor="booking-numAdults">Adulti</label>
                   <input
                     style={input}
                     type="number"
                     min="1"
+                    id="booking-numAdults"
                     value={numAdults}
                     onChange={(e) => setNumAdults(e.target.value)}
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Bambini</label>
+                  <label style={label} htmlFor="booking-numChildren">Bambini</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
+                    id="booking-numChildren"
                     value={numChildren}
                     onChange={(e) => setNumChildren(e.target.value)}
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Ora Arrivo</label>
+                  <label style={label} htmlFor="booking-arrivalTime">Ora Arrivo</label>
                   <input
                     style={input}
                     type="time"
+                    id="booking-arrivalTime"
                     value={arrivalTime}
                     onChange={(e) => setArrivalTime(e.target.value)}
                   />
@@ -785,9 +799,10 @@ function Bookings() {
               </div>
 
               <div style={field}>
-                <label style={label}>Canale</label>
+                <label style={label} htmlFor="booking-source">Canale</label>
                 <select
                   style={select}
+                  id="booking-source"
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
                 >
@@ -806,19 +821,21 @@ function Bookings() {
                 }}
               >
                 <div style={field}>
-                  <label style={label}>Check-in</label>
+                  <label style={label} htmlFor="booking-checkinDate">Check-in</label>
                   <input
                     style={input}
                     type="date"
+                    id="booking-checkinDate"
                     value={checkinDate}
                     onChange={(e) => setCheckinDate(e.target.value)}
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Check-out</label>
+                  <label style={label} htmlFor="booking-checkoutDate">Check-out</label>
                   <input
                     style={input}
                     type="date"
+                    id="booking-checkoutDate"
                     value={checkoutDate}
                     onChange={(e) => setCheckoutDate(e.target.value)}
                   />
@@ -851,24 +868,26 @@ function Bookings() {
                 }}
               >
                 <div style={field}>
-                  <label style={label}>Tariffa per notte</label>
+                  <label style={label} htmlFor="booking-nightlyRate">Tariffa per notte</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
                     step="0.01"
+                    id="booking-nightlyRate"
                     value={nightlyRate}
                     onChange={(e) => setNightlyRate(e.target.value)}
                     placeholder="es. 80"
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Totale prenotazione</label>
+                  <label style={label} htmlFor="booking-totalPrice">Totale prenotazione</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
                     step="0.01"
+                    id="booking-totalPrice"
                     value={totalPrice}
                     onChange={(e) => setTotalPrice(e.target.value)}
                     placeholder="lascia vuoto per calcolo automatico"
@@ -884,24 +903,26 @@ function Bookings() {
                 }}
               >
                 <div style={field}>
-                  <label style={label}>Cleaning fee</label>
+                  <label style={label} htmlFor="booking-cleaningFee">Cleaning fee</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
                     step="0.01"
+                    id="booking-cleaningFee"
                     value={cleaningFee}
                     onChange={(e) => setCleaningFee(e.target.value)}
                     placeholder="es. 20"
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Tassa di soggiorno</label>
+                  <label style={label} htmlFor="booking-cityTax">Tassa di soggiorno</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
                     step="0.01"
+                    id="booking-cityTax"
                     value={cityTax}
                     onChange={(e) => setCityTax(e.target.value)}
                     placeholder="es. 8"
@@ -917,21 +938,23 @@ function Bookings() {
                 }}
               >
                 <div style={field}>
-                  <label style={label}>Commissioni canale</label>
+                  <label style={label} htmlFor="booking-channelFee">Commissioni canale</label>
                   <input
                     style={input}
                     type="number"
                     min="0"
                     step="0.01"
+                    id="booking-channelFee"
                     value={channelFee}
                     onChange={(e) => setChannelFee(e.target.value)}
                     placeholder="es. 15"
                   />
                 </div>
                 <div style={field}>
-                  <label style={label}>Valuta</label>
+                  <label style={label} htmlFor="booking-currency">Valuta</label>
                   <select
                     style={select}
+                    id="booking-currency"
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
                   >
@@ -1007,9 +1030,10 @@ function Bookings() {
               </div>
 
               <div style={field}>
-                <label style={label}>Note interne</label>
+                <label style={label} htmlFor="booking-notes">Note interne</label>
                 <textarea
                   style={textarea}
+                  id="booking-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Note per te / staff (non visibili all'ospite)"
@@ -1060,6 +1084,7 @@ function Bookings() {
                       width: 120,
                     }}
                     value={unitFilter}
+                    aria-label="Filtra per unita"
                     onChange={(e) => setUnitFilter(e.target.value)}
                   >
                     <option value="all">Tutte</option>
@@ -1082,6 +1107,7 @@ function Bookings() {
                       width: 140,
                     }}
                     value={paymentFilter}
+                    aria-label="Filtra per pagamento"
                     onChange={(e) => setPaymentFilter(e.target.value)}
                   >
                     <option value="all">Tutte</option>
@@ -1090,6 +1116,27 @@ function Bookings() {
                   </select>
                 </div>
               </div>
+            </div>
+
+            <div className="booking-filters">
+              <input type="search" aria-label="Cerca prenotazioni" placeholder="Ospite, email, telefono o unita" value={search} onChange={event => setSearch(event.target.value)} />
+              <select aria-label="Vista prenotazioni" value={viewFilter} onChange={event => setParams(previous => {
+                const next = new URLSearchParams(previous);
+                if (event.target.value === "all") { next.delete("view"); next.delete("date"); }
+                else next.set("view", event.target.value);
+                return next;
+              })}>
+                <option value="all">Tutte le prenotazioni</option>
+                <option value="arrivals">Arrivi</option>
+                <option value="departures">Partenze</option>
+                <option value="in-house">In casa</option>
+                <option value="cancelled">Cancellate</option>
+              </select>
+              {["arrivals", "departures", "in-house"].includes(viewFilter) && <input aria-label="Data operativa" type="date" value={filterDate} onChange={event => {
+                const date = event.target.value;
+                if (date) setParams(previous => { const next = new URLSearchParams(previous); next.set("date", date); return next; }, { replace: true });
+              }} />}
+              {(search || unitFilter !== "all" || paymentFilter !== "all" || viewFilter !== "all") && <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setUnitFilter("all"); setPaymentFilter("all"); setParams({}); }}>Azzera filtri</Button>}
             </div>
 
             {filteredBookings.length === 0 ? (
@@ -1166,7 +1213,7 @@ function Bookings() {
                                   color: "var(--color-text-muted)",
                                 }}
                               >
-                                {n} notte{n !== 1 ? "i" : ""}
+                                {n} {n === 1 ? "notte" : "notti"}
                               </span>
                               {b.has_late_checkout && (
                                 <span
@@ -1191,9 +1238,10 @@ function Bookings() {
                               : "—"}
                           </td>
                           <td style={td} data-label="Stato">
-                            <span style={pillPaid(b.is_paid)}>
+                            <div style={{ fontSize: 12, marginBottom: 4, color: b.status === "cancelled" ? "var(--color-danger-strong)" : "var(--color-text-muted)" }}>{BOOKING_STATUS_LABELS[b.status] || b.status}</div>
+                            {b.status !== "cancelled" && <span style={pillPaid(b.is_paid)}>
                               {b.is_paid ? "Pagata" : "Da incassare"}
-                            </span>
+                            </span>}
                           </td>
                           <td
                             style={{ ...td, whiteSpace: "nowrap" }}
@@ -1209,7 +1257,7 @@ function Bookings() {
                                   setIsModalOpen(true);
                                 }}
                               >
-                                Modifica
+                                {canEdit ? "Modifica" : "Dettagli"}
                               </Button>
                               <Button
                                 variant="secondary"
