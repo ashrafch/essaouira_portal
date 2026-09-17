@@ -1,0 +1,77 @@
+.occupancy-month { min-width: 0; }
+.occupancy-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 4px; }
+.occupancy-week--labels { color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; text-align: center; padding-bottom: 6px; }
+.occupancy-day {
+  height: 160px;
+  min-width: 0;
+  padding: 4px;
+  display: grid;
+  grid-template-rows: 24px 102px 20px;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+.occupancy-day--outside { background: var(--color-surface-soft); }
+.occupancy-day--today { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.occupancy-day__header { display: flex; align-items: center; justify-content: space-between; min-width: 0; }
+.occupancy-day__date, .occupancy-day__add, .occupancy-day__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  box-shadow: none;
+  cursor: pointer;
+}
+.occupancy-day__date { width: 24px; height: 24px; font-size: 12px; font-weight: 700; color: var(--color-text); }
+.occupancy-day--outside .occupancy-day__date { color: var(--color-text-subtle); }
+.occupancy-day--today .occupancy-day__date { background: var(--color-primary); color: var(--color-on-primary); }
+.occupancy-day__add { width: 24px; height: 24px; flex: none; }
+.occupancy-day__bookings { display: grid; grid-template-rows: repeat(3, 32px); gap: 3px; min-width: 0; }
+.occupancy-booking {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 3px 5px;
+  border: 0;
+  border-left: 3px solid var(--booking-color);
+  border-radius: 4px;
+  background: var(--booking-bg);
+  color: var(--booking-text);
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+}
+.occupancy-source--direct { --booking-color: var(--color-success); --booking-bg: var(--color-success-soft); --booking-text: var(--color-success-strong); }
+.occupancy-source--airbnb { --booking-color: var(--color-warning); --booking-bg: var(--color-warning-soft); --booking-text: var(--color-warning-strong); }
+.occupancy-source--booking { --booking-color: var(--color-info); --booking-bg: var(--color-info-soft); --booking-text: var(--color-info-strong); }
+.occupancy-booking[draggable="true"] { cursor: grab; }
+.occupancy-booking--dragging { opacity: 0.4; }
+.occupancy-booking__text { flex: 1; min-width: 0; }
+.occupancy-booking__text > * { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; line-height: 13px; }
+.occupancy-booking__text strong { font-weight: 700; }
+.occupancy-booking__nights { flex: none; font-size: 10px; }
+.occupancy-day__more { justify-content: flex-start; gap: 3px; font-size: 11px; font-weight: 600; width: 100%; white-space: nowrap; }
+.occupancy-day__add:hover, .occupancy-day__more:hover { background: var(--color-surface-soft); color: var(--color-primary); }
+.occupancy-booking:hover { background: var(--booking-bg); box-shadow: inset 0 0 0 1px var(--booking-color); }
+.occupancy-day__date:not([aria-current]):hover { background: var(--color-surface-soft); }
+.occupancy-month button:focus-visible, .occupancy-details button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.occupancy-details { list-style: none; padding: 0; margin: 0; }
+.occupancy-details li + li { border-top: 1px solid var(--color-border); }
+.occupancy-details button { display: flex; gap: 12px; align-items: center; width: 100%; padding: 14px 4px; border: 0; border-radius: 0; box-shadow: none; text-align: left; color: var(--color-text); background: transparent; cursor: pointer; }
+.occupancy-details button:hover { background: var(--color-surface-soft); }
+.occupancy-details__text { display: grid; gap: 4px; min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 13px; }
+.occupancy-details__text span { color: var(--color-text-muted); font-size: 12px; }
+.occupancy-details svg { flex: none; color: var(--color-text-muted); }
+.occupancy-agenda { overflow-wrap: anywhere; }
+.occupancy-dialog { display: flex; flex-direction: column; overflow: hidden; border-radius: 8px; }
+.occupancy-dialog .ui-modal-header, .occupancy-dialog .ui-modal-footer { flex: none; }
+.occupancy-dialog .ui-modal-body { min-height: 0; overflow-y: auto; }

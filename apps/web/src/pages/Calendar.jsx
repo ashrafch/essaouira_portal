@@ -9,14 +9,15 @@ import {
   getRateCalendar,
 } from "../services/api";
 import { PageHeader, Button, useToast } from "../components/ui";
+import MonthGrid from "../components/calendar/MonthGrid";
 import {
   MONTH_LABELS,
-  WEEKDAY_LABELS,
   startOfDay,
   addDays,
   formatISO,
   isSameDay,
   getWeeksForMonth,
+  nightsBetween,
 } from "../utils/dateUtils";
 import { formatCurrency } from "../utils/format";
 import { useIsMobile } from "../hooks/useIsMobile";
@@ -103,15 +104,14 @@ function Calendar() {
 
   const bookingsWithParsedDates = useMemo(
     () =>
-      bookings.map((b) => {
-        const checkin = startOfDay(new Date(b.checkin_date));
-        const checkout = startOfDay(new Date(b.checkout_date));
+      bookings.filter((b) => b.status !== "cancelled").map((b) => {
+        const checkin = startOfDay(new Date(`${b.checkin_date}T00:00:00`));
+        const checkout = startOfDay(new Date(`${b.checkout_date}T00:00:00`));
         return {
           ...b,
           _checkin: checkin,
           _checkout: checkout,
-          _nights:
-            (checkout.getTime() - checkin.getTime()) / (1000 * 60 * 60 * 24),
+          _nights: nightsBetween(checkin, checkout),
         };
       }),
     [bookings]
@@ -261,11 +261,10 @@ function Calendar() {
       const data = dataJson ? JSON.parse(dataJson) : null;
       if (!data) return;
 
-      const oldCheckin = startOfDay(new Date(data.checkin_date));
-      const oldCheckout = startOfDay(new Date(data.checkout_date));
-      const nights =
-        (oldCheckout.getTime() - oldCheckin.getTime()) /
-        (1000 * 60 * 60 * 24);
+      const nights = nightsBetween(
+        new Date(`${data.checkin_date}T00:00:00`),
+        new Date(`${data.checkout_date}T00:00:00`)
+      );
 
       const newCheckin = startOfDay(dayDate);
       const newCheckout = addDays(newCheckin, nights);
@@ -302,14 +301,16 @@ function Calendar() {
 
   // --- CLICK: APRI PRENOTAZIONE IN MODIFICA ---
   function openBookingInEdit(bookingId) {
-    navigate("/bookings", { state: { editBookingId: bookingId } });
+    navigate(`/bookings?booking_id=${bookingId}`);
   }
 
   // --- CLICK + : NUOVA PRENOTAZIONE PER QUEL GIORNO ---
   function createBookingForDay(dayDate) {
     const iso = formatISO(dayDate);
-    if (!canEditOperations()) return;
-    navigate("/bookings", { state: { newBookingDate: iso, unitId: selectedUnitId } });
+    if (!canEditOperations() || fromCache) return;
+    const params = new URLSearchParams({ new_booking: "1", date: iso });
+    if (selectedUnitId) params.set("unit_id", String(selectedUnitId));
+    navigate(`/bookings?${params}`);
   }
 
   // STILI
@@ -342,7 +343,7 @@ function Calendar() {
 
   const card = {
     backgroundColor: "var(--color-surface)",
-    borderRadius: "14px",
+    borderRadius: "8px",
     padding: "16px 18px",
     boxShadow: "var(--shadow-sm)",
     border: "1px solid var(--color-border)",
@@ -370,108 +371,6 @@ function Calendar() {
     backgroundColor: bg,
     border: `1px solid ${border}`,
   });
-
-  const calendarGrid = {
-    display: "grid",
-    gridTemplateRows: "auto",
-    gap: 4,
-  };
-
-  const weekRow = {
-    display: "grid",
-    gridTemplateColumns: "repeat(7, 1fr)",
-    gap: 4,
-  };
-
-  const weekdayHeaderCell = {
-    fontSize: 11,
-    textTransform: "uppercase",
-    color: "var(--color-text-muted)",
-    textAlign: "center",
-    paddingBottom: 4,
-  };
-
-  const dayCell = (isCurrentMonth, isToday) => ({
-    borderRadius: 10,
-    border: "1px solid var(--color-border)",
-    backgroundColor: isCurrentMonth ? "var(--color-surface-soft)" : "var(--color-surface)",
-    position: "relative",
-    minHeight: 90,
-    padding: "4px 4px 4px 4px",
-    fontSize: 11,
-    cursor: draggingBooking && !fromCache ? "copy" : "default",
-    boxShadow: isToday ? "0 0 0 2px var(--color-primary) inset" : "none",
-    overflow: "hidden",
-  });
-
-  const dayNumber = (isCurrentMonth) => ({
-    position: "absolute",
-    top: 4,
-    right: 6,
-    fontSize: 11,
-    fontWeight: 600,
-    color: isCurrentMonth ? "var(--color-text)" : "var(--color-text-subtle)",
-  });
-
-  // 🔧 bottone + centrato
-  const addButton = {
-    position: "absolute",
-    top: 4,
-    left: 4,
-    width: 18,
-    height: 18,
-    borderRadius: "999px",
-    border: "1px solid var(--color-border-strong)",
-    backgroundColor: "var(--color-surface)",
-    fontSize: 12,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    color: "var(--color-text-muted)",
-    padding: 0,
-    lineHeight: 1,
-  };
-
-  const bookingsContainer = {
-    marginTop: 22,
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  };
-
-  // 🎨 colori più accesi per le pill
-  const bookingPill = (source, isDragging) => {
-    let bg = "var(--color-success-soft)";
-    let border = "var(--color-success)";
-    let color = "var(--color-success-strong)";
-
-    if (source === "airbnb") {
-      bg = "var(--color-warning-soft)";
-      border = "var(--color-warning)";
-      color = "var(--color-warning-strong)";
-    } else if (source === "booking") {
-      bg = "var(--color-info-soft)";
-      border = "var(--color-info)";
-      color = "var(--color-info-strong)";
-    }
-
-    return {
-      padding: "2px 6px",
-      borderRadius: 999,
-      backgroundColor: bg,
-      border: `1px solid ${border}`,
-      color,
-      fontSize: 11,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 4,
-      opacity: isDragging ? 0.4 : 1,
-      cursor: fromCache ? "default" : "grab",
-      userSelect: "none",
-    };
-  };
 
   // STILI TIMELINE UNITÀ
   const timelineCard = {
@@ -545,7 +444,6 @@ function Calendar() {
     <div>
       <PageHeader
         title="Calendario occupazione"
-        subtitle="Vista mensile con prenotazioni per giorno. Trascina una prenotazione su un altro giorno per spostarla."
         actions={
           <div style={navControls}>
             <Button
@@ -567,8 +465,8 @@ function Calendar() {
             />
             <span style={fromCache ? badgeOffline : badgeInfo}>
               {fromCache
-                ? "Offline – spostamento disabilitato (solo cache)"
-                : "Dati live – drag & drop attivo"}
+                ? "Cache offline"
+                : "Dati aggiornati"}
             </span>
           </div>
         }
@@ -583,9 +481,9 @@ function Calendar() {
             Nessun appartamento configurato.
           </p>
         ) : isMobile ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="occupancy-agenda" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 2 }}>
-              Agenda di {MONTH_LABELS[month]} {year} — tocca una prenotazione per aprirla.
+              Agenda di {MONTH_LABELS[month]} {year}
             </div>
             {monthAgenda.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
@@ -594,7 +492,7 @@ function Calendar() {
             ) : (
               monthAgenda.map((b) => {
                 const unit = unitMap[b.unit_id];
-                const dotColor = bookingPill(b.source, false).border;
+                const dotColor = timelineBar(b.source).backgroundColor;
                 return (
                   <button
                     key={b.id}
@@ -608,7 +506,7 @@ function Calendar() {
                       width: "100%",
                       background: "var(--color-surface-soft)",
                       border: "1px solid var(--color-border)",
-                      borderRadius: 10,
+                      borderRadius: 8,
                       padding: "10px 12px",
                       cursor: "pointer",
                       color: "var(--color-text)",
@@ -668,123 +566,13 @@ function Calendar() {
               </span>
             </div>
 
-            <div style={calendarGrid}>
-              {/* intestazione giorni della settimana */}
-              <div style={weekRow}>
-                {WEEKDAY_LABELS.map((lbl) => (
-                  <div key={lbl} style={weekdayHeaderCell}>
-                    {lbl}
-                  </div>
-                ))}
-              </div>
-
-              {/* settimane */}
-              {weeks.map((week, wi) => (
-                <div key={wi} style={weekRow}>
-                  {week.map((dayDate, di) => {
-                    const isCurrentMonth = dayDate.getMonth() === month;
-                    const isToday = isSameDay(dayDate, today);
-                    const dayKey = formatISO(dayDate);
-                    const dayBookings = bookingsByDay[dayKey] || [];
-
-                    const visibleBookings = dayBookings.slice(0, 3);
-                    const extraCount =
-                      dayBookings.length > 3 ? dayBookings.length - 3 : 0;
-
-                    return (
-                      <div
-                        key={di}
-                        style={dayCell(isCurrentMonth, isToday)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, dayDate)}
-                      >
-                        {/* Numero giorno */}
-                        <div style={dayNumber(isCurrentMonth)}>
-                          {dayDate.getDate()}
-                        </div>
-
-                        {/* Pulsante + per nuova prenotazione */}
-                        <button
-                          type="button"
-                          style={addButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            createBookingForDay(dayDate);
-                          }}
-                          title="Nuova prenotazione per questo giorno"
-                        >
-                          +
-                        </button>
-
-                        {/* Prenotazioni del giorno */}
-                        <div style={bookingsContainer}>
-                          {visibleBookings.map((b) => {
-                            const unit = unitMap[b.unit_id];
-                            const isDraggingCard =
-                              draggingBooking &&
-                              draggingBooking.id === b.id;
-
-                            const title = `${b.guest_name || "Ospite"} – ${
-                              unit?.name || `Unit #${b.unit_id}`
-                            }\n${new Date(
-                              b.checkin_date
-                            ).toLocaleDateString("it-IT")} → ${new Date(
-                              b.checkout_date
-                            ).toLocaleDateString("it-IT")}\nFonte: ${
-                              b.source
-                            }`;
-
-                            const isCheckinDay = isSameDay(
-                              dayDate,
-                              b._checkin
-                            );
-
-                            return (
-                              <div
-                                key={b.id}
-                                style={bookingPill(
-                                  b.source,
-                                  isDraggingCard
-                                )}
-                                title={title}
-                                draggable={isCheckinDay && !fromCache}
-                                onDragStart={(e) =>
-                                  isCheckinDay && handleDragStart(e, b)
-                                }
-                                onDragEnd={handleDragEnd}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openBookingInEdit(b.id);
-                                }}
-                              >
-                                <span>
-                                  {b.guest_name || "Ospite"} ·{" "}
-                                  {unit?.name || `Unit #${b.unit_id}`}
-                                </span>
-                                <span style={{ fontSize: 10 }}>
-                                  {b._nights}n
-                                </span>
-                              </div>
-                            );
-                          })}
-                          {extraCount > 0 && (
-                            <div
-                              style={{
-                                fontSize: 10,
-                                color: "var(--color-text-muted)",
-                              }}
-                            >
-                              +{extraCount} altre
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-
+            <MonthGrid
+              weeks={weeks} month={month} today={today} bookingsByDay={bookingsByDay}
+              unitMap={unitMap} canEdit={canEditOperations()} fromCache={fromCache}
+              draggingBooking={draggingBooking} onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={handleDrop}
+              onOpenBooking={openBookingInEdit} onCreateBooking={createBookingForDay}
+            />
             {error && !fromCache && (
               <p style={{ color: "var(--color-danger)", fontSize: 12, marginTop: 8 }}>
                 Errore caricamento: {error}
@@ -803,6 +591,7 @@ function Calendar() {
             gap: 12,
             alignItems: "center",
             marginBottom: 8,
+            flexWrap: "wrap",
           }}
         >
           <div>
@@ -813,8 +602,10 @@ function Calendar() {
               Occupazione sul mese corrente per una singola unità.
             </p>
           </div>
-          <div>
+          <div style={{ minWidth: 0, maxWidth: "100%" }}>
             <select
+              aria-label="Appartamento della timeline"
+              style={{ maxWidth: "100%" }}
               value={selectedUnitId || ""}
               onChange={(e) =>
                 setSelectedUnitId(

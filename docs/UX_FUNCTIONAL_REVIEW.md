@@ -95,10 +95,36 @@ I test unitari coprono selezioni, sovrapposizioni, permessi e stati della home.
 - Nessuna modifica alla repository VillaCore in questa fase. Nessun comando
   inviato agli impianti e nessuna nuova attestazione di commissioning sul posto.
 
+## Calendario affollato - 17 settembre 2026
+
+- Griglia mensile con celle da 160px, colonne vincolate e massimo tre
+  prenotazioni visibili. Ospite e appartamento su due righe separate,
+  nomi lunghi abbreviati solo nell'anteprima, canale distinto per colore.
+- Il numero del giorno e `+N altre` aprono l'elenco completo e scorrevole:
+  nomi integrali, date, canale e stato; apertura diretta della prenotazione.
+  Intestazione e azione nuova prenotazione restano visibili durante lo scroll.
+- Cancellate escluse da griglia, agenda mobile e occupazione della timeline.
+  Opzioni e prenotazioni in attesa mantengono il comportamento precedente.
+  Check-out esclusivo, conteggio notti intero anche al cambio dell'ora.
+- Trascinamento solo dal check-in e solo per utenti abilitati online;
+  nuova prenotazione con data/unita precompilate e URL persistente.
+- Sei test unitari dedicati: overflow, dettaglio completo, tastiera/focus,
+  permessi, cache offline e trascinamento. Suite frontend: 80 test in 13 file.
+  Una riesecuzione sotto carico ha avuto un timeout nel test preesistente
+  `Bookings.test.jsx`; la suite completa rieseguita con `--maxWorkers=1`
+  e passata (80/80), senza modificare o allentare le asserzioni.
+- `e2e/calendar.spec.mjs`: fixture intercettate nel browser, dieci prenotazioni
+  con nomi lunghi, cancellata, griglia a 1440/1100/820px e agenda a 390/320px,
+  light/dark, geometria costante, hover, dettaglio, modifica e creazione.
+  Il test drag verifica payload e aggiornamento UI con risposta API simulata:
+  non costituisce una nuova verifica della persistenza del trascinamento.
+- Ricostruita e riavviata solo l'immagine web dello stack QA Docker isolato;
+  backend, dati della villa e Home Assistant non modificati.
+
 ## Limiti e prossime priorita
 
 - Questa revisione non certifica ogni combinazione di form, ruolo e stato.
-  Ampliare i percorsi E2E a drag calendario, ripianificazione staff,
+  Ampliare i percorsi E2E alla persistenza del drag calendario, ripianificazione staff,
   manutenzioni, import iCal e procedure di emergenza.
 - La data server usa ancora la configurazione temporale del backend:
   definire in modo trasversale il fuso della struttura, soprattutto per

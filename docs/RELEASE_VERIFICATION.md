@@ -11,7 +11,8 @@ e impedisce dispatch concorrenti nello stesso pannello.
 
 Revisione successiva della UX: [UX_FUNCTIONAL_REVIEW.md](UX_FUNCTIONAL_REVIEW.md).
 Home operativa separata dal rendiconto, filtri prenotazioni e collegamenti
-persistenti; suite frontend ampliata a 74 test. Questa fase non modifica
+persistenti e calendario ad altezza costante con dettaglio giornaliero;
+suite frontend ampliata a 80 test. Questa fase non modifica
 backend, schema dati o automazioni VillaCore e non estende le garanzie hardware.
 
 ## Flussi e responsabilita
