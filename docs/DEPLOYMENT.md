@@ -19,6 +19,82 @@ See [RELEASE_VERIFICATION.md](RELEASE_VERIFICATION.md) for evidence and remainin
 
 ## 1. Local development
 
+### Gestionale locale separato dai test
+
+Per lavorare sui sei appartamenti usare **questo ambiente**, non l'URL casuale
+di `verify-production.py`. Requisiti: Docker Desktop attivo e Python 3.10+.
+
+```powershell
+# Primo avvio: migrazioni, credenziali casuali, sei appartamenti e backup locali
+python scripts/manage-local.py start --initialize
+
+# Avvii successivi: mantiene dati, nomi degli appartamenti e credenziali
+python scripts/manage-local.py start --no-build
+python scripts/manage-local.py status
+
+# Arresto conservando database e backup
+python scripts/manage-local.py stop
+```
+
+Aprire <http://127.0.0.1:8081>. Account `owner`, tenant `default`; la password
+casuale e nel campo `ADMIN_PASSWORD` di `.env.management.json`, generato al
+primo avvio ed escluso da Git. Proteggere questo file con i permessi del proprio
+account Windows e includerlo nel piano di recupero sicuro, mai in screenshot o commit.
+Il launcher non sovrascrive il file e non cambia password al riavvio.
+Una password modificata nell'app non viene reimpostata dalla configurazione.
+
+- Progetto Docker fisso `hostara-management`, database `management`, volumi e
+  rete indipendenti. Nessun import dai progetti `portal-verify-*`.
+- Esposta solo la porta web su loopback; database e API senza porte host.
+  Se 8081 e occupata, cambiare `WEB_PORT` (stringa) nel JSON prima di riprovare.
+- Inizializzazione tramite API owner: una struttura `Villa Essaouira`,
+  `Appartamento A1` fino ad `Appartamento A6`. Nessuna villa, piscina o
+  area comune aggiunta alla lista delle unita prenotabili. Nomi modificabili
+  nell'anagrafica; tariffe, capienza e prenotazioni non vengono inventate.
+- `--initialize` e idempotente per A1-A6 e rifiuta inventari estranei,
+  senza eliminarli. Dopo personalizzazioni usare l'avvio senza questo flag.
+- Migrazioni Alembic, credenziali forti, seed demo disabilitato e servizio
+  `db-backup` attivo. Gli archivi restano sul disco locale: non sono backup off-site.
+- Provider `mock`, polling e ingest disabilitati: **nessun collegamento HA live**.
+  A1-A6 corrisponderanno alle zone VillaCore `a1`-`a6` solo dopo configurazione
+  esplicita del provider e mapping nel wizard. Non aggiungere `villa` come settimo
+  appartamento se non viene affittata. Non modificare gli impianti per fare QA.
+
+Il launcher e deliberatamente locale e non accetta variabili HA nel JSON.
+Per passare a HA/LAN/produzione usare le sezioni successive e conservare
+**lo stesso progetto `hostara-management`, database, utente DB e segreti**
+nella configurazione di destinazione; fare prima backup e prova di restore.
+Una volta collegato HA non riusare questo launcher, che forza il provider mock.
+
+Aggiornare il gestionale con `python scripts/manage-local.py start` ricostruisce
+le immagini senza reinizializzare l'inventario. Non usare un semplice
+`docker compose up` per questo ambiente: avvierebbe il progetto di sviluppo.
+
+I test automatici si eseguono invece con:
+
+```powershell
+python scripts/verify-production.py --browser
+```
+
+Questo comando crea e rimuove un progetto QA usa-e-getta. L'opzione `--keep`
+conserva **anche i dati fittizi** per diagnostica, non produce un gestionale pulito.
+L'account QA `verifier` non viene creato nel gestionale.
+
+Verifica iniziale del gestionale, senza inserire prenotazioni o altre fixture:
+
+```powershell
+python scripts/tests/test_manage_local.py
+node apps/web/scripts/check-management.mjs
+```
+
+Il secondo comando richiede le dipendenze web e Chromium di Playwright gia
+installati. Controlla A1-A6 nella lista Libere e nel calendario, desktop/mobile;
+blocca ogni scrittura API tranne il login e salva screenshot in `test-results`.
+E una verifica dell'inventario iniziale, non va usata per imporre nuovamente i
+nomi standard dopo personalizzazioni. Non stampa la password.
+
+### Development sandbox
+
 ```bash
 copy .env.example .env        # only if absent; never overwrite existing secrets
 docker compose up --build -d --wait

@@ -141,7 +141,8 @@ def main() -> None:
             result = run("npm.cmd" if os.name == "nt" else "npm", "--prefix", "apps/web", "run", "test:e2e")
             print(result.stdout, flush=True)
         if args.keep:
-            print(f"QA stack retained: http://127.0.0.1:{port} (synthetic verifier account)")
+            print(f"QA ONLY - contains synthetic apartments/bookings: http://127.0.0.1:{port}")
+            print("Do not use this URL for management. Use scripts/manage-local.py instead.")
             print(f"Cleanup: docker compose -p {project} down -v")
     finally:
         if started and not args.keep:

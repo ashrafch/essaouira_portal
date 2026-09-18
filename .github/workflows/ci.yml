@@ -59,6 +59,7 @@ jobs:
       - run: npm exec --prefix apps/web -- playwright install --with-deps chromium
       - run: docker compose --env-file .env.example config --quiet
       - run: python scripts/tests/test_backup_scripts.py
+      - run: python scripts/tests/test_manage_local.py
       - name: Production migrations, API, backup, restore and browser journeys
         run: python scripts/verify-production.py --browser
       - uses: actions/upload-artifact@v4

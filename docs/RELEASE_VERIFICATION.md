@@ -17,6 +17,24 @@ backend, schema dati o automazioni VillaCore e non estende le garanzie hardware.
 
 ## Flussi e responsabilita
 
+### Separazione gestionale / QA - 18 settembre 2026
+
+- Creato il progetto Docker persistente `hostara-management`, web solo su
+  `127.0.0.1:8081`, database e volumi indipendenti da `portal-verify-*`.
+- Inventario iniziale verificato: una struttura, Appartamento A1-A6, nessuna
+  prenotazione, task, manutenzione o dispositivo fittizio. Nessun dato eliminato
+  dal vecchio QA (25 unita conservate).
+- Doppia inizializzazione e ciclo stop/start: stessi sei ID, nessun duplicato,
+  credenziali conservate. Primo archivio PostgreSQL locale creato correttamente.
+- Sei test del launcher; verifica browser in sola lettura a 1440/390px:
+  sei opzioni e sei unita libere nel form, sei opzioni nella timeline,
+  zero scritture di dati e zero errori JavaScript. Screenshot ispezionati.
+- Nessuna connessione HA o comando fisico: provider mock forzato, niente token
+  copiati. Il mapping VillaCore a1-a6 resta un passo esplicito successivo.
+  Non e una nuova certificazione di produzione o di recupero off-site.
+
+### Copertura generale
+
 | Flusso | Correzione / copertura | Limite |
 | --- | --- | --- |
 | Avvio e login | Migrazioni PostgreSQL vuoto, primo owner senza seed, API autenticate | Dati esistenti richiedono backup e prova di migrazione |

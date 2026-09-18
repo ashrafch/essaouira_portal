@@ -2,7 +2,27 @@
 
 Hospitality operations platform (PMS/Ops + Smart Building) for a villa and six bungalow apartments in Essaouira: bookings, staff, maintenance, finance and Home Assistant integration. Dockerized, with dedicated single-owner production deployment.
 
-## Quick start
+## Gestionale Locale: Sei Appartamenti
+
+Ambiente persistente per il tuo utilizzo, separato dai dati dei test:
+
+```powershell
+python scripts/manage-local.py start --initialize
+```
+
+- Portale: <http://127.0.0.1:8081>, solo sul PC locale.
+- Una struttura, **Appartamento A1-A6**, senza ospiti o prenotazioni fittizie.
+- Login `owner`, tenant `default`; password generata nel campo `ADMIN_PASSWORD`
+  del file locale `.env.management.json`, escluso da Git. Non usare `owner123`.
+- Riavvio: `python scripts/manage-local.py start --no-build`.
+- Stato: `python scripts/manage-local.py status`.
+- Arresto senza cancellare dati: `python scripts/manage-local.py stop`.
+
+Database, volumi e rete del progetto `hostara-management` sono separati da QA.
+Home Assistant **non collegato** in questo ambiente: niente comandi agli impianti.
+Dettagli e limiti in [DEPLOYMENT.md](docs/DEPLOYMENT.md#gestionale-locale-separato-dai-test).
+
+## Development Quick Start
 
 ```bash
 docker compose up --build -d --wait
@@ -12,7 +32,8 @@ docker compose up --build -d --wait
 - API health via proxy: <http://localhost:8081/api/health>
 - Default login: `owner / owner123` — tenant `default`
 
-Stop: `docker compose down` · Full DB reset: `docker compose down -v`
+Stop: `docker compose down`. Never use `down -v` on data you need.
+This development stack is not the persistent management workspace above.
 
 Other modes (LAN publication, production/product deployment, ops profile with Prometheus/Grafana/backups): see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
@@ -25,12 +46,14 @@ To test the production bundle without touching villa data or devices:
 ```powershell
 npm ci --prefix apps/web
 npm exec --prefix apps/web -- playwright install chromium
-python scripts/verify-production.py --browser --keep
+python scripts/verify-production.py --browser
 ```
 
 Requires Docker Compose 2.24.4+ and Python 3.10+. The script prints a private
 test URL; login `verifier` / `Verification-only-local-password-2026`, tenant
-`default`. Without `--keep`, its disposable resources are removed automatically.
+`default`. Its disposable resources are removed automatically. Use `--keep`
+only to inspect QA failures: retained QA contains fake apartments and must never
+be used as the management workspace.
 Never aim this suite at a live database. Keep normal installation data by using
 `docker compose down` without `-v`.
 
